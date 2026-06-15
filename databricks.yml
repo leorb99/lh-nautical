@@ -10,8 +10,7 @@ include:
 # Variable declarations. These variables are assigned in the dev/prod targets below.
 variables:
   catalog_name:
-    description: "Catálogo dinâmico (pessoal em dev, oficial em prod)" #customizei aqui
-    default: "dev_${workspace.current_user.short_name}" #customizei aqui tb
+    description: "Catálogo de destino (pessoal em dev, oficial em prod)" #customizei aqui
 
 targets:
   dev:
@@ -24,9 +23,10 @@ targets:
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
     variables:
-      catalog_name: "dev_${workspace.current_user.short_name}" #customizei aqui tb
+      catalog_name: dev_gabriel_freitas_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
     presets:
       artifacts_dynamic_version: true
+
   prod:
     mode: production
     workspace:
