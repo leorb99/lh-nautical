@@ -1,1 +1,15 @@
-#vamos colocar as instruções do nosso pipeline aqui
+resources:
+  jobs:
+    job_schedule_ingestao:
+      name: "Execução da Ingestão de dados todos os dias"
+      schedule:
+        quartz_cron_expression: "0 5 16 * * ?"
+        timezone_id: "America/Sao_Paulo"
+        pause_status: "UNPAUSED"
+  
+      tasks:
+        - task_key: "tarefa_de_execucao_python"
+          notebook_task:
+            notebook_path: ../src/bronze/ingestao_jdbc.ipynb
+            base_parameters:
+              catalog_dev: dev_adriano_takata_lh_nautical.bronze
