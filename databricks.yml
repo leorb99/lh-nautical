@@ -12,17 +12,6 @@ variables:
   catalog_name:
     description: "Catálogo de destino (pessoal em dev, oficial em prod)" #customizei aqui
 
-resources:
-  jobs:
-    job_ingestion:
-      name: "Job - Ingestão DB SQL Server"
-      tasks:
-        - task_key: "tarefa_de_execucao_python"
-          notebook_task:
-            notebook_path: src/bronze/ingestao_jdbc.ipynb
-            base_parameters:
-              catalog_dev: dev_adriano_takata_lh_nautical.bronze
-
 targets:
   dev:
     # The default target uses 'mode: development' to create a development copy.
@@ -34,7 +23,7 @@ targets:
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
     variables:
-      catalog_name: dev_adriano_takata_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
+      catalog_name: dev_gabriel_freitas_lh_nautical.bronze #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
     presets:
       artifacts_dynamic_version: true
 
