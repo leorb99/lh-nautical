@@ -1,9 +1,9 @@
 resources:
   jobs:
     job_schedule_ingestao:
-      name: "Execução da Ingestão de dados todos os dias"
+      name: "Execução da Ingestão de dados" # Executar o Job todos os dias a 1 hora da manhã
       schedule:
-        quartz_cron_expression: "0 5 16 * * ?"
+        quartz_cron_expression: "0 0 1 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
   
