@@ -1,7 +1,7 @@
 resources:
   jobs:
     job_schedule_ingestao:
-      name: "Execução da Ingestão de dados" # Executar o Job todos os dias a 1 hora da manhã
+      name: "Execução da Ingestão de dados" # Executar o Job todos os dias a 1hora da manhã
       schedule:
         quartz_cron_expression: "0 0 1 * * ?"
         timezone_id: "America/Sao_Paulo"
