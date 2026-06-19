@@ -12,5 +12,5 @@ resources:
           notebook_task:
             notebook_path: ../src/bronze/ingestao_jdbc.ipynb
             base_parameters:
-              catalog_dev: dev_leonardo_barbosa_lh_nautical
+              catalog_dev: ${var.catalog_name}
               schema: bronze
