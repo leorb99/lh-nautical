@@ -11,6 +11,8 @@ include:
 variables:
   catalog_name:
     description: "Catálogo de destino (pessoal em dev, oficial em prod)" #customizei aqui
+  schema:
+    description: "Schema de destino"
 
 targets:
   dev:
@@ -23,7 +25,8 @@ targets:
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
     variables:
-      catalog_name: dev_gabriel_freitas_lh_nautical.bronze #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
+      catalog_name: dev_leonardo_barbosa_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
+      schema: bronze
     presets:
       artifacts_dynamic_version: true
 
@@ -35,6 +38,7 @@ targets:
       root_path: /Workspace/Users/gabriel.freitas@indicium.ai/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog_name: prod_lh_nautical #customizei aqui tb
+      schema: bronze
     permissions:
       - user_name: gabriel.freitas@indicium.ai
         level: CAN_MANAGE
