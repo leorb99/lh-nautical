@@ -1,4 +1,13 @@
-"""This file configures pytest, initializes Databricks Connect, and provides fixtures for Spark and loading test data."""
+"""
+Shared Pytest Configuration
+
+Defines reusable fixtures and utilities for automated validation of
+data ingestion pipelines.
+
+This configuration initializes Databricks Connect, provides Spark
+sessions for test execution, and centralizes resources required by
+the test suite.
+"""
 
 import os, sys, pathlib
 from contextlib import contextmanager
