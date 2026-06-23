@@ -37,7 +37,7 @@ targets:
       catalog_name: prod_lh_nautical #customizei aqui tb
     permissions:
       # Corrigido para service_principal_name para alinhar com o tipo do objeto no Databricks
-      - service_principal_name: sp-cicd-bitbucket-lh-nautical
+      - service_principal_name: d45477c2-9a5a-45e8-aa63-ac026acbeac3 #name: sp-cicd-bitbucket-lh-nautical
         level: CAN_MANAGE
       - group_name: users
-        level: CAN_MANAGE        
+        level: CAN_MANAGE_RUN
