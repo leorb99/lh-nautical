@@ -1,11 +1,18 @@
 resources:
   jobs:
     job_schedule_ingestao:
-      name: "Execução da Ingestão de dados" # Executar o Job todos os dias a 1hora da manhã
+      # Executar o Job todos os dias a 1hora da manhã
+      name: "Execução da Ingestão de dados" 
       schedule:
         quartz_cron_expression: "0 0 1 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
+
+      # Quando entrar no expect um e-mail é disparado nos e-mail cadastrados
+      email_notifications:
+        on_failure:
+          - "adriano.takata@indicium.ai"
+          #- "time-dados@suaempresa.com" # Pode colocar mais de um e-mail se quiser
   
       tasks:
         - task_key: "tarefa_de_execucao_python"
@@ -14,3 +21,4 @@ resources:
             base_parameters:
               catalog_dev: ${var.catalog_name}
               schema: bronze
+              numPartitions: "4"
