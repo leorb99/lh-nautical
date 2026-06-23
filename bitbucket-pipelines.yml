@@ -25,4 +25,4 @@ pipelines:
           trigger: automatic # Roda sozinho logo após o passo acima terminar
           script:
             - echo "Deploy validado com sucesso! Iniciando a limpeza do ambiente prod..."
-            - databricks bundle destroy -t prod
+            - databricks bundle destroy -t prod --auto-approve
