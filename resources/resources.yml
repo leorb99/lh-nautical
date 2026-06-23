@@ -14,3 +14,18 @@ resources:
             base_parameters:
               catalog_dev: ${var.catalog_name}
               schema: bronze
+  
+    job_autoloader_ingestao:
+      name: "Execução da Ingestão de Dados das Planilhas" # Executar o Job todos os dias a 1hora da manhã
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"
+        timezone_id: "America/Sao_Paulo"
+        pause_status: "UNPAUSED"
+  
+      tasks:
+        - task_key: "task_autoloader_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
+            base_parameters:
+              catalog_dev: ${var.catalog_name} 
+              schema: bronze
