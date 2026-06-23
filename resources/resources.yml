@@ -27,7 +27,7 @@ resources:
     job_autoloader_ingestao:
       name: "Execução da Ingestão de Dados das Planilhas" # Executar o Job todos os dias a 1hora da manhã
       schedule:
-        quartz_cron_expression: "0 0 4 * * ?"
+        quartz_cron_expression: "0 0 1 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
   
