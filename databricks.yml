@@ -1,4 +1,4 @@
-# This is a Databricks asset bundle definition for lh_nautical_project.
+# This is a Databricks asset bundle definition for lh_nautical_project. 
 # See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
 bundle:
   name: lh_nautical_project
