@@ -1,4 +1,4 @@
-# This is a Databricks asset bundle definition for lh_nautical_project.
+# This is a Databricks asset bundle definition for lh_nautical_project. 
 # See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
 bundle:
   name: lh_nautical_project
@@ -31,10 +31,13 @@ targets:
     mode: production
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
-      # We explicitly deploy to /Workspace/Users/gabriel.freitas@indicium.ai to make sure we only have a single copy.
-      root_path: /Workspace/Users/gabriel.freitas@indicium.ai/.bundle/${bundle.name}/${bundle.target}
+      # Mudei para a pasta Shared para que o Service Principal consiga gerenciar o deploy centralizado
+      root_path: /Workspace/Shared/bundles/${bundle.name}/${bundle.target}
     variables:
       catalog_name: prod_lh_nautical #customizei aqui tb
     permissions:
-      - user_name: gabriel.freitas@indicium.ai
+      # Corrigido para service_principal_name para alinhar com o tipo do objeto no Databricks
+      - service_principal_name: sp-cicd-bitbucket-lh-nautical
         level: CAN_MANAGE
+      - group_name: users
+        level: CAN_MANAGE        

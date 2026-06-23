@@ -19,7 +19,7 @@ resources:
           notebook_task:
             notebook_path: ../src/bronze/ingestao_jdbc.ipynb
             base_parameters:
-              catalog_dev: ${var.catalog_name}
+              catalog_name: ${var.catalog_name}
               schema: bronze
               numPartitions: "4"
 
@@ -36,5 +36,5 @@ resources:
           notebook_task:
             notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
             base_parameters:
-              catalog_dev: ${var.catalog_name} 
+              catalog_name: ${var.catalog_name} 
               schema: bronze

@@ -1,0 +1,28 @@
+image: ghcr.io/databricks/cli:0.298.0
+
+pipelines:
+  # Cenário A: Alguém abriu um Pull Request de 'develop' -> 'main' 
+  pull-requests:
+    main:
+      - step:
+          name: "Validação Estrutural do Bundle (Pré-Merge)"
+          script:
+            - echo "Iniciando checagem de sintaxe para o ambiente de produção..."
+            - databricks bundle validate -t prod
+
+  # Cenário B: O PR foi aprovado e o código foi mergeado na 'main'
+  branches:
+    main:
+      - step:
+          name: "Deploy Automatizado para Produção"
+          script:
+            - echo "PR aprovado! Realizando o deploy dos novos artefatos e Jobs..."
+            - databricks bundle deploy -t prod
+            
+      # PASSO TEMPORÁRIO: Remove tudo logo após o sucesso do deploy
+      - step:
+          name: "Limpeza de Segurança (Destroy PROD)"
+          trigger: automatic # Roda sozinho logo após o passo acima terminar
+          script:
+            - echo "Deploy validado com sucesso! Iniciando a limpeza do ambiente prod..."
+            - databricks bundle destroy -t prod
