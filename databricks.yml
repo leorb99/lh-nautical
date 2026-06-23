@@ -40,4 +40,4 @@ targets:
       - service_principal_name: d45477c2-9a5a-45e8-aa63-ac026acbeac3 #name: sp-cicd-bitbucket-lh-nautical
         level: CAN_MANAGE
       - group_name: users
-        level: CAN_MANAGE_RUN
+        level: CAN_RUN
