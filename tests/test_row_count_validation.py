@@ -20,35 +20,29 @@ A ausência de registos pode indicar:
 - Falhas de permissões
 - Problemas na escrita para a camada Bronze
 
-Escopo deste teste
-------------------
-Esta validação verifica apenas se as tabelas contêm pelo
-menos um registo após a execução da ingestão.
+Escopo
+-------
+Este teste valida que todas as tabelas esperadas da camada
+Bronze foram carregadas com pelo menos um registo após a
+execução da ingestão.
 
-O teste não realiza reconciliação entre a origem e a Bronze,
-nem valida a completude dos dados carregados.
-
-Disclaimer Técnico
-------------------
-Esta validação atua como uma verificação inicial de
-disponibilidade dos dados na camada Bronze.
-
-Uma reconciliação completa entre os sistemas de origem e
-a camada Bronze deverá ser implementada futuramente quando
-existir acesso automatizado às métricas e contagens da
-fonte de dados.
-
-A existência de registos não garante, por si só, que a
-carga esteja completa ou que todos os dados esperados
-tenham sido processados.
+Esta verificação assegura a disponibilidade inicial dos
+dados e complementa as demais validações de qualidade,
+como integridade, idempotência e consistência estrutural.
 """
+
 import pytest
 
+# Define o catálogo utilizado durante a execução dos testes.
 CATALOG = "dev_natalia_correia_lh_nautical"
+
+# Define o schema correspondente à camada Bronze.
 SCHEMA = "bronze"
+
+# Constrói o caminho completo utilizado nas consultas Spark SQL.
 CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
 
-# Tabelas esperadas na camada Bronze
+# Lista das tabelas que devem conter dados após a ingestão.
 BRONZE_TABLES = [
     "addresses",
     "attributes",
@@ -77,16 +71,20 @@ BRONZE_TABLES = [
 ]
 
 
+# Executa o mesmo teste para cada tabela esperada da camada Bronze.
 @pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
 def test_tabela_bronze_tem_registos(spark, nome_tabela):
     """
     Valida se a tabela contém pelo menos um registo.
     """
 
+    # Lê a tabela correspondente na camada Bronze.
     df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
 
+    # Obtém a quantidade total de registos presentes na tabela.
     quantidade_registos = df.count()
 
+    # Falha o teste caso a tabela esteja vazia.
     assert quantidade_registos > 0, (
         f"Falha na validação de disponibilidade: "
         f"a tabela {nome_tabela} não contém registos."

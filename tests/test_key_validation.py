@@ -3,8 +3,8 @@ CP2 - Testes de Validação de Chaves da Camada Bronze
 
 Objetivo
 --------
-Validar a integridade mínima das chaves primárias simples
-nas tabelas da camada Bronze.
+Validar a integridade mínima das chaves primárias nas tabelas
+da camada Bronze.
 
 Importância
 -----------
@@ -20,94 +20,112 @@ A presença de valores nulos ou duplicados pode provocar:
 - Problemas de modelação dimensional
 - Resultados incorretos em análises e relatórios
 
-Escopo deste teste
-------------------
+Escopo
+------
 Esta validação verifica:
 
 - Ausência de valores nulos na coluna "id"
 - Ausência de valores duplicados na coluna "id"
 
-O teste aplica-se apenas às tabelas que utilizam uma chave
-primária simples baseada na coluna "id".
+As tabelas com chave primária composta permanecem incluídas
+na suíte, mas são marcadas como xfail porque não possuem uma
+chave primária simples baseada na coluna "id".
 
-Disclaimer Técnico
-------------------
-As tabelas "product_suppliers", "stock_levels" e
-"variant_attribute_values" foram excluídas desta validação
-por potencialmente utilizarem chaves compostas em vez de uma
-chave primária simples ("id").
-
-O mapeamento definitivo das chaves de negócio e dos
-relacionamentos será realizado durante a modelação da
-camada Silver (CP3).
-
-A eventual implementação de validações de unicidade para
-essas entidades deverá considerar a combinação correta
-dos atributos que compõem a chave de negócio.
+Essa abordagem evita maquiar a cobertura do teste e documenta
+explicitamente quais tabelas exigem validações específicas
+durante a modelação da camada Silver (CP3).
 """
 
 import pytest
 
+# Define o catálogo utilizado durante a execução dos testes.
 CATALOG = "dev_natalia_correia_lh_nautical"
+
+# Define o schema correspondente à camada Bronze.
 SCHEMA = "bronze"
+
+# Constrói o caminho completo utilizado nas consultas Spark SQL.
 CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
 
-# Tabelas com chave primária simples na coluna "id"
-TABLES_WITH_ID = [
-    "addresses",
-    "attributes",
-    "brands",
-    "categories",
-    "customers",
-    "employees",
-    "fiscal_invoices",
-    "goods_receipt_items",
-    "goods_receipts",
-    "locations",
-    "order_items",
-    "orders",
-    "payments",
-    "product_variants",
-    "products",
-    "purchase_order_items",
-    "purchase_orders",
-    "return_items",
-    "returns",
-    "stock_movements",
-    "suppliers",
+# Tabelas esperadas na camada Bronze e respetiva estratégia de validação.
+BRONZE_TABLES = [
+    pytest.param("addresses"),
+    pytest.param("attributes"),
+    pytest.param("brands"),
+    pytest.param("categories"),
+    pytest.param("customers"),
+    pytest.param("employees"),
+    pytest.param("fiscal_invoices"),
+    pytest.param("goods_receipt_items"),
+    pytest.param("goods_receipts"),
+    pytest.param("locations"),
+    pytest.param("order_items"),
+    pytest.param("orders"),
+    pytest.param("payments"),
+    pytest.param(
+        "product_suppliers",
+        marks=pytest.mark.xfail(
+            reason="Tabela possui chave primária composta: product_variant_id + supplier_id"
+        ),
+    ),
+    pytest.param("product_variants"),
+    pytest.param("products"),
+    pytest.param("purchase_order_items"),
+    pytest.param("purchase_orders"),
+    pytest.param("return_items"),
+    pytest.param("returns"),
+    pytest.param(
+        "stock_levels",
+        marks=pytest.mark.xfail(
+            reason="Tabela possui chave primária composta: location_id + product_variant_id"
+        ),
+    ),
+    pytest.param("stock_movements"),
+    pytest.param("suppliers"),
+    pytest.param(
+        "variant_attribute_values",
+        marks=pytest.mark.xfail(
+            reason="Tabela possui chave primária composta: attribute_id + product_variant_id"
+        ),
+    ),
 ]
 
 
-@pytest.mark.parametrize("table_name", TABLES_WITH_ID)
-def test_id_not_null(spark, table_name):
+@pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
+def test_id_not_null(spark, nome_tabela):
     """Valida a inexistência de valores nulos na coluna 'id'."""
 
-    df = spark.table(f"{CATALOG_SCHEMA}.{table_name}")
+    # Lê a tabela correspondente na camada Bronze.
+    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
 
-    null_count = df.filter("id IS NULL").count()
+    # Conta quantos registos possuem valor nulo na coluna "id".
+    quantidade_nulos = df.filter("id IS NULL").count()
 
-    assert null_count == 0, (
+    # Falha o teste caso exista qualquer valor nulo na chave primária simples.
+    assert quantidade_nulos == 0, (
         f"Falha na validação de chave primária: a tabela "
-        f"{table_name} possui {null_count} valores nulos na coluna 'id'."
+        f"{nome_tabela} possui {quantidade_nulos} valores nulos na coluna 'id'."
     )
 
 
-@pytest.mark.parametrize("table_name", TABLES_WITH_ID)
-def test_id_unique(spark, table_name):
+@pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
+def test_id_unique(spark, nome_tabela):
     """Valida a inexistência de valores duplicados na coluna 'id'."""
 
-    df = spark.table(f"{CATALOG_SCHEMA}.{table_name}")
+    # Lê a tabela correspondente na camada Bronze.
+    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
 
-    duplicate_count = (
+    # Conta quantos valores de "id" aparecem mais de uma vez na tabela.
+    quantidade_duplicados = (
         df.groupBy("id")
         .count()
         .filter("count > 1")
         .count()
     )
 
-    assert duplicate_count == 0, (
+    # Falha o teste caso exista qualquer chave primária simples duplicada.
+    assert quantidade_duplicados == 0, (
         f"Falha na validação de unicidade: a tabela "
-        f"{table_name} possui {duplicate_count} valores duplicados "
+        f"{nome_tabela} possui {quantidade_duplicados} valores duplicados "
         f"na coluna 'id'."
     )
-
