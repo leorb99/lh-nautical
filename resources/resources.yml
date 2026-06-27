@@ -25,6 +25,8 @@ resources:
               numPartitions: "4"
 
         - task_key: "autoloader_ingestao"
+          depends_on:
+            - task_key: "jdbc_ingestao"
           notebook_task:
             notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
             base_parameters:
