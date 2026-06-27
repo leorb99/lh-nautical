@@ -33,15 +33,6 @@ como integridade, idempotência e consistência estrutural.
 
 import pytest
 
-# Define o catálogo utilizado durante a execução dos testes.
-CATALOG = "dev_natalia_correia_lh_nautical"
-
-# Define o schema correspondente à camada Bronze.
-SCHEMA = "bronze"
-
-# Constrói o caminho completo utilizado nas consultas Spark SQL.
-CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
-
 # Lista das tabelas que devem conter dados após a ingestão.
 BRONZE_TABLES = [
     "addresses",
@@ -73,13 +64,17 @@ BRONZE_TABLES = [
 
 # Executa o mesmo teste para cada tabela esperada da camada Bronze.
 @pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
-def test_tabela_bronze_tem_registos(spark, nome_tabela):
+def test_tabela_bronze_tem_registos(
+    spark,
+    catalog_schema,
+    nome_tabela,
+):
     """
     Valida se a tabela contém pelo menos um registo.
     """
 
     # Lê a tabela correspondente na camada Bronze.
-    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
+    df = spark.table(f"{catalog_schema}.{nome_tabela}")
 
     # Obtém a quantidade total de registos presentes na tabela.
     quantidade_registos = df.count()
