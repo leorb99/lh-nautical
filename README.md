@@ -60,3 +60,107 @@ with this project. It's also possible to interact with it directly using the CLI
    ```
    $ uv run pytest
    ```
+
+# Pipeline de Ingestão de Dados via JDBC (SQL Server - Delta Lake)
+
+## Visão Geral
+Este ingestão de dados foi desenvolvido em **PySpark** no Databricks. Ele foi desenhado para automatizar a extração de tabelas de um banco de dados relacional (SQL Server) e carregá-las no **Data Lake** (Delta Lake integrado ao Unity Catalog).
+
+O grande diferencial tecnológico deste script é a implementação de um **CDC Lógico baseado em Hashing** combinado com o **Time Travel do Delta**, garantindo ingestões incrementais de alta performance e baixo consumo de memória (I/O otimizado).
+
+---
+
+## Arquitetura e Fluxo de Dados
+
+O pipeline segue um padrão de **EL (Extract and Load)** para a camada *Bronze/Staging*, atuando de forma genérica para suportar dezenas de tabelas dinamicamente.
+
+### 1. Descoberta Dinâmica de Tabelas
+O código não possui uma lista fixa (hardcoded) de tabelas. Ele inicia consultando o `information_schema.tables` diretamente no SQL Server de origem. 
+* Captura dinamicamente apenas tabelas do tipo `Base table` pertencentes ao schema `dbo`.
+* Se uma nova tabela for criada no ERP/Banco Transacional, ela será automaticamente capturada na próxima execução, sem necessidade de deploy de código.
+
+### 2. Leitura Particionada e Paralelizada
+Ler grandes volumes de dados via JDBC em uma única thread causa gargalos. O pipeline resolve isso com a função `consulta_tabela_jdbc`.
+* Se uma chave de particionamento for definida, o Spark dispara uma query rápida na origem utilizando `MIN()` e `MAX()`.
+* Usando esses limites e o parâmetro `numPartitions`, o Spark divide a leitura em múltiplas queries concorrentes, acelerando drasticamente o processo.
+
+### 3. CDC Hashing e Time Travel
+Ao invés de realizar updates lentos ou ler a tabela inteira do destino para comparar, a função `ingestao_incremental_hash` faz o seguinte:
+* **Na Origem:** Gera um Hash MD5 da linha inteira. Utiliza a função `coalesce` para garantir que valores nulos não quebrem a geração do Hash, e concatena tudo com o separador `||`.
+* **No Destino (Delta):** Descobre a última versão da tabela com `DESCRIBE HISTORY` e carrega para a memória **apenas** a coluna `_hash` dessa versão específica usando a option `versionAsOf`.
+* **O Join:** Executa um `left_anti` join. O Spark compara as origens e mantém apenas os Hashes que são novos ou sofreram alterações (I/O mínimo). 
+
+---
+
+## Pré-requisitos e Setup do Ambiente
+
+### 1. Databricks Secrets (Credenciais)
+As credenciais do banco nunca ficam expostas no código. O Databricks deve ter um *Secret Scope* configurado com as seguintes chaves:
+* **Escopo:** `databases_lh_nautical`
+* **Chaves Necessárias:** `sql_server_user`, `sql_server_password`, `sql_server_host`, `sql_server_port`.
+
+*Nota:* A string de conexão JDBC aponta fixamente para o banco de dados `lh_nautical` e utiliza o driver `com.microsoft.sqlserver.jdbc.SQLServerDriver`.
+
+### 2. Parâmetros de Orquestração (Widgets)
+O código consome variáveis em tempo de execução via `dbutils.widgets.get`. Esses parâmetros devem ser passados pelo orquestrador:
+* `catalog_name`: Nome do catálogo no Unity Catalog.
+* `schema`: Nome do banco/schema de destino.
+* `numPartitions`: Valor determinando a concorrência do JDBC.
+
+---
+
+## Mergulho Técnico nas Funções Principais
+
+### 1. `consulta_tabela_jdbc`
+Responsável por estabelecer a conexão e extrair os dados, aplicando paralelização quando aplicável.
+
+**Como funciona sob o capô:**
+1. **Avaliação de Paralelismo:** Checa se uma `coluna_referencia_paralelizacao` foi informada. Se não for (`None`), faz uma leitura JDBC sequencial.
+2. **Descoberta de Limites (Bounds):** Se informada, o Spark envia uma subquery leve para a origem: `SELECT MIN(coluna), MAX(coluna)`.
+3. **Leitura Distribuída:** Os valores extraídos são passados para `lowerBound` e `upperBound` do conector JDBC.
+4. **Fatiamento:** O Spark divide o intervalo e dispara múltiplas queries simultâneas para o SQL Server com base no `numPartitions`.
+
+### 2. `ingestao_incremental_hash`
+O coração lógico do pipeline que decide se os dados devem ser sobrescritos ou apensados.
+
+**Árvore de Decisão de Gravação:**
+* **Cenário A (Carga Inicial):** Verifica se a tabela de destino existe. Se não existir, adiciona as colunas `_ingested_at` e `_action` e retorna a instrução `"overwrite"`.
+* **Cenário B (Tabela Legada - Sem Hash):** Se a tabela existir mas não possuir a coluna `_hash`, recria a tabela do zero injetando data/hora (`_ingested_at`) e a flag `"CARGA_INICIAL"` (`_action`) e retorna `"overwrite"` para atualização segura do schema.
+* **Cenário C (Ingestão Incremental via CDC):** * Busca a última versão via `DESCRIBE HISTORY`.
+  * Lê o Data Lake trazendo apenas a coluna `_hash` usando `versionAsOf`.
+  * Faz o `left_anti` join para isolar novos registros ou updates.
+  * Se houver alterações, injeta data/hora (`_ingested_at`) e a flag `"INSERT_OU_UPDATE"` (`_action`) e retorna `"append"`. Caso contrário, retorna `None, None`, poi não houver alterações.
+
+---
+
+## Regras de Negócio e Estratégia de Tabelas
+
+Durante a iteração, o script aplica regras para decidir **como** cada tabela deve ser lida:
+
+| Tabela(s) | Chave de Partição | Comportamento Explicado |
+| :--- | :--- | :--- |
+| `variant_attribute_values` | *Nenhuma* | Tabela não mapeada com chave confiável. Roda sequencialmente (sem paralelismo). |
+| `product_suppliers`, `stock_levels` | `updated_at` | Usa a coluna de data de atualização para criar as fatias particionadas. |
+| **Demais Tabelas** | `id` | Comportamento padrão. Utiliza a chave primária sequencial `id` da tabela. |
+
+---
+
+## Metadados Injetados (Auditoria)
+
+As tabelas salvas no Delta Lake contêm colunas extras fundamentais para rastreabilidade:
+
+* **`_hash`** `[String]`: A assinatura MD5 dos dados. Usada puramente para performance na detecção de mudanças futuras.
+* **`_ingested_at`** `[String]`: Registra o momento da inserção no formato `yyyy-MM-dd HH:mm:ss`.
+* **`_action`** `[String]`: Flag indicando o motivo da entrada na base. 
+  * `CARGA_INICIAL`: Ocorreu porque a tabela era nova ou teve seu schema legado atualizado.
+  * `INSERT_OU_UPDATE`: Apenas deltas foram inseridos através do CDC.
+
+---
+
+## Monitoramento e Tratamento de Erros
+
+O script adota uma postura focada em resiliência e propagação de alertas:
+1. Ele encapsula o processamento em blocos `try-except` monitorando `Py4JJavaError`, `PySparkException` e erros gerais.
+2. Se uma tabela falha (ex: erro de JDBC ou schema), o erro é logado e o nome da tabela é adicionado à lista `tabelas_com_erro`.
+3. O laço de repetição continua (`continue`) processando as tabelas restantes para não paralisar toda a carga por causa de um único erro.
+4. **Alerta Final:** Ao término, se a lista `tabelas_com_erro` contiver itens, o pipeline aciona um `raise Exception`, falhando intencionalmente a célula final. Isso garante que a ferramenta de orquestração marque o job como "Failed" e a equipe de engenharia seja alertada.
