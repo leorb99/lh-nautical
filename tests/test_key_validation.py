@@ -38,15 +38,6 @@ durante a modelação da camada Silver (CP3).
 
 import pytest
 
-# Define o catálogo utilizado durante a execução dos testes.
-CATALOG = "dev_natalia_correia_lh_nautical"
-
-# Define o schema correspondente à camada Bronze.
-SCHEMA = "bronze"
-
-# Constrói o caminho completo utilizado nas consultas Spark SQL.
-CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
-
 # Tabelas esperadas na camada Bronze e respetiva estratégia de validação.
 BRONZE_TABLES = [
     pytest.param("addresses"),
@@ -92,11 +83,11 @@ BRONZE_TABLES = [
 
 
 @pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
-def test_id_not_null(spark, nome_tabela):
+def test_id_not_null(spark, catalog_schema, nome_tabela):
     """Valida a inexistência de valores nulos na coluna 'id'."""
 
     # Lê a tabela correspondente na camada Bronze.
-    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
+    df = spark.table(f"{catalog_schema}.{nome_tabela}")
 
     # Conta quantos registos possuem valor nulo na coluna "id".
     quantidade_nulos = df.filter("id IS NULL").count()
@@ -109,11 +100,11 @@ def test_id_not_null(spark, nome_tabela):
 
 
 @pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
-def test_id_unique(spark, nome_tabela):
+def test_id_unique(spark, catalog_schema, nome_tabela):
     """Valida a inexistência de valores duplicados na coluna 'id'."""
 
     # Lê a tabela correspondente na camada Bronze.
-    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
+    df = spark.table(f"{catalog_schema}.{nome_tabela}")
 
     # Conta quantos valores de "id" aparecem mais de uma vez na tabela.
     quantidade_duplicados = (

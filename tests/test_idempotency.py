@@ -39,15 +39,6 @@ durante a modelação da camada Silver (CP3).
 
 import pytest
 
-# Define o catálogo utilizado durante a execução dos testes.
-CATALOG = "dev_natalia_correia_lh_nautical"
-
-# Define o schema correspondente à camada Bronze.
-SCHEMA = "bronze"
-
-# Constrói o caminho completo utilizado nas consultas Spark SQL.
-CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
-
 # Tabelas esperadas na camada Bronze e respetiva estratégia de validação.
 BRONZE_TABLES = [
     pytest.param("addresses"),
@@ -94,13 +85,13 @@ BRONZE_TABLES = [
 
 # Executa o mesmo teste para cada tabela esperada da camada Bronze.
 @pytest.mark.parametrize("nome_tabela", BRONZE_TABLES)
-def test_pipeline_idempotente_por_chave_primaria(spark, nome_tabela):
+def test_pipeline_idempotente_por_chave_primaria(spark, catalog_schema, nome_tabela):
     """
     Valida a inexistência de chaves primárias simples duplicadas.
     """
 
     # Lê a tabela correspondente na camada Bronze.
-    df = spark.table(f"{CATALOG_SCHEMA}.{nome_tabela}")
+    df = spark.table(f"{catalog_schema}.{nome_tabela}")
 
     # Conta quantos valores de "id" aparecem mais de uma vez na tabela.
     quantidade_duplicados = (

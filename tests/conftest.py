@@ -18,7 +18,7 @@ except ImportError:
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def spark() -> SparkSession:
     """Provide a SparkSession fixture for tests.
 
@@ -28,6 +28,23 @@ def spark() -> SparkSession:
             assert df.count() == 1
     """
     return DatabricksSession.builder.getOrCreate()
+
+
+@pytest.fixture(scope="session")
+def catalog_name() -> str:
+    """Retorna o catalog ativo, lido da variável de ambiente injetada pelo job."""
+    catalog = os.environ.get("DATABRICKS_CATALOG")
+    if catalog is None:
+        raise ValueError(
+            "Variável DATABRICKS_CATALOG não definida. "
+            "Rode via job ou passe --catalog no run_tests.py."
+        )
+    return catalog
+
+@pytest.fixture(scope="session")
+def catalog_schema(catalog_name: str) -> str:
+    """Retorna o catalog.schema completo para uso nos testes."""
+    return f"{catalog_name}.bronze"
 
 
 @pytest.fixture()
