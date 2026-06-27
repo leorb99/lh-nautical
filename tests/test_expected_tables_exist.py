@@ -22,15 +22,6 @@ A ausência de qualquer tabela pode indicar:
 Este teste atua como uma validação estrutural da camada Bronze.
 """
 
-# Define o catálogo utilizado durante a execução dos testes.
-CATALOG = "dev_natalia_correia_lh_nautical"
-
-# Define o schema correspondente à camada Bronze.
-SCHEMA = "bronze"
-
-# Constrói o caminho completo utilizado nas consultas Spark SQL.
-CATALOG_SCHEMA = f"{CATALOG}.{SCHEMA}"
-
 # Lista das tabelas que devem existir após a ingestão completa.
 EXPECTED_TABLES = [
     "addresses",
@@ -60,7 +51,10 @@ EXPECTED_TABLES = [
 ]
 
 
-def test_todas_as_tabelas_esperadas_existem_na_bronze(spark):
+def test_todas_as_tabelas_esperadas_existem_na_bronze(
+    spark,
+    catalog_schema,
+):
     """
     Valida se todas as tabelas esperadas existem na camada Bronze.
     """
@@ -69,7 +63,7 @@ def test_todas_as_tabelas_esperadas_existem_na_bronze(spark):
     tabelas_existentes = [
         row.tableName
         for row in spark.sql(
-            f"SHOW TABLES IN {CATALOG_SCHEMA}"
+            f"SHOW TABLES IN {catalog_schema}"
         ).collect()
     ]
 
@@ -82,7 +76,6 @@ def test_todas_as_tabelas_esperadas_existem_na_bronze(spark):
 
     # Falha o teste caso exista qualquer tabela ausente.
     assert len(tabelas_ausentes) == 0, (
-        f"As seguintes tabelas não foram encontradas na Bronze: "
+        "As seguintes tabelas não foram encontradas na camada Bronze: "
         f"{', '.join(tabelas_ausentes)}"
     )
-    
