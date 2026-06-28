@@ -25,7 +25,7 @@ except ImportError:
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def spark() -> SparkSession:
     """
     Disponibiliza uma sessão Spark para execução dos testes.

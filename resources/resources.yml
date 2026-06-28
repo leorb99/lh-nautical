@@ -1,8 +1,8 @@
 resources:
   jobs:
-    job_schedule_ingestao:
-      # Executar o Job todos os dias a 1hora da manhã
-      name: "Execução da Ingestão de dados" 
+    job_ingestao_completa:
+      name: "Ingestão Completa (JDBC + Autoloader)" 
+      # Executar o Job todos os dias a 1h da manhã
       schedule:
         quartz_cron_expression: "0 0 1 * * ?"
         timezone_id: "America/Sao_Paulo"
@@ -11,11 +11,12 @@ resources:
       # Quando entrar no expect um e-mail é disparado nos e-mail cadastrados
       email_notifications:
         on_failure:
-          - "adriano.takata@indicium.ai"
+          #- "adriano.takata@indicium.ai"
+          - "gabriel.freitas@indicium.ai"
           #- "time-dados@suaempresa.com" # Pode colocar mais de um e-mail se quiser
   
       tasks:
-        - task_key: "tarefa_de_execucao_python"
+        - task_key: "jdbc_ingestao"
           notebook_task:
             notebook_path: ../src/bronze/ingestao_jdbc.ipynb
             base_parameters:
@@ -23,18 +24,29 @@ resources:
               schema: bronze
               numPartitions: "4"
 
-  
-    job_autoloader_ingestao:
-      name: "Execução da Ingestão de Dados das Planilhas" # Executar o Job todos os dias a 1hora da manhã
-      schedule:
-        quartz_cron_expression: "0 0 1 * * ?"
-        timezone_id: "America/Sao_Paulo"
-        pause_status: "UNPAUSED"
-  
-      tasks:
-        - task_key: "task_autoloader_ingestao"
+        - task_key: "autoloader_ingestao"
+          depends_on:
+            - task_key: "jdbc_ingestao"
           notebook_task:
             notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
             base_parameters:
               catalog_name: ${var.catalog_name} 
               schema: bronze
+
+        - task_key: "testes_ingestao"
+          depends_on:
+            - task_key: "jdbc_ingestao"
+            - task_key: "autoloader_ingestao"
+          environment_key: default
+          spark_python_task:
+            python_file: ../tests/run_tests.py
+            parameters:
+              - "--catalog"
+              - ${var.catalog_name}
+
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - pytest
