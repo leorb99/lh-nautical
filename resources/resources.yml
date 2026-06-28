@@ -11,8 +11,10 @@ resources:
       # Quando entrar no expect um e-mail é disparado nos e-mail cadastrados
       email_notifications:
         on_failure:
-          #- "adriano.takata@indicium.ai"
+          - "adriano.takata@indicium.ai"
           - "gabriel.freitas@indicium.ai"
+          - "natalia.correia@indicium.ai"
+          - "leonardo.barbosa@indicium.ai"
           #- "time-dados@suaempresa.com" # Pode colocar mais de um e-mail se quiser
   
       tasks:
@@ -35,7 +37,6 @@ resources:
 
         - task_key: "testes_ingestao"
           depends_on:
-            - task_key: "jdbc_ingestao"
             - task_key: "autoloader_ingestao"
           environment_key: default
           spark_python_task:
