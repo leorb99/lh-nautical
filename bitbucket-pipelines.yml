@@ -18,11 +18,3 @@ pipelines:
           script:
             - echo "PR aprovado! Realizando o deploy dos novos artefatos e Jobs..."
             - databricks bundle deploy -t prod
-            
-      # PASSO TEMPORÁRIO: Remove tudo logo após o sucesso do deploy
-      - step:
-          name: "Limpeza de Segurança (Destroy PROD)"
-          trigger: automatic # Roda sozinho logo após o passo acima terminar
-          script:
-            - echo "Deploy validado com sucesso! Iniciando a limpeza do ambiente prod..."
-            - databricks bundle destroy -t prod --auto-approve
