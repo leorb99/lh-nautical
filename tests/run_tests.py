@@ -2,7 +2,7 @@
 Ponto de entrada para execução dos testes via Databricks Job.
 Lê o catalog passado pelo resources.yml via parameters como argumento de linha de comando e o injeta
 como variável de ambiente antes de invocar o pytest (injeta em os.environ para que o conftest.py consiga
-ler via os.environ.get("DATABRICKS_CATALOG"))
+ler via os.environ.get("CATALOG"))
 """
 import argparse
 import os
@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--catalog", required=True, help="Catalog ativo do ambiente")
 args = parser.parse_args()
 
-os.environ["DATABRICKS_CATALOG"] = args.catalog
+os.environ["CATALOG"] = args.catalog
 
 exit_code = pytest.main([
     ".",
