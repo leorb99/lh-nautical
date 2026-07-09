@@ -22,6 +22,12 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+# Isso é o que permite {{ var('catalog_name') }} funcionar dentro dos 
+# models/sources. O valor aqui é só um fallback pra quando alguém rodar dbt run
+# local sem passar --vars explicitamente; em produção/CI, 
+# o valor real vem do ${var.catalog_name} do bundle propagado via --vars na task.
+vars:
+  catalog_name: "REQUIRED_PASS_VIA_VARS"
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
@@ -32,5 +38,19 @@ clean-targets:         # directories to be removed by `dbt clean`
 models:
   dbt_lh_nautical:
     # Config indicated by + and applies to all files under models/example/
-    example:
+    staging:
       +materialized: view
+      +schema: silver
+    intermediate:
+      +materialized: view
+      +schema: silver
+    marts:
+      dimension:
+        +materialized: table
+        +schema: gold
+      fact:
+        +materialized: table
+        +schema: gold
+      aggregation:
+        +materialized: table
+        +schema: gold
