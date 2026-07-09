@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: bronze
-    database: "{{ var('catalog_name') }}"
+    database: "{{ env_var('DBT_CATALOG_NAME') }}"
     schema: bronze
     tables:
       - name: addresses
