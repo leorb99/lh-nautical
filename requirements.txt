@@ -1,3 +1,13 @@
+# Project core:
+databricks-connect==18.2.2
+dbt-databricks==1.12.1
+
+# Version constraints: 
+#dbt-databricks 1.12.x depends on sdk < 0.105.0
+databricks-sdk>=0.100.0,<0.105.0
+#databricks-connect 18.2.2 depends on packaging>=23.2 and dbt-databricks 1.12.1 depends on packaging<26.0 and >=21.0
+packaging>=23.2,<26.0
+
 asttokens==3.0.1
 attrs==26.1.0
 certifi==2026.6.17
@@ -5,8 +15,6 @@ cffi==2.0.0
 charset-normalizer==3.4.7
 comm==0.2.3
 cryptography==49.0.0
-databricks-connect==18.2.2
-databricks-sdk==0.117.0
 debugpy==1.8.21
 decorator==5.3.1
 executing==2.2.1
@@ -31,7 +39,6 @@ matplotlib-inline==0.2.2
 nbformat==5.10.4
 nest-asyncio2==1.7.2
 numpy==2.4.6
-packaging==26.2
 pandas==2.3.3
 parso==0.8.7
 pexpect==4.9.0
