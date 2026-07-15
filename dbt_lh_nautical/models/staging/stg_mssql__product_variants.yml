@@ -1,0 +1,78 @@
+models:
+  - name: stg_mssql__product_variants
+    description: >
+      Staging model for product variants. This model standardizes raw variant-level data,
+      including SKU, pricing, taxation, and activation status for downstream analytics.
+
+    columns:
+      - name: product_variant_id
+        description: "Primary key for the product variant."
+        tests:
+          - unique
+          - not_null
+      
+      - name: product_id
+        description: "Foreign key to the parent product master record."
+        tests:
+          - not_null
+          - relationships:
+              field: product_id
+              to: ref('stg_mssql__products')
+      
+      - name: product_variant_sku
+        description: "SKU code for the product variant."
+        tests:
+          - not_null
+      
+      - name: barcode_ean
+        description: "EAN barcode for the product variant."
+      
+      - name: sale_price
+        description: "Sale price for the product variant."
+        tests:
+          - not_null
+      
+      - name: cost_price
+        description: "Cost price for the product variant."
+      
+      - name: weight_kg
+        description: "Weight of the product variant in kilograms."
+      
+      - name: icms_rate
+        description: "ICMS tax rate applied to the product variant."
+      
+      - name: ipi_rate
+        description: "IPI tax rate applied to the product variant."
+      
+      - name: is_prod_var_active
+        description: "Boolean flag that indicates whether the product variant is active."
+        tests:
+          - not_null
+      
+      - name: created_at
+        description: "Timestamp when the product variant record was created in the source system."
+        tests:
+          - not_null
+      
+      - name: updated_at
+        description: "Timestamp when the product variant record was last updated in the source system."
+        tests:
+          - not_null
+      
+      - name: _hash
+        description: "MD5/SHA hash of the record used for deduplication or change tracking."
+        tests:
+          - not_null
+      
+      - name: _ingested_at
+        description: "Timestamp when the data was ingested into the Bronze layer."
+        tests:
+          - not_null
+      
+      - name: _action
+        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true
