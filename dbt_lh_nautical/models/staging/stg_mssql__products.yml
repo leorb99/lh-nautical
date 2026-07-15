@@ -1,0 +1,81 @@
+models:
+  - name: stg_mssql__products
+    description: >
+      Staging model for products. This model cleans and standardizes the raw product data
+      from the e-commerce system, including descriptive, classification, and CDC metadata.
+    
+    columns:
+      - name: product_id
+        description: "Primary key of the product."
+        tests:
+          - unique
+          - not_null
+      
+      - name: product_name
+        description: "The product name."
+        tests:
+          - not_null
+      
+      - name: product_description
+        description: "The product description."
+      
+      - name: brand_id
+        description: "Foreign key to the product brand."
+        tests:
+          - not_null
+          - relationships:
+              field: brand_id
+              to: ref('stg_mssql__brands')
+
+      - name: category_id
+        description: "Foreign key to the product category."
+        tests:
+          - not_null
+          - relationships:
+              field: category_id
+              to: ref('stg_mssql__categories')
+      
+      - name: ncm_code
+        description: "NCM classification code for the product."
+        tests:
+          - not_null
+      
+      - name: unit_of_mesuare
+        description: "Unit of measure for the product (e.g., L, M, PC, UN)."
+        tests:
+          - accepted_values:
+              values: ['L', 'M', 'PC', 'UN']
+              quote: true
+      
+      - name: is_prod_active
+        description: "Boolean flag that indicates whether the product is active."
+        tests:
+          - not_null
+      
+      - name: created_at
+        description: "Timestamp when the product record was created in the source system."
+        tests:
+          - not_null
+      
+      - name: updated_at
+        description: "Timestamp when the product record was last updated in the source system."
+        tests:
+          - not_null
+
+      - name: _hash
+        description: "MD5/SHA hash of the record used for deduplication or change tracking."
+        tests:
+          - not_null
+      
+      - name: _ingested_at
+        description: "Timestamp when the data was ingested into the Bronze layer."
+        tests:
+          - not_null
+      
+      - name: _action
+        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true
