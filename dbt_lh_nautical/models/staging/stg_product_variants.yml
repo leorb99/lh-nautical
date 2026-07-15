@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__product_variants
+  - name: stg_product_variants
     description: >
       Staging model for product variants. This model standardizes raw variant-level data,
       including SKU, pricing, taxation, and activation status for downstream analytics.
@@ -17,7 +17,7 @@ models:
           - not_null
           - relationships:
               field: product_id
-              to: ref('stg_mssql__products')
+              to: ref('stg_products')
       
       - name: product_variant_sku
         description: "SKU code for the product variant."

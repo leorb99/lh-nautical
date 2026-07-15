@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__purchase_orders
+  - name: stg_purchase_orders
     description: >
       Staging model for purchase orders. This model cleans and standardizes the raw 
       purchase order data, including financial totals, supplier references, and 
@@ -24,7 +24,7 @@ models:
           - not_null
           - relationships:
               field: supplier_id
-              to: ref('stg_mssql__suppliers')
+              to: ref('stg_suppliers')
 
       - name: buyer_id
         description: "Foreign key pointing to the employee/buyer who placed the order."
@@ -37,7 +37,7 @@ models:
           - not_null
           - relationships:
               field: location_id
-              to: ref('stg_mssql__locations')
+              to: ref('stg_locations')
 
       - name: purchase_order_status
         description: "Current status of the purchase order."

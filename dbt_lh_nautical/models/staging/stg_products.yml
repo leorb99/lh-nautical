@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__products
+  - name: stg_products
     description: >
       Staging model for products. This model cleans and standardizes the raw product data
       from the e-commerce system, including descriptive, classification, and CDC metadata.
@@ -25,7 +25,7 @@ models:
           - not_null
           - relationships:
               field: brand_id
-              to: ref('stg_mssql__brands')
+              to: ref('stg_brands')
 
       - name: category_id
         description: "Foreign key to the product category."
@@ -33,7 +33,7 @@ models:
           - not_null
           - relationships:
               field: category_id
-              to: ref('stg_mssql__categories')
+              to: ref('stg_categories')
       
       - name: ncm_code
         description: "NCM classification code for the product."

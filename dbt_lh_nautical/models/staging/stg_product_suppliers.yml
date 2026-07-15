@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__product_suppliers
+  - name: stg_product_suppliers
     description: >
       Staging model for product suppliers. This model cleans and standardizes the raw
       supplier-product mapping data from the e-commerce system, including supplier SKUs,
@@ -18,7 +18,7 @@ models:
           - not_null
           - relationships:
               field: product_variant_id
-              to: ref('stg_mssql__product_variants')
+              to: ref('stg_product_variants')
       
       - name: supplier_id
         description: "Foreign key to the supplier."
@@ -26,7 +26,7 @@ models:
           - not_null
           - relationships:
               field: supplier_id
-              to: ref('stg_mssql__suppliers')
+              to: ref('stg_suppliers')
       
       - name: supplier_sku
         description: "Supplier-specific SKU for the product variant."

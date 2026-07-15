@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__purchase_order_items
+  - name: stg_purchase_order_items
     description: >
       Staging model for purchase order items. This model standardizes raw purchase order line
       data including quantities, unit costs, totals and ingestion metadata.
@@ -17,7 +17,7 @@ models:
           - not_null
           - relationships:
               field: purchase_orders_id
-              to: ref('stg_mssql__purchase_orders')
+              to: ref('stg_purchase_orders')
       
       - name: product_variant_id
         description: "Foreign key to the purchased product variant."
@@ -25,7 +25,7 @@ models:
           - not_null
           - relationships:
               field: product_variant_id
-              to: ref('stg_mssql__product_variants')
+              to: ref('stg_product_variants')
       
       - name: quantity_ordered
         description: "Quantity ordered for this purchase order line item."

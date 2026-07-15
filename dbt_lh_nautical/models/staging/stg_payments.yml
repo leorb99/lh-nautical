@@ -1,5 +1,5 @@
 models:
-  - name: stg_mssql__payments
+  - name: stg_payments
     description: >
       Staging model for payments. This model cleans and standardizes the raw payments data 
       coming from the e-commerce system. It contains transaction amounts, payment methods, 
@@ -18,7 +18,7 @@ models:
           - not_null
           - relationships:
               field: order_id
-              to: ref('stg_mssql__orders')
+              to: ref('stg_orders')
       
       - name: payment_method
         description: "The method used to pay (e.g., credit_card, pix, debit_card)."
