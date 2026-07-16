@@ -14,7 +14,7 @@ with
         , cast(primary_location_id as int) as employee_primary_location_id
         , cast(hire_date as date) as employee_hire_date
         , cast(termination_date as date) as employee_termination_date
-        , cast(is_active as boolean) as employee_is_active
+        , cast(is_active as boolean) as is_active
         , cast(created_at as timestamp) as created_at
         , cast(updated_at as timestamp) as updated_at
 
