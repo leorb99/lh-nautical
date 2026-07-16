@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: dim_dates
+    description: "Date dimension serving as both a civil and operational calendar, containing Brazilian national holidays and business day flags"
+    columns:
+      - name: date
+        description: "Primary key in DATE format (e.g., 2026-07-15)"
+        tests:
+          - unique
+          - not_null
+
+      - name: date_id
+        description: "Numeric alternative key in YYYYMMDD format (e.g., 20260715). Ideal for fast indexing and joins"
+        tests:
+          - unique
+          - not_null
+
+      - name: year_num
+        description: "Four-digit calendar year (e.g., 2026)"
+
+      - name: quarter_num
+        description: "Calendar quarter number (1 to 4)"
+
+      - name: quarter_name
+        description: "Calendar quarter name (Q1, Q2, Q3, Q4)"
+
+      - name: month_num
+        description: "Calendar month number (1 to 12)"
+
+      - name: month_name
+        description: "Full English name of the month (e.g., January)"
+
+      - name: month_short_name
+        description: "Three-letter English name of the month (e.g., Jan)"
+
+      - name: day_month_num
+        description: "Day of the month (1 to 31)"
+
+      - name: day_week_num
+        description: "Day of the week number where 1 is Sunday and 7 is Saturday"
+
+      - name: is_weekend_day
+        description: "Boolean flag indicating if the date falls on a weekend (Saturday or Sunday)"
+
+      - name: day_week_name
+        description: "Full English name of the weekday (e.g., Wednesday)"
+
+      - name: day_week_short_name
+        description: "Three-letter abbreviation of the weekday (e.g., Wed)"
+
+      - name: is_holiday
+        description: "Boolean flag indicating if the date is a national holiday"
+
+      - name: holiday_name
+        description: "Name of the holiday if applicable (null on non-holidays)"
+
+      - name: is_business_day
+        description: "Boolean flag indicating if the date is a business day (not a weekend and not a holiday)"
