@@ -5,7 +5,7 @@ models:
       data including quantities, unit costs, totals and ingestion metadata.
     
     columns:
-      - name: purchase_order_items_id
+      - name: purchase_order_item_id
         description: "Primary key for the purchase order item."
         tests:
           - unique
@@ -27,17 +27,17 @@ models:
               field: product_variant_id
               to: ref('stg_product_variants')
       
-      - name: quantity_ordered
+      - name: purchase_order_item_quantity_ordered
         description: "Quantity ordered for this purchase order line item."
         tests:
           - not_null
       
-      - name: unit_cost
+      - name: purchase_order_item_unit_cost
         description: "Unit cost for this line item."
         tests:
           - not_null
       
-      - name: line_total
+      - name: purchase_order_item_line_total
         description: "Total amount for this purchase order line item."
         tests:
           - not_null

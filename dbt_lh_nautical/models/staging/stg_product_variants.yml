@@ -24,27 +24,27 @@ models:
         tests:
           - not_null
       
-      - name: barcode_ean
+      - name: product_variant_barcode_ean
         description: "EAN barcode for the product variant."
       
-      - name: sale_price
+      - name: product_variant_sale_price
         description: "Sale price for the product variant."
         tests:
           - not_null
       
-      - name: cost_price
+      - name: product_variant_cost_price
         description: "Cost price for the product variant."
       
-      - name: weight_kg
+      - name: product_variant_weight_kg
         description: "Weight of the product variant in kilograms."
       
-      - name: icms_rate
+      - name: product_variant_icms_rate
         description: "ICMS tax rate applied to the product variant."
       
-      - name: ipi_rate
+      - name: product_variant_ipi_rate
         description: "IPI tax rate applied to the product variant."
       
-      - name: is_prod_var_active
+      - name: is_active
         description: "Boolean flag that indicates whether the product variant is active."
         tests:
           - not_null

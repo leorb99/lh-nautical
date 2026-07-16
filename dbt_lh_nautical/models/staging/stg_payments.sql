@@ -9,7 +9,7 @@ with
             cast(id as int) as payment_id
             , cast(order_id as int) as order_id
             , cast(method as string) as payment_method
-            , cast(installments as int) as qty_installments
+            , cast(installments as int) as payment_installments
             , cast(amount as decimal(14, 2)) as payment_amount 
             , cast(status as string) as payment_status
             , cast(paid_at as timestamp) as paid_at

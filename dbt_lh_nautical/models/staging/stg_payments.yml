@@ -28,7 +28,7 @@ models:
               values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
               quote: true
       
-      - name: qty_installments
+      - name: payment_installments
         description: "Number of installments for the payment."
         tests:
           - not_null

@@ -6,7 +6,7 @@ models:
       tracking timestamps for CDC.
     
     columns:
-      - name: purchase_orders_id
+      - name: purchase_order_id
         description: "Internal primary key for the purchase order."
         tests:
           - unique
@@ -47,7 +47,7 @@ models:
               values: ['partially_received', 'draft', 'received', 'cancelled', 'sent']
               quote: true
 
-      - name: currency
+      - name: purchase_order_currency
         description: "The currency used for the purchase order amounts (e.g., BRL, USD)."
         tests:
           - not_null

@@ -35,19 +35,19 @@ models:
               field: category_id
               to: ref('stg_categories')
       
-      - name: ncm_code
+      - name: product_ncm_code
         description: "NCM classification code for the product."
         tests:
           - not_null
       
-      - name: unit_of_mesuare
+      - name: product_unit_of_mesuare
         description: "Unit of measure for the product (e.g., L, M, PC, UN)."
         tests:
           - accepted_values:
               values: ['L', 'M', 'PC', 'UN']
               quote: true
       
-      - name: is_prod_active
+      - name: is_active
         description: "Boolean flag that indicates whether the product is active."
         tests:
           - not_null

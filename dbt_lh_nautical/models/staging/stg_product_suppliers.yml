@@ -28,13 +28,13 @@ models:
               field: supplier_id
               to: ref('stg_suppliers')
       
-      - name: supplier_sku
+      - name: product_suppliers_supplier_sku
         description: "Supplier-specific SKU for the product variant."
       
-      - name: last_quoted_cost
+      - name: product_suppliers_last_quoted_cost
         description: "The most recent cost quoted by the supplier."
       
-      - name: lead_time_days
+      - name: product_suppliers_lead_time_days
         description: "Supplier lead time for the product variant, in days."
       
       - name: created_at
