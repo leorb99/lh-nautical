@@ -44,7 +44,7 @@ with
             else trim(customer_phone)
             end as customer_phone
             
-            , customer_is_active
+            , is_active
             , created_at
             , updated_at
         from customers
@@ -125,7 +125,7 @@ with
             , cleaned_customers.customer_state_registration
             , cleaned_customers.customer_email
             , cleaned_customers.customer_phone
-            , cleaned_customers.customer_is_active
+            , cleaned_customers.is_active
             , cleaned_customers.created_at
             , cleaned_customers.updated_at
 

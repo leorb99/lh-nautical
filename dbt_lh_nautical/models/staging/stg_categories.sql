@@ -10,7 +10,7 @@ with
         , cast(name as string) as category_name
         , cast(slug as string) as category_url_slug
         , cast(parent_category_id as int) as parent_category_id
-        , cast(is_active as boolean) as category_is_active
+        , cast(is_active as boolean) as is_active
         , cast(created_at as timestamp) as created_at
         , cast(updated_at as timestamp) as updated_at
 

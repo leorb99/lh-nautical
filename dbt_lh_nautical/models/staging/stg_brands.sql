@@ -9,7 +9,7 @@ with
         cast(id as int) as brand_id
         , cast(name as string) as brand_name
         , cast(country as string) as brand_country
-        , cast(is_active as boolean) as brand_is_active
+        , cast(is_active as boolean) as is_active
         , cast(created_at as timestamp) as created_at
         , cast(updated_at as timestamp) as updated_at
 
