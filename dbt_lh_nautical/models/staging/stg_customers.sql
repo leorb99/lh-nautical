@@ -14,7 +14,7 @@ with
         , cast(state_registration as string) as customer_state_registration
         , cast(email as string) as customer_email
         , cast(phone as string) as customer_phone
-        , cast(is_active as boolean) as is_active
+        , cast(is_active as boolean) as customer_is_active
         , cast(created_at as timestamp) as created_at
         , cast(updated_at as timestamp) as updated_at
 

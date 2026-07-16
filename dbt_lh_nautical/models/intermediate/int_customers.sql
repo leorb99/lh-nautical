@@ -44,7 +44,7 @@ with
             else trim(customer_phone)
             end as customer_phone
             
-            , is_active
+            , customer_is_active
             , created_at
             , updated_at
         from customers
@@ -58,10 +58,10 @@ with
 
             -- Standardizes postal code to contain only numbers, removing the inconsistent
             -- hyphen formatting found in the source via discovery
-            , regexp_replace(postal_code, '[^0-9]', '') as postal_code
+            , regexp_replace(address_postal_code, '[^0-9]', '') as address_postal_code
 
             -- Trims whitespace, confirmed via discovery to have leading/trailing spaces
-            , trim(street_name) as street_name
+            , trim(address_street_name) as address_street_name
 
             , address_number
             
@@ -74,12 +74,12 @@ with
             end as address_complement
 
             -- Trims whitespace, confirmed via discovery to have leading/trailing spaces
-            , trim(district) as district
+            , trim(address_district) as address_district
 
-            , city
-            , state
-            , country
-            , is_primary
+            , address_city
+            , address_state
+            , address_country
+            , address_is_primary
             , _hash
             , _ingested_at
             , _action
@@ -91,15 +91,15 @@ with
             address_id as primary_address_id
             , customer_id 
             , address_type as primary_address_type
-            , postal_code as primary_postal_code
-            , street_name as primary_street_name
+            , address_postal_code as primary_address_postal_code
+            , address_street_name as primary_address_street_name
             , address_number as primary_address_number
             , address_complement as primary_address_complement
-            , district as primary_district
-            , city as primary_city
-            , state as primary_state
-            , country as primary_country
-            -- , is_primary
+            , address_district as primary_address_district
+            , address_city as primary_address_city
+            , address_state as primary_address_state
+            , address_country as primary_address_country
+            -- , address_is_primary
             -- , _hash
             -- , _ingested_at
             -- , _action
@@ -110,7 +110,7 @@ with
         -- we're using row_number to get the the most recent primary address
         qualify row_number() over(
             partition by customer_id
-            order by is_primary desc, _ingested_at desc
+            order by address_is_primary desc, _ingested_at desc
         ) = 1
     )
 
@@ -125,7 +125,7 @@ with
             , cleaned_customers.customer_state_registration
             , cleaned_customers.customer_email
             , cleaned_customers.customer_phone
-            , cleaned_customers.is_active
+            , cleaned_customers.customer_is_active
             , cleaned_customers.created_at
             , cleaned_customers.updated_at
 
@@ -133,14 +133,14 @@ with
             , primary_addresses_filtered.primary_address_id
             -- , primary_addresses_filtered.customer_id
             , primary_addresses_filtered.primary_address_type
-            , primary_addresses_filtered.primary_postal_code
-            , primary_addresses_filtered.primary_street_name
+            , primary_addresses_filtered.primary_address_postal_code
+            , primary_addresses_filtered.primary_address_street_name
             , primary_addresses_filtered.primary_address_number
             , primary_addresses_filtered.primary_address_complement
-            , primary_addresses_filtered.primary_district
-            , primary_addresses_filtered.primary_city
-            , primary_addresses_filtered.primary_state
-            , primary_addresses_filtered.primary_country
+            , primary_addresses_filtered.primary_address_district
+            , primary_addresses_filtered.primary_address_city
+            , primary_addresses_filtered.primary_address_state
+            , primary_addresses_filtered.primary_address_country
 
         from cleaned_customers
         left join primary_addresses_filtered
