@@ -59,10 +59,10 @@ models:
       - name: primary_address_type
         description: "Type of the primary address (e.g. billing, secondary)"
 
-      - name: primary_postal_code
+      - name: primary_address_postal_code
         description: "Postal code of the primary address, standardized to digits only"
 
-      - name: primary_street_name
+      - name: primary_address_street_name
         description: "Street name of the primary address"
 
       - name: primary_address_number
@@ -74,16 +74,16 @@ models:
           values found in the source (e.g. 'TBD', 'N/A', punctuation-only) are
           converted to null.
 
-      - name: primary_district
+      - name: primary_address_district
         description: "District/neighborhood of the primary address"
 
-      - name: primary_city
+      - name: primary_address_city
         description: "City of the primary address"
 
-      - name: primary_state
+      - name: primary_address_state
         description: "State of the primary address"
 
-      - name: primary_country
+      - name: primary_address_country
         description: "Country of the primary address"
 
     tests:

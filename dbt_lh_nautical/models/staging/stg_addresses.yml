@@ -23,12 +23,12 @@ models:
               arguments:
                 values: ['billing', 'secondary']
 
-      - name: postal_code
+      - name: address_postal_code
         description: "Postal code of the address, kept as string (may start with zero, or contain a hyphen)"
         tests:
           - not_null
 
-      - name: street_name
+      - name: address_street_name
         description: "Street name"
 
       - name: address_number
@@ -37,19 +37,19 @@ models:
       - name: address_complement
         description: "Address complement (apartment, block, etc.)"
 
-      - name: district
+      - name: address_district
         description: "District/neighborhood of the address"
 
-      - name: city
+      - name: address_city
         description: "City of the address"
 
-      - name: state
+      - name: address_state
         description: "State of the address"
 
-      - name: country
+      - name: address_country
         description: "Country of the address"
 
-      - name: is_primary
+      - name: address_is_primary
         description: "Indicates whether this is the customer's primary address ('billing')"
         tests:
           - not_null
