@@ -9,15 +9,15 @@ with
         cast(id as int) as address_id
         , cast(customer_id as int) as customer_id
         , cast(address_type as string) as address_type
-        , cast(postal_code as string) as postal_code
-        , cast(street as string) as street_name
+        , cast(postal_code as string) as address_postal_code
+        , cast(street as string) as address_street_name
         , cast(number as string) as address_number
         , cast(complement as string) as address_complement
-        , cast(district as string) as district
-        , cast(city as string) as city
-        , cast(state as string) as state
-        , cast(country as string) as country
-        , cast(is_primary as boolean) as is_primary
+        , cast(district as string) as address_district
+        , cast(city as string) as address_city
+        , cast(state as string) as address_state
+        , cast(country as string) as address_country
+        , cast(is_primary as boolean) as address_is_primary
 
         -- internal ingestion metadata
         , cast(_hash as string) as _hash
