@@ -1,0 +1,78 @@
+models:
+  - name: stg_payments
+    description: >
+      Staging model for payments. This model cleans and standardizes the raw payments data 
+      coming from the e-commerce system. It contains transaction amounts, payment methods, 
+      and temporal tracking columns for CDC.
+    
+    columns: 
+      - name: payment_id
+        description: "Primary key of the payment transaction."
+        tests:
+          - unique
+          - not_null
+      
+      - name: order_id
+        description: "Foreign key pointing to the order associated with this payment."
+        tests:
+          - not_null
+          - relationships:
+              field: order_id
+              to: ref('stg_orders')
+      
+      - name: payment_method
+        description: "The method used to pay (e.g., credit_card, pix, debit_card)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
+              quote: true
+      
+      - name: payment_installments
+        description: "Number of installments for the payment."
+        tests:
+          - not_null
+      
+      - name: payment_amount
+        description: "The actual amount paid in this transaction. Useful for financial reconciliation."
+        tests:
+          - not_null
+      
+      - name: payment_status
+        description: "Current status of the payment (e.g., pending, approved, refunded)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['pending', 'approved', 'refunded', 'refused']
+              quote: true
+      
+      - name: paid_at
+        description: "Timestamp when the payment was actually approved/cleared."
+      
+      - name: created_at
+        description: "Timestamp when the payment record was first created in the source system."
+        tests:
+          - not_null
+      
+      - name: updated_at
+        description: "Timestamp when the payment record was last updated. Used for CDC."
+        tests:
+          - not_null
+      
+      - name: _hash
+        description: "MD5/SHA hash of the record used for deduplication or change tracking."
+        tests:
+          - not_null
+        
+      - name: _ingested_at
+        description: "Timestamp when the data was ingested into the Bronze layer."
+        tests:
+          - not_null
+        
+      - name: _action
+        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true

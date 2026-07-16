@@ -1,0 +1,61 @@
+models:
+  - name: stg_purchase_order_items
+    description: >
+      Staging model for purchase order items. This model standardizes raw purchase order line
+      data including quantities, unit costs, totals and ingestion metadata.
+    
+    columns:
+      - name: purchase_order_item_id
+        description: "Primary key for the purchase order item."
+        tests:
+          - unique
+          - not_null
+      
+      - name: purchase_order_id
+        description: "Foreign key to the parent purchase order."
+        tests:
+          - not_null
+          - relationships:
+              field: purchase_orders_id
+              to: ref('stg_purchase_orders')
+      
+      - name: product_variant_id
+        description: "Foreign key to the purchased product variant."
+        tests:
+          - not_null
+          - relationships:
+              field: product_variant_id
+              to: ref('stg_product_variants')
+      
+      - name: purchase_order_item_quantity_ordered
+        description: "Quantity ordered for this purchase order line item."
+        tests:
+          - not_null
+      
+      - name: purchase_order_item_unit_cost
+        description: "Unit cost for this line item."
+        tests:
+          - not_null
+      
+      - name: purchase_order_item_line_total
+        description: "Total amount for this purchase order line item."
+        tests:
+          - not_null
+      
+      - name: _hash
+        description: "MD5/SHA hash of the record used for deduplication or change tracking."
+        tests:
+          - not_null
+      
+      - name: _ingested_at
+        description: "Timestamp when the data was ingested into the Bronze layer."
+        tests:
+          - not_null
+      
+      - name: _action
+        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true
