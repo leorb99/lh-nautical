@@ -8,7 +8,7 @@ with
         select
             cast(id as int) as location_id
             , cast(name as string) as location_name
-            , cast(location_type as string)
+            , cast(location_type as string) as location_type
             , cast(postal_code as string) as location_postal_code
             , cast(street as string) as location_street
             , cast(number as int) as location_number

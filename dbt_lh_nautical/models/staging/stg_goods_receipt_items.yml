@@ -14,9 +14,9 @@ models:
         description: "Foreign key mapping to the goods receipt table."
         tests:
           - not_null
-          # Relationship test example (if you have stg_goods_receipt)
+          # Relationship test example (if you have stg_goods_receipts)
           #- relationships:
-          #  to: ref('stg_goods_receipt')
+          #  to: ref('stg_goods_receipts')
           #  field: goods_receipt_id
 
       - name: purchase_order_item_id
