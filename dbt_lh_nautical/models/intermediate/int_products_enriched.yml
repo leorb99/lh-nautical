@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: int_products_enriched
+    description: >
+      Intermediate model that enriches raw product data with brand and category
+      metadata while applying cleaning rules to description and name fields.
+    
+    columns:
+      - name: product_id
+        description: "Primary key of the product."
+        tests:
+          - unique
+          - not_null
+      
+      - name: product_name
+        description: "Normalized product name, using description fallback when necessary."
+      
+      - name: product_description
+        description: "Cleaned product description with placeholder values removed."
+      
+      - name: product_ncm_code
+        description: "NCM classification code for the product."
+      
+      - name: product_unit_of_measure
+        description: "Unit of measure for the product."
+      
+      - name: is_product_active
+        description: "Indicates whether the product is active."
+      
+      - name: brand_id
+        description: "Foreign key to the product brand."
+      
+      - name: brand_name
+        description: "Name of the product brand."
+      
+      - name: category_id
+        description: "Foreign key to the product category."
+      
+      - name: category_name
+        description: "Name of the product category."
+      
+      - name: category_url_slug
+        description: "URL slug for the product category."
+      
+      - name: parent_category_id
+        description: "Foreign key to the parent category."
+      
+      - name: parent_category_name
+        description: "Name of the parent category."
+    
+    tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_products')
