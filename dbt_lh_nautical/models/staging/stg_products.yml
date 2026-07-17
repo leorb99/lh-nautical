@@ -40,7 +40,7 @@ models:
         tests:
           - not_null
       
-      - name: product_unit_of_mesuare
+      - name: product_unit_of_measure
         description: "Unit of measure for the product (e.g., L, M, PC, UN)."
         tests:
           - accepted_values:
