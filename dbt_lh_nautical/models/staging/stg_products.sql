@@ -1,6 +1,6 @@
 with
     source as (
-        select * 
+        select *
         from {{ source('bronze', 'products') }}
     )
 
@@ -23,5 +23,6 @@ with
             , cast(_action as string) as _action
         from source
     )
-select * 
+
+select *
 from products
