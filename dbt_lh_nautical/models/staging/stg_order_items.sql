@@ -9,11 +9,11 @@ with
             cast(id as int) as order_item_id
             , cast(order_id as int) as order_id
             , cast(product_variant_id as int) as product_variant_id
-            , cast(quantity as numeric) as order_item_quantity
-            , cast(unit_price as numeric) as order_item_unit_price
-            , cast(icms_rate as numeric) as order_item_icms_rate
-            , cast(ipi_rate as numeric) as order_item_ipi_rate
-            , cast(line_total as numeric) as order_item_line_total
+            , cast(quantity as int) as order_item_quantity
+            , cast(unit_price as decimal(14,2)) as order_item_unit_price
+            , cast(icms_rate as decimal(5,2)) as order_item_icms_rate
+            , cast(ipi_rate as decimal(5,2)) as order_item_ipi_rate
+            , cast(line_total as decimal(14,2)) as order_item_line_total
 
 
             -- internal ingestion metadata
