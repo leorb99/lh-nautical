@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: stg_suppliers
+    description: "Staging table containing cleaned and standardized supplier data."
+
+    columns:
+      - name: supplier_id
+        description: "Primary key of the suppliers table."
+        tests:
+          - unique
+          - not_null
+
+      - name: supplier_legal_name
+        description: "The registered legal name of the supplier."
+        tests:
+          - not_null
+
+      - name: supplier_trade_name
+        description: "The commercial or trade name used by the supplier."
+
+      - name: supplier_country
+        description: "The country where the supplier is registered."
+        tests:
+          - not_null
+
+      - name: supplier_tax_id
+        description: "The unique tax identification number of the supplier."
+        tests:
+          - unique
+          - not_null
+
+      - name: supplier_tax_id_type
+        description: "The type of tax identification document used by the supplier."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["CNPJ", "VAT"]
+
+      - name: supplier_email
+        description: "The primary email address used to contact the supplier."
+        tests:
+          - unique
+          - not_null
+
+      - name: supplier_phone
+        description: "The primary phone number used to contact the supplier."
+
+      - name: supplier_contact_name
+        description: "The name of the main contact person at the supplier."
+
+      - name: is_active
+        description: "Flag indicating whether the supplier is currently active."
+        tests:
+          - not_null
+
+      - name: created_at
+        description: "Timestamp indicating when the supplier record was created."
+
+      - name: updated_at
+        description: "Timestamp indicating when the supplier record was last updated."
