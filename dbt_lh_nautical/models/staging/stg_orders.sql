@@ -13,9 +13,9 @@ with
             , cast(order_number as string) as order_number
             , cast(channel as string) as order_channel
             , cast(status as string) as order_status
-            , cast(subtotal as numeric) as order_subtotal_amount
-            , cast(discount_amount as numeric) as order_discount_amount
-            , cast(total as numeric) as order_total_amount
+            , cast(subtotal as decimal(14,2)) as order_subtotal_amount
+            , cast(discount_amount as decimal(14,2)) as order_discount_amount
+            , cast(total as decimal(14,2)) as order_total_amount
             , cast(placed_at as timestamp) as placed_at
             , cast(created_at as timestamp) as created_at
             , cast(updated_at as timestamp) as updated_at
