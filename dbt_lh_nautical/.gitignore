@@ -2,3 +2,4 @@
 target/
 dbt_packages/
 logs/
+load_env.ps1
