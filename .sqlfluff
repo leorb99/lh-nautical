@@ -3,7 +3,7 @@ templater = dbt
 dialect = databricks
 sql_file_exts = .sql
 max_line_length = 150
-exclude_rules = structure.column_order
+exclude_rules = structure.column_order, structure.simple_case
 
 [sqlfluff:templater:dbt]
 project_dir = ./dbt_lh_nautical
