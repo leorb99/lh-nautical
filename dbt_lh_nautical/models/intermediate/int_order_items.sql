@@ -12,17 +12,17 @@ with
             , order_item_quantity
             , order_item_unit_price
         
-            -- Cálculo da receita bruta mantendo a precisão decimal
+            -- Calculate gross revenue maintaining decimal precision
             , cast(order_item_quantity * order_item_unit_price as decimal(14,2)) as order_item_gross_amount
-            
+
+            -- Original tax rates
             , order_item_icms_rate
             , order_item_ipi_rate
         
-            -- Cálculo nominal dos impostos ajustado para a precisão decimal(14,2)
+            -- Nominal tax calculation adjusted for decimal(14,2) precision
             , cast((order_item_quantity * order_item_unit_price) * (order_item_icms_rate / 100.0) as decimal(14,2)) as order_item_icms_amount
             , cast((order_item_quantity * order_item_unit_price) * (order_item_ipi_rate / 100.0) as decimal(14,2)) as order_item_ipi_amount
         
-            -- Valor total final vindo do staging
             , order_item_line_total
         from order_items
     )
