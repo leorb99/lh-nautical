@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_locations  # Substitua pelo nome real do seu arquivo .sql se for diferente
+    description: "Intermediate locations table with cleaned addresses, normalized postal codes, and standardized null values."
+    columns:
+      - name: location_id
+        description: "Primary key of the location."
+        tests:
+          - unique
+          - not_null
+
+      - name: location_name
+        description: "Cleaned and formatted name of the location using capitalization rules."
+        tests:
+          - not_null
+
+      - name: location_postal_code
+        description: "Normalized postal code containing digits only (dots and dashes removed)."
+        tests:
+          - not_null
+
+      - name: location_state
+        description: "Standardized and capitalized state abbreviation code."
+        tests:
+          - not_null
+
+      - name: is_active
+        description: "Boolean flag indicating if the location is currently active."
+        tests:
+          - not_null

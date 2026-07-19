@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: int_goods_receipts
+    description: "Intermediate warehouse goods receipts with entry latency calculations."
+    columns:
+        - name: goods_receipt_id
+          description: "Primary key of the goods receipt document."
+          tests:
+            - unique
+            - not_null

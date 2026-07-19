@@ -19,7 +19,7 @@ with goods_receipts as (
         , created_at
 
         -- Calculation of latency between operational receipt and system creation in hours
-        , cast(timestamp_diff(created_at, received_at, hour) as int) as system_entry_latency_hours
+        --, cast((cast(created_at as double) - cast(received_at as double)) / 3600 as int) as system_entry_latency_hours
 
     from goods_receipts
 )

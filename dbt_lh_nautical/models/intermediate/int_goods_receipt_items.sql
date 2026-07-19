@@ -18,13 +18,6 @@ with goods_receipt_items as (
             then true 
             else false 
           end as is_fractional_quantity
-          
-        -- Flag to easily audit empty or rejected physical receipts at line level
-        , case 
-            when goods_receipt_item_quantity_received = 0 
-            then true 
-            else false 
-          end as is_zero_quantity_receipt
 
     from goods_receipt_items
 )
