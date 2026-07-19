@@ -2,12 +2,7 @@ version: 2
 
 models:
   - name: int_purchase_order_items
-    description: >
-      Intermediate model for purchase order line items. Explicit pass-through
-      from stg_purchase_order_items, excluding ingestion metadata. Discovery
-      found no data quality issues (no nulls, no negative/zero quantities,
-      line_total consistent with quantity * unit_cost, no orphaned foreign
-      keys), so no cleaning logic was needed
+    description: "Intermediate model for purchase order line items, one row per item within a purchase order"
     columns:
       - name: purchase_order_item_id
         description: "Primary key for the purchase order item"

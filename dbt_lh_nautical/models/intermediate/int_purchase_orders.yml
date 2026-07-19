@@ -2,12 +2,7 @@ version: 2
 
 models:
   - name: int_purchase_orders
-    description: >
-      Intermediate model for purchase order headers. Discovery found
-      purchase_order_subtotal always equal to purchase_order_total (0
-      divergent rows out of 2,000), and ~14% of rows with placed_at/created_at/
-      updated_at in the future, which were nullified since a purchase order
-      cannot have been placed/created/updated ahead of the current time
+    description: "Intermediate model for purchase order headers, one row per purchase order"
     columns:
       - name: purchase_order_id
         description: "Primary key for the purchase order"
