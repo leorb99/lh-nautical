@@ -12,7 +12,7 @@ with
             , cast(brand_id as int) as brand_id
             , cast(category_id as int) as category_id
             , cast(ncm_code as string) as product_ncm_code
-            , cast(unit_of_measure as string) as product_unit_of_mesuare
+            , cast(unit_of_measure as string) as product_unit_of_measure
             , cast(is_active as boolean) as is_active
             , cast(created_at as timestamp) as created_at
             , cast(updated_at as timestamp) as updated_at
