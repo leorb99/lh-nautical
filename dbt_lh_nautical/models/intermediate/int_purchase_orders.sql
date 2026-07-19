@@ -15,6 +15,7 @@ with
             , purchase_order_currency
             , purchase_order_subtotal
             , purchase_order_total
+            , purchase_order_expected_delivery_at
 
             -- Nullifies future timestamps confirmed via discovery (~14% of rows,
             -- a purchase order cannot have been placed/created/updated in the future)
@@ -22,7 +23,9 @@ with
             , case when created_at > current_timestamp() then null else created_at end as created_at
             , case when updated_at > current_timestamp() then null else updated_at end as updated_at
 
-            , purchase_order_expected_delivery_at
+            -- , _hash
+            -- , _ingested_at
+            -- , _action
         from purchase_orders
     )
 
