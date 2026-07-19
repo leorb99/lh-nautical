@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_purchase_order_items
+    description: >
+      Intermediate model for purchase order line items. Explicit pass-through
+      from stg_purchase_order_items, excluding ingestion metadata. Discovery
+      found no data quality issues (no nulls, no negative/zero quantities,
+      line_total consistent with quantity * unit_cost, no orphaned foreign
+      keys), so no cleaning logic was needed
+    columns:
+      - name: purchase_order_item_id
+        description: "Primary key for the purchase order item"
+        tests:
+          - unique
+          - not_null
+
+      - name: purchase_order_id
+        description: "Foreign key pointing to the parent purchase order"
+
+      - name: product_variant_id
+        description: "Foreign key pointing to the purchased product variant"
+
+      - name: purchase_order_item_quantity_ordered
+        description: "Quantity ordered for this purchase order line item"
+
+      - name: purchase_order_item_unit_cost
+        description: "Unit cost for this line item"
+
+      - name: purchase_order_item_line_total
+        description: "Total amount for this purchase order line item"

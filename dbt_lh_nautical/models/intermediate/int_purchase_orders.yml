@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: int_purchase_orders
+    description: >
+      Intermediate model for purchase order headers. Discovery found
+      purchase_order_subtotal always equal to purchase_order_total (0
+      divergent rows out of 2,000), and ~14% of rows with placed_at/created_at/
+      updated_at in the future, which were nullified since a purchase order
+      cannot have been placed/created/updated ahead of the current time
+    columns:
+      - name: purchase_order_id
+        description: "Primary key for the purchase order"
+        tests:
+          - unique
+          - not_null
+
+      - name: purchase_order_number
+        description: "The natural key / human-readable purchase order number (e.g., PO-000001)"
+
+      - name: supplier_id
+        description: "Foreign key pointing to the supplier associated with this purchase order"
+
+      - name: buyer_id
+        description: "Foreign key pointing to the employee who placed the purchase order (employees with the 'buyer' role)"
+
+      - name: destination_location_id
+        description: "Foreign key pointing to the physical location where the order should be delivered"
+
+      - name: purchase_order_status
+        description: "Current status of the purchase order"
+
+      - name: purchase_order_currency
+        description: "The currency used for the purchase order amounts (e.g., BRL, USD)"
+
+      - name: purchase_order_subtotal
+        description: "The total amount of the order before taxes, shipping, or discounts"
+
+      - name: purchase_order_total
+        description: "The final total amount of the purchase order"
+
+      - name: placed_at
+        description: "Timestamp when the purchase order was officially placed/submitted. Nullified when found in the future"
+
+      - name: purchase_order_expected_delivery_at
+        description: "The expected delivery date for the purchase order"
+
+      - name: created_at
+        description: "Timestamp when the record was created in the source system. Nullified when found in the future"
+
+      - name: updated_at
+        description: "Timestamp when the record was last updated in the source system. Nullified when found in the future"
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "purchase_order_subtotal = purchase_order_total"
