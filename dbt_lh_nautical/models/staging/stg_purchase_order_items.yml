@@ -16,7 +16,7 @@ models:
         tests:
           - not_null
           - relationships:
-              field: purchase_orders_id
+              field: purchase_order_id
               to: ref('stg_purchase_orders')
       
       - name: product_variant_id
