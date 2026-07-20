@@ -1,4 +1,4 @@
-with 
+with
     product_variants as (
         select * from {{ ref('stg_product_variants') }}
     )
@@ -13,37 +13,37 @@ with
 
     , final_build as (
         select
-            v.product_variant_id as product_variant_id
-            , p.product_id
-            , v.product_variant_sku
-            , v.product_variant_sale_price
-            , v.product_variant_cost_price
-            , v.product_variant_icms_rate
-            , v.product_variant_ipi_rate
-            , v.is_active as is_variant_active
-            , p.product_name
-            , p.product_description
-            , p.product_unit_of_measure
-            , p.is_product_active
-            , p.brand_name
-            , p.category_name
-            , p.parent_category_name
-            , a.attr_color
-            , a.attr_size
-            , a.attr_length_m
-            , a.attr_power_hp
-            , a.attr_voltage_v
-            , a.attr_weight_kg
-            , a.attr_waterproof
-            , a.attr_material
-            
-        from product_variants v
-        
-        left join products_enriched p 
-            on v.product_id = p.product_id
-            
-        left join variant_attributes a 
-            on v.product_variant_id = a.product_variant_id
+            product_variants.product_variant_id
+            , products_enriched.product_id
+            , product_variants.product_variant_sku
+            , product_variants.product_variant_sale_price
+            , product_variants.product_variant_cost_price
+            , product_variants.product_variant_icms_rate
+            , product_variants.product_variant_ipi_rate
+            , product_variants.is_active as is_variant_active
+            , products_enriched.product_name
+            , products_enriched.product_description
+            , products_enriched.product_unit_of_measure
+            , products_enriched.is_product_active
+            , products_enriched.brand_name
+            , products_enriched.category_name
+            , products_enriched.parent_category_name
+            , variant_attributes.attr_color
+            , variant_attributes.attr_size
+            , variant_attributes.attr_length_m
+            , variant_attributes.attr_power_hp
+            , variant_attributes.attr_voltage_v
+            , variant_attributes.attr_weight_kg
+            , variant_attributes.attr_waterproof
+            , variant_attributes.attr_material
+
+        from product_variants
+
+        left join products_enriched
+            on product_variants.product_id = products_enriched.product_id
+
+        left join variant_attributes
+            on product_variants.product_variant_id = variant_attributes.product_variant_id
     )
 
 select *
