@@ -45,8 +45,11 @@ with
             end as customer_phone
 
             , is_active
-            , created_at
-            , updated_at
+
+            -- Nullifies future timestamps, since a record can't be created/updated ahead
+            -- of now; keeps the rest of the row, as this is an isolated field-level issue
+            , case when created_at > current_timestamp() then null else created_at end as created_at
+            , case when updated_at > current_timestamp() then null else updated_at end as updated_at
         from customers
     )
 
@@ -107,10 +110,15 @@ with
 
         -- To ensure only one record per customer, 
         -- and in case there is more than one address marked as primary by mistake,
-        -- we're using row_number to get the the most recent primary address
+        -- we're using row_number to get the the most recent primary address.
+        -- On the initial load, every row shares the same _ingested_at,
+        -- so without it the pick would be non-deterministic whenever a customer
+        -- has multiple primary addresses. That is also true on any run that
+        -- touches more than one primary address.
+        -- For that reason, address_id is a final deterministic tiebreaker.
         qualify row_number() over (
             partition by customer_id
-            order by address_is_primary desc, _ingested_at desc
+            order by address_is_primary desc, _ingested_at desc, address_id desc
         ) = 1
     )
 
