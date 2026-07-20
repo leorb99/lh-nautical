@@ -35,9 +35,18 @@ resources:
               catalog_name: ${var.catalog_name} 
               schema: bronze
 
-        - task_key: "testes_ingestao"
+        - task_key: "ingestion_currency"
           depends_on:
             - task_key: "autoloader_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/currency_ingestion.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name} 
+              schema: bronze
+
+        - task_key: "testes_ingestao"
+          depends_on:
+            - task_key: "ingestion_currency"
           environment_key: default
           spark_python_task:
             python_file: ../tests/run_tests.py
