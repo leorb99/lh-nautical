@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: stg_stock_levels
+    description: "Staging table containing cleaned and standardized inventory levels by product variant and location."
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id
+
+    columns:
+      - name: product_variant_id
+        description: "Foreign key mapping to the product variants table."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_product_variants')
+                field: product_variant_id
+
+      - name: location_id
+        description: "Foreign key mapping to the locations table."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_locations')
+                field: location_id
+
+      - name: stock_level_quantity_on_hand
+        description: "The physical quantity currently available at the location."
+        tests:
+          - not_null
+
+      - name: stock_level_reorder_point
+        description: "The inventory quantity threshold used to indicate when replenishment is required."
+
+      - name: updated_at
+        description: "Timestamp indicating when the stock level record was last updated."
