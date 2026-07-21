@@ -1,0 +1,9 @@
+version: 2
+
+seeds:
+  - name: holidays
+    description: List of Brazilian national holidays (2020-2026) including Carnival and Corpus Christi
+    config:
+      column_types:
+        holiday_date: date
+        holiday: string
