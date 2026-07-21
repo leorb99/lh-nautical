@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: fct_current_inventory
+    description: >
+      Current inventory position fact table with one row per product variant
+      and location. Combines the current quantity on hand with sales demand
+      from the latest 30-day period available in the dataset. Provides
+      inventory coverage and stockout-risk indicators for the inventory
+      dashboard.
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id
+
+    columns:
+      - name: current_inventory_sk
+        description: >
+          Surrogate key generated from product_variant_id and location_id.
+        tests:
+          - unique
+          - not_null
+
+      - name: product_variant_id
+        description: "Identifier of the product variant."
+        tests:
+          - not_null
+
+      - name: location_id
+        description: "Identifier of the inventory location."
+        tests:
+          - not_null
+
+      - name: quantity_on_hand
+        description: "Current physical quantity available at the location."
+        tests:
+          - not_null
+
+      - name: source_reorder_point
+        description: >
+          Reorder point provided by the source system. The field is currently
+          null in the available source records and is preserved for future use.
+
+      - name: inventory_reference_date
+        description: "Source date associated with the current inventory position."
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_30_days
+        description: "Quantity sold during the latest 30-day analysis window."
+        tests:
+          - not_null
+
+      - name: average_daily_sales_30d
+        description: "Average sales quantity per calendar day over the 30-day window."
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_30_days
+        description: "Number of distinct days with sales during the analysis window."
+
+      - name: last_sale_date
+        description: "Most recent sale date for the variant and location."
+
+      - name: inventory_analysis_date
+        description: >
+          Latest stock movement date available and ending date of the analysis
+          window.
+
+      - name: inventory_coverage_days
+        description: >
+          Estimated number of days the current inventory can cover, based on
+          average daily sales over the latest 30 days.
+
+      - name: inventory_health_status
+        description: >
+          Inventory health classification. Thresholds are analytical premises:
+          out_of_stock for zero inventory, critical for up to 7 days of
+          coverage, attention for more than 7 and up to 15 days, healthy for
+          more than 15 days, and no_recent_sales when there was no demand in
+          the analysis window.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - out_of_stock
+                  - critical
+                  - attention
+                  - healthy
+                  - no_recent_sales
+
+      - name: is_stockout_risk
+        description: >
+          Indicates zero inventory or estimated coverage of seven days or less.
+        tests:
+          - not_null
