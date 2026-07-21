@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: stg_return_items
+    description: "Staging table containing cleaned and standardized items associated with product returns."
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - return_id
+              - order_item_id
+
+    columns:
+      - name: return_item_id
+        description: "Primary key of the return items table."
+        tests:
+          - unique
+          - not_null
+
+      - name: return_id
+        description: "Foreign key mapping to the return associated with the item."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_returns')
+                field: return_id
+
+      - name: order_item_id
+        description: "Foreign key mapping to the original order item."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_order_items')
+                field: order_item_id
+
+      - name: return_item_quantity
+        description: "The quantity of the order item included in the return."
+        tests:
+          - not_null
+
+      - name: return_item_action
+        description: "The action applied to the returned item."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["refund", "exchange"]
+
+      - name: exchange_variant_id
+        description: "Foreign key mapping to the replacement product variant when the action is an exchange."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('stg_product_variants')
+                field: product_variant_id
+
+      - name: return_item_unit_refund_amount
+        description: "The refund amount per returned unit. It is zero when the action is an exchange."
+        tests:
+          - not_null

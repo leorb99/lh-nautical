@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: stg_variant_attribute_values
+    description: "Staging table containing the values assigned to each attribute of a product variant."
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - product_variant_id
+            - attribute_id
+
+    columns:
+      - name: product_variant_id
+        description: "Foreign key identifying the product variant associated with the attribute value."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product_variants')
+              field: product_variant_id
+
+      - name: attribute_id
+        description: "Foreign key identifying the attribute represented by the value."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_attributes')
+              field: attribute_id
+
+      - name: attribute_value
+        description: "Text value assigned to the attribute for the product variant."
+        tests:
+          - not_null
