@@ -1,6 +1,6 @@
 with
     source as (
-        select * 
+        select *
         from {{ source('bronze', 'purchase_orders') }}
     )
 
@@ -10,11 +10,11 @@ with
             , cast(po_number as string) as purchase_order_number
             , cast(supplier_id as int) as supplier_id
             , cast(buyer_id as int) as buyer_id
-            , cast(destination_location_id as string) as destination_location_id
+            , cast(destination_location_id as int) as destination_location_id
             , cast(status as string) as purchase_order_status
             , cast(currency as string) as purchase_order_currency
-            , cast(subtotal as decimal(14,2)) as purchase_order_subtotal
-            , cast(total as decimal(14,2)) as purchase_order_total
+            , cast(subtotal as decimal(14, 2)) as purchase_order_subtotal
+            , cast(total as decimal(14, 2)) as purchase_order_total
             , cast(placed_at as timestamp) as placed_at
             , cast(expected_delivery_at as date) as purchase_order_expected_delivery_at
             , cast(created_at as timestamp) as created_at
@@ -26,5 +26,6 @@ with
             , cast(_action as string) as _action
         from source
     )
-select * 
+
+select *
 from purchase_orders
