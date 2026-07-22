@@ -1,87 +1,69 @@
 version: 2
 
 models:
-  - name: int_product_variants_build
-    description: >
-      Final intermediate model that combines enriched product data, variant-level pricing,
-      and cleaned variant attribute values for downstream analytics.
-    
+  - name: int_product_variants
+    description: "Intermediate model that cleans and enriches product variant data for downstream dimensions."
     columns:
       - name: product_variant_id
         description: "Primary key of the product variant."
         tests:
           - unique
           - not_null
-      
       - name: product_id
         description: "Foreign key to the parent product."
         tests:
           - not_null
-      
       - name: product_variant_sku
         description: "SKU code for the product variant."
-      
+        tests:
+          - not_null
+      - name: product_variant_barcode_ean
+        description: "EAN barcode for the product variant."
       - name: product_variant_sale_price
         description: "Sale price for the product variant."
-      
+        tests:
+          - not_null
       - name: product_variant_cost_price
         description: "Cost price for the product variant."
-      
       - name: product_variant_icms_rate
         description: "ICMS tax rate for the product variant."
-      
       - name: product_variant_ipi_rate
         description: "IPI tax rate for the product variant."
-      
       - name: is_variant_active
         description: "Indicates whether the product variant is active."
-      
+        tests:
+          - not_null
       - name: product_name
-        description: "Normalized product name used when variant-level data is combined with product master data."
-      
+        description: "Normalized product name."
       - name: product_description
-        description: "Normalized product description used for the variant build."
-      
+        description: "Normalized product description."
       - name: product_unit_of_measure
         description: "Unit of measure for the product."
-      
       - name: is_product_active
         description: "Indicates whether the parent product is active."
-      
       - name: brand_name
-        description: "Brand name of the product."
-      
+        description: "Brand name for the product."
       - name: category_name
-        description: "Category name of the product."
-      
+        description: "Product category name."
+      - name: category_url_slug
+        description: "Product category URL slug."
       - name: parent_category_name
-        description: "Parent category name of the product category."
-      
+        description: "Parent category name for the product."
+      - name: product_ncm_code
+        description: "NCM classification code for the product."
       - name: attr_color
-        description: "Cleaned and normalized color attribute for the product variant."
-      
+        description: "Cleaned color attribute."
       - name: attr_size
-        description: "Cleaned and normalized size attribute for the product variant."
-      
+        description: "Cleaned size attribute."
       - name: attr_length_m
-        description: "Length attribute in meters for the product variant."
-      
+        description: "Length attribute in meters."
       - name: attr_power_hp
-        description: "Power attribute in horsepower for the product variant."
-      
+        description: "Power attribute in horsepower."
       - name: attr_voltage_v
-        description: "Voltage attribute in volts for the product variant."
-      
+        description: "Voltage attribute in volts."
       - name: attr_weight_kg
-        description: "Weight attribute in kilograms for the product variant."
-      
+        description: "Weight attribute in kilograms."
       - name: attr_waterproof
-        description: "Boolean attribute indicating whether the variant is waterproof."
-      
+        description: "Waterproof attribute as a boolean."
       - name: attr_material
         description: "Material attribute for the product variant."
-    
-    tests:
-      - dbt_utils.equal_rowcount:
-          arguments:
-            compare_model: ref('stg_product_variants')
