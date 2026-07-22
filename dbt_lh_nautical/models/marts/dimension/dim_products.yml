@@ -33,6 +33,12 @@ models:
       - name: product_description
         description: "Normalized product description for the product variant."
       
+      - name: unit_of_measure
+        description: "Unit of measure for the product variant."
+      
+      - name: product_ncm_code
+        description: "NCM classification code for the product."
+      
       - name: category_name
         description: "Name of the product category."
       
@@ -45,11 +51,8 @@ models:
       - name: brand_name
         description: "Name of the product brand."
       
-      - name: product_ncm_code
-        description: "NCM classification code for the product."
-      
-      - name: product_unit_of_measure
-        description: "Unit of measure for the product."
+      - name: brand_country
+        description: "Country of origin for the product brand."
       
       - name: product_variant_weight_kg
         description: "Weight of the product variant in kilograms."
@@ -92,3 +95,18 @@ models:
       
       - name: is_variant_active
         description: "Indicates whether the product variant is active."
+
+      - name: is_product_active
+        description: "Indicates whether the parent product is active."
+      
+      - name: is_brand_active
+        description: "Indicates whether the related brand is active."
+      
+      - name: is_category_active
+        description: "Indicates whether the related category is active."
+      
+      - name: product_created_at
+        description: "Creation timestamp of the source product record."
+      
+      - name: brand_created_at
+        description: "Creation timestamp of the source brand record."
