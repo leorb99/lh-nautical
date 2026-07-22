@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: int_variant_attributes
+    description: >
+      Intermediate model that pivots cleaned variant attribute values into a single
+      wide row per product variant for easier analytics consumption.
+
+    columns:
+      - name: product_variant_id
+        description: "Primary key of the product variant."
+        tests:
+          - unique
+          - not_null
+
+      - name: attr_color
+        description: "Normalized color attribute for the product variant."
+
+      - name: attr_size
+        description: "Normalized size attribute for the product variant."
+
+      - name: attr_length_m
+        description: "Length attribute in meters."
+
+      - name: attr_power_hp
+        description: "Power attribute in horsepower."
+
+      - name: attr_voltage_v
+        description: "Voltage attribute in volts."
+
+      - name: attr_weight_kg
+        description: "Weight attribute in kilograms."
+
+      - name: attr_waterproof
+        description: "Boolean flag indicating whether the product variant is waterproof."
+
+      - name: attr_material
+        description: "Material attribute for the product variant."
