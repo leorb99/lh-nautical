@@ -58,9 +58,15 @@ models:
           - not_null
       
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Action type from the CDC pipeline."
         tests:
           - not_null
           - accepted_values:
+              arguments:
+                values:
+                  - CARGA_INICIAL
+                  - INITIAL_LOAD
+                  - INSERT_OR_UPDATE
+                quote: true
               values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
               quote: true
