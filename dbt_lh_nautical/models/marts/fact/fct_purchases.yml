@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: fct_purchases
+    description: "Purchases fact, one row per purchase order item, with purchase order attributes denormalized"
+    columns:
+      - name: purchase_order_item_id
+        description: "Primary key for the purchase order item"
+        tests:
+          - unique
+          - not_null
+
+      - name: purchase_order_id
+        description: "Foreign key pointing to the parent purchase order"
+
+      - name: product_variant_id
+        description: "Foreign key pointing to the purchased product variant"
+
+      - name: supplier_id
+        description: "Foreign key pointing to the supplier associated with this purchase order"
+
+      - name: buyer_id
+        description: "Foreign key pointing to the employee who placed the purchase order"
+
+      - name: destination_location_id
+        description: "Foreign key pointing to the location where the order should be delivered"
+
+      - name: purchase_order_number
+        description: "The natural key / human-readable purchase order number"
+
+      - name: purchase_order_status
+        description: "The current lifecycle status of the purchase order"
+
+      - name: purchase_order_currency
+        description: "The currency used for the purchase order amounts"
+
+      - name: placed_at
+        description: "Timestamp when the purchase order was placed"
+
+      - name: purchase_order_expected_delivery_at
+        description: "The expected delivery date for the purchase order"
+
+      - name: purchase_order_item_quantity_ordered
+        description: "Quantity ordered for this purchase order line item"
+
+      - name: purchase_order_item_unit_cost
+        description: "Unit cost for this purchase order line item"
+
+      - name: purchase_order_item_line_total
+        description: "Total amount for this purchase order line item"
