@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: int_goods_receipt_items
+    description: >
+      Intermediate model for goods receipt line items, one row per purchase
+      order item received within a goods receipt event. A purchase order item
+      can have more than one goods receipt over time (partial deliveries), so
+      this isn't a 1:1 relationship. In the initial load dataset, no
+      purchase_order_item_id repeats across more than one goods_receipt_id (1:1 or 1:0),
+      but that's a property of this dataset, not a guarantee, so no uniqueness
+      test is enforced on purchase_order_item_id.
+    columns:
+      - name: goods_receipt_item_id
+        description: "Primary key for the goods receipt item"
+        tests:
+          - unique
+          - not_null
+
+      - name: goods_receipt_id
+        description: "Foreign key pointing to the parent goods receipt event"
+
+      - name: purchase_order_item_id
+        description: "Foreign key pointing to the purchase order item being received"
+
+      - name: goods_receipt_item_quantity_received
+        description: "Quantity received for this purchase order line item in this receiving event"
