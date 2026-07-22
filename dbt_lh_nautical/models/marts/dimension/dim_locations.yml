@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: dim_locations
+    description: >
+      Location dimension, one row per physical location (store or warehouse).
+      Excludes updated_at (source audit timestamp, no analytical value here),
+      present in int_locations.
+    columns:
+      - name: location_sk
+        description: >
+          Surrogate key for the location, generated from location_id. Decoupled
+          from the source system's ID; other models should join on this key
+        tests:
+          - unique
+          - not_null
+
+      - name: location_id
+        description: "Natural/business key for the location, as assigned by the source system"
+        tests:
+          - unique
+          - not_null
+
+      - name: location_name
+        description: "Commercial or internal name of the location"
+
+      - name: location_type
+        description: "Categorization of the location (e.g., store, warehouse)"
+
+      - name: location_postal_code
+        description: "Postal code of the location"
+
+      - name: location_street
+        description: "Street name of the location"
+
+      - name: location_number
+        description: "Address number of the location"
+
+      - name: location_complement
+        description: "Complement of the location address (e.g. block, floor)"
+
+      - name: location_district
+        description: "District/neighborhood of the location"
+
+      - name: location_city
+        description: "City of the location"
+
+      - name: location_state
+        description: "State of the location"
+
+      - name: location_country
+        description: "Country of the location"
+
+      - name: is_active
+        description: "Indicates whether the location is currently operational"
+
+      - name: created_at
+        description: "Timestamp when the location record was created in the source system. Nullified when found in the future"
