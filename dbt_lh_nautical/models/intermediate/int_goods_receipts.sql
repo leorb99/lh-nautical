@@ -1,28 +1,28 @@
-with goods_receipts as (
-    select *
-    from {{ ref('stg_goods_receipts') }}
-)
+with
+    goods_receipts as (
+        select *
+        from {{ ref('stg_goods_receipts') }}
+    )
 
-, intermediate_transformations as (
-    select
-        goods_receipt_id
-        , purchase_order_id
-        , received_by_employee_id
-        
-        -- notes are not necessary
-        -- 1471 values null
-        --, goods_receipt_notes
-        
-        -- Timestamps
-        -- There are future date
-        , received_at
-        , created_at
+    , cleaned_goods_receipts as (
+        select
+            goods_receipt_id
+            , purchase_order_id
+            , received_by_employee_id
 
-        -- Calculation of latency between operational receipt and system creation in hours
-        --, cast((cast(created_at as double) - cast(received_at as double)) / 3600 as int) as system_entry_latency_hours
+            -- Nullifies placeholder values found via discovery: only punctuation-only values,
+            -- covering both '...' and a standalone em dash ('—')
+            , case
+                when trim(goods_receipt_notes) rlike '^[.\\-—?]+$' then null
+                else trim(goods_receipt_notes)
+            end as goods_receipt_notes
 
-    from goods_receipts
-)
+            -- Nullifies future timestamps, since a receipt can't be received/created
+            -- ahead of now; keeps the rest of the row, as this is an isolated field-level issue
+            , case when received_at > current_timestamp() then null else received_at end as received_at
+            , case when created_at > current_timestamp() then null else created_at end as created_at
+        from goods_receipts
+    )
 
 select *
-from intermediate_transformations
+from cleaned_goods_receipts
