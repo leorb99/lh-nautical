@@ -1,0 +1,11 @@
+dbt_lh_nautical:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: "{{ var('catalog_name') }}"
+      schema: "{{ var('schema_name') }}"
+      host: "{{ env_var('DBT_HOST') }}"
+      http_path: /sql/1.0/warehouses/e792e2cd0d725b8c
+      token: "{{ env_var('DBT_ACCESS_TOKEN') }}"
+      threads: 4
