@@ -109,10 +109,9 @@ with
             , enriched_invoices.created_at as fiscal_invoice_created_at
             , enriched_invoices.updated_at as fiscal_invoice_updated_at
 
-            -- Centralized rule for what counts as an effective/completed sale: the order
-            -- must be paid AND have an authorized fiscal invoice. Orders paid but with a
-            -- cancelled/rejected invoice are excluded, since they lack valid fiscal
-            -- documentation for the sale, even though payment was received.
+            -- Centralized rule for what counts as an effective/completed sale: the order must be paid AND have an authorized fiscal invoice.
+            -- Orders paid but with a cancelled/rejected invoice are excluded, since they lack valid fiscal documentation for the sale, 
+            -- even though payment was received.
             , case
                 when
                     cleaned_orders.order_status = 'paid'
@@ -120,6 +119,19 @@ with
                     then true
                 else false
             end as is_effective_sale
+
+            -- TODO: consider a separate flag for order_status = 'paid' with fiscal_invoice_status = 'rejected' (~1,071 orders, ~R$30.9M): 
+            -- payment was received but the invoice failed fiscal validation and could still be reissued, 
+            -- so this may be revenue pending regularization rather than lost.
+            -- 'cancelled' invoices are a separate (~R$50M), more ambiguous case (the invoice was deliberately voided, 
+            -- possibly meaning the sale itself was reversed).
+            -- , case
+            --     when
+            --         cleaned_orders.order_status = 'paid'
+            --         and enriched_invoices.fiscal_invoice_status = 'rejected'
+            --         then true
+            --     else false
+            -- end as is_paid_sale_pending_invoice_fix 
         from cleaned_orders
         left join enriched_invoices
             on cleaned_orders.order_id = enriched_invoices.order_id
