@@ -1,7 +1,7 @@
 with
     inventory_snapshots as (
         select *
-        from {{ ref('fct_inventory_snapshot') }}
+        from {{ ref('int_inventory_snapshots') }}
     )
 
     , snapshot_periods as (
@@ -43,7 +43,7 @@ with
 
         from snapshot_periods
 
-        left join {{ ref('fct_stock_movements') }} as stock_movements
+        left join {{ ref('int_stock_movements') }} as stock_movements
             on snapshot_periods.product_variant_id
                 = stock_movements.product_variant_id
             and snapshot_periods.location_id

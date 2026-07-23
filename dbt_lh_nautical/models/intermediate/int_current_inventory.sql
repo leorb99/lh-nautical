@@ -1,37 +1,25 @@
 with
-    stock_level_snapshots as (
+    inventory_snapshots as (
         select *
-        from {{ ref('snp_stock_levels') }}
-        where dbt_valid_to is null
+        from {{ ref('int_inventory_snapshots') }}
+        where is_current_snapshot = true
     )
 
     , current_inventory as (
         select
-            dbt_scd_id as current_inventory_snapshot_sk
+            inventory_snapshot_sk as current_inventory_snapshot_sk
 
             , product_variant_id
             , location_id
-            , stock_level_quantity_on_hand as quantity_on_hand
-            , stock_level_reorder_point as reorder_point
-            , updated_at as source_updated_at
+            , quantity_on_hand
+            , reorder_point
+            , source_updated_at
+            , snapshot_valid_from
+            , snapshot_date
+            , is_out_of_stock
+            , is_below_reorder_point
 
-            , dbt_valid_from as snapshot_valid_from
-            , cast(dbt_valid_from as date) as snapshot_date
-
-            , case
-                when stock_level_quantity_on_hand = 0 then true
-                else false
-            end as is_out_of_stock
-
-            , case
-                when stock_level_reorder_point is not null
-                    and stock_level_quantity_on_hand
-                        <= stock_level_reorder_point
-                    then true
-                else false
-            end as is_below_reorder_point
-
-        from stock_level_snapshots
+        from inventory_snapshots
     )
 
 select *
