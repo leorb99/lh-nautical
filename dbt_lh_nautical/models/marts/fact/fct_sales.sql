@@ -26,11 +26,16 @@ with
             , orders.order_status
             , orders.fiscal_invoice_status
             , orders.placed_at
+            , orders.is_effective_sale
 
-            -- Order-level monetary totals, excluded: not additive at item grain, would be double-counted if summed across an order's items
+            -- Official order-level revenue field, repeated per item: do not SUM directly
+            -- across items of the same order, it would double-count. Aggregate by
+            -- order_id first (e.g. count(distinct order_id) for average ticket).
+            , orders.order_total_amount
+
+            -- Other order-level monetary totals, excluded: not additive at item grain, would be double-counted if summed across an order's items
             -- , orders.order_subtotal_amount
             -- , orders.order_discount_amount
-            -- , orders.order_total_amount
             -- , orders.fiscal_invoice_total_amount
             -- , orders.authorized_fiscal_invoice_amount
 

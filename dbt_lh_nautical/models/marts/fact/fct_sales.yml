@@ -43,6 +43,17 @@ models:
       - name: placed_at
         description: "Timestamp when the order was placed"
 
+      - name: is_effective_sale
+        description: >
+          Indicates whether the parent order counts as an effective/completed
+          sale (paid, with an authorized fiscal invoice).
+
+      - name: order_total_amount
+        description: >
+          The order's official total amount (after discount), repeated per
+          item. Do not sum directly across items of the same order, it would
+          double-count; aggregate by order_id first (e.g. for average ticket).
+
       - name: order_item_quantity
         description: "Quantity sold for this line item"
 

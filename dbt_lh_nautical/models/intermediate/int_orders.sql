@@ -108,6 +108,18 @@ with
             , enriched_invoices.issued_at as fiscal_invoice_issued_at
             , enriched_invoices.created_at as fiscal_invoice_created_at
             , enriched_invoices.updated_at as fiscal_invoice_updated_at
+
+            -- Centralized rule for what counts as an effective/completed sale: the order
+            -- must be paid AND have an authorized fiscal invoice. Orders paid but with a
+            -- cancelled/rejected invoice are excluded, since they lack valid fiscal
+            -- documentation for the sale, even though payment was received.
+            , case
+                when
+                    cleaned_orders.order_status = 'paid'
+                    and enriched_invoices.fiscal_invoice_status = 'authorized'
+                    then true
+                else false
+            end as is_effective_sale
         from cleaned_orders
         left join enriched_invoices
             on cleaned_orders.order_id = enriched_invoices.order_id
