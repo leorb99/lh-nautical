@@ -1,7 +1,7 @@
 with
-    stock_levels as (
+    current_stock as (
         select *
-        from {{ ref('stg_stock_levels') }}
+        from {{ ref('int_current_inventory') }}
     )
 
     , inventory_consumption as (
@@ -12,15 +12,15 @@ with
     , current_inventory as (
         select
             {{ dbt_utils.generate_surrogate_key([
-                'stock_levels.product_variant_id',
-                'stock_levels.location_id'
+                'current_stock.product_variant_id',
+                'current_stock.location_id'
             ]) }} as current_inventory_sk
 
-            , stock_levels.product_variant_id
-            , stock_levels.location_id
-            , stock_levels.stock_level_quantity_on_hand as quantity_on_hand
-            , stock_levels.stock_level_reorder_point as source_reorder_point
-            , cast(stock_levels.updated_at as date) as inventory_reference_date
+            , current_stock.product_variant_id
+            , current_stock.location_id
+            , current_stock.quantity_on_hand
+            , current_stock.reorder_point as source_reorder_point
+            , current_stock.snapshot_date as inventory_reference_date
 
             , coalesce(
                 inventory_consumption.sales_quantity_last_30_days,
@@ -39,7 +39,7 @@ with
             , case
                 when inventory_consumption.average_daily_sales_30d > 0
                 then cast(
-                    stock_levels.stock_level_quantity_on_hand
+                    current_stock.quantity_on_hand
                     / inventory_consumption.average_daily_sales_30d
                     as decimal(14, 2)
                 )
@@ -47,7 +47,7 @@ with
             end as inventory_coverage_days
 
             , case
-                when stock_levels.stock_level_quantity_on_hand = 0
+                when current_stock.quantity_on_hand = 0
                     then 'out_of_stock'
 
                 when coalesce(
@@ -57,13 +57,13 @@ with
                     then 'no_recent_sales'
 
                 when (
-                    stock_levels.stock_level_quantity_on_hand
+                    current_stock.quantity_on_hand
                     / inventory_consumption.average_daily_sales_30d
                 ) <= 7
                     then 'critical'
 
                 when (
-                    stock_levels.stock_level_quantity_on_hand
+                    current_stock.quantity_on_hand
                     / inventory_consumption.average_daily_sales_30d
                 ) <= 15
                     then 'attention'
@@ -72,12 +72,12 @@ with
             end as inventory_health_status
 
             , case
-                when stock_levels.stock_level_quantity_on_hand = 0
+                when current_stock.quantity_on_hand = 0
                     then true
 
                 when inventory_consumption.average_daily_sales_30d > 0
                     and (
-                        stock_levels.stock_level_quantity_on_hand
+                        current_stock.quantity_on_hand
                         / inventory_consumption.average_daily_sales_30d
                     ) <= 7
                     then true
@@ -85,11 +85,12 @@ with
                 else false
             end as is_stockout_risk
 
-        from stock_levels
+        from current_stock
+
         left join inventory_consumption
-            on stock_levels.product_variant_id
+            on current_stock.product_variant_id
                 = inventory_consumption.product_variant_id
-            and stock_levels.location_id
+            and current_stock.location_id
                 = inventory_consumption.location_id
     )
 
