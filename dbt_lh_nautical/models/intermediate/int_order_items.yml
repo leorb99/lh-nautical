@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: int_order_items
+    description: "Intermediate model for order line items, one row per order item"
+    columns:
+      - name: order_item_id
+        description: "Primary key for the order item"
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: "Foreign key pointing to the parent order"
+
+      - name: product_variant_id
+        description: "Foreign key pointing to the purchased product variant"
+
+      - name: order_item_quantity
+        description: "Quantity ordered for this line item"
+
+      - name: order_item_unit_price
+        description: "Unit price for this line item"
+
+      - name: order_item_line_total
+        description: "Total amount charged for this line item"
+
+      - name: order_item_icms_rate
+        description: "ICMS tax rate applied to this line item"
+
+      - name: order_item_ipi_rate
+        description: "IPI tax rate applied to this line item"
+
+      - name: order_item_icms_amount
+        description: "ICMS tax amount for this line item, calculated from the line total"
+
+      - name: order_item_ipi_amount
+        description: "IPI tax amount for this line item, calculated from the line total"
+
+      - name: order_item_net_revenue
+        description: "The actual income the business keeps from this line item, after taxes"
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_item_line_total = order_item_quantity * order_item_unit_price"

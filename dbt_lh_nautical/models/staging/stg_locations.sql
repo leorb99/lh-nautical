@@ -8,15 +8,15 @@ with
         select
             cast(id as int) as location_id
             , cast(name as string) as location_name
-            , cast(location_type as string)
+            , cast(location_type as string) as location_type
             , cast(postal_code as string) as location_postal_code
             , cast(street as string) as location_street
-            , cast(number as int) as location_number
+            , cast(number as string) as location_number
             , cast(complement as string) as location_complement
             , cast(district as string) as location_district
             , cast(city as string) as location_city
             , cast(state as string) as location_state
-            , cast(country as string) as location_contry
+            , cast(country as string) as location_country
             , cast(is_active as boolean) as is_active
             , cast(created_at as timestamp) as created_at
             , cast(updated_at as timestamp) as updated_at

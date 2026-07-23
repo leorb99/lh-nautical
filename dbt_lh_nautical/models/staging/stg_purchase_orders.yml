@@ -30,6 +30,9 @@ models:
         description: "Foreign key pointing to the employee/buyer who placed the order."
         tests:
           - not_null
+          - relationships:
+              field: employee_id
+              to: ref('stg_employees')
 
       - name: destination_location_id
         description: "Foreign key pointing to the physical location where the order should be delivered."

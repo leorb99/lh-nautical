@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: fct_sales
+    description: "Sales fact, one row per order item, with order attributes denormalized"
+    columns:
+      - name: order_item_id
+        description: "Primary key for the order item"
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: "Foreign key pointing to the parent order"
+
+      - name: product_variant_id
+        description: "Foreign key pointing to the sold product variant"
+
+      - name: customer_id
+        description: "Foreign key pointing to the customer who placed the order"
+
+      - name: salesperson_id
+        description: "Foreign key pointing to the employee who acted as salesperson for this order"
+
+      - name: location_id
+        description: "Foreign key pointing to the location where the order was placed"
+
+      - name: fiscal_invoice_id
+        description: "Foreign key pointing to the fiscal invoice associated with the order, if one exists"
+
+      - name: order_number
+        description: "The natural key / human-readable order number"
+
+      - name: order_channel
+        description: "The sales channel where the order originated (e.g., ecommerce, pos)"
+
+      - name: order_status
+        description: "The current lifecycle status of the order"
+
+      - name: fiscal_invoice_status
+        description: "The current status of the fiscal invoice associated with the order"
+
+      - name: placed_at
+        description: "Timestamp when the order was placed"
+
+      - name: order_item_quantity
+        description: "Quantity sold for this line item"
+
+      - name: order_item_unit_price
+        description: "Unit price for this line item"
+
+      - name: order_item_line_total
+        description: "Total amount charged for this line item"
+
+      - name: order_item_icms_rate
+        description: "ICMS tax rate applied to this line item"
+
+      - name: order_item_ipi_rate
+        description: "IPI tax rate applied to this line item"
+
+      - name: order_item_icms_amount
+        description: "ICMS tax amount for this line item"
+
+      - name: order_item_ipi_amount
+        description: "IPI tax amount for this line item"
+
+      - name: order_item_net_revenue
+        description: "The actual income the business keeps from this line item, after taxes"
+
+    tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('int_order_items')

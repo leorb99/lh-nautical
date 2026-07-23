@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: stg_returns
+    description: "Staging table containing cleaned and standardized product return records."
+
+    columns:
+      - name: return_id
+        description: "Primary key of the returns table."
+        tests:
+          - unique
+          - not_null
+
+      - name: return_number
+        description: "Unique business identifier assigned to the return."
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: "Foreign key mapping to the order associated with the return."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+      - name: customer_id
+        description: "Foreign key mapping to the customer associated with the return."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: received_at_location_id
+        description: "Foreign key mapping to the location where the returned items were received."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_locations')
+                field: location_id
+
+      - name: return_status
+        description: "The current processing status of the return."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["completed", "cancelled", "open"]
+
+      - name: return_reason
+        description: "The reported reason for the product return."
+
+      - name: return_total_refund_amount
+        description: "The total monetary amount refunded for the return."
+        tests:
+          - not_null
+
+      - name: created_at
+        description: "Timestamp indicating when the return record was created."
+        tests:
+          - not_null
+
+      - name: updated_at
+        description: "Timestamp indicating when the return record was last updated."
+        tests:
+          - not_null
