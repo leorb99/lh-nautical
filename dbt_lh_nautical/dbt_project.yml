@@ -45,6 +45,3 @@ models:
       fact:
         +materialized: table
         +schema: gold
-      aggregation:
-        +materialized: table
-        +schema: gold
