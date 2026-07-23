@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: int_inventory_demand_metrics
+    description: >
+      Calculates inventory demand metrics by product variant and location
+      using 30-day, 60-day and 90-day sales windows.
+
+    columns:
+      - name: product_variant_id
+        description: Identifier of the product variant.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Identifier of the inventory location.
+        tests:
+          - not_null
+
+      - name: inventory_analysis_date
+        description: Latest available sales movement date used as the reference date.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_30_days
+        description: Total quantity sold in the latest 30-day window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_60_days
+        description: Total quantity sold in the latest 60-day window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_90_days
+        description: Total quantity sold in the latest 90-day window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_30d
+        description: Average daily sales across the latest 30 calendar days.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_60d
+        description: Average daily sales across the latest 60 calendar days.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_90d
+        description: Average daily sales across the latest 90 calendar days.
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_30_days
+        description: Number of distinct days with sales in the latest 30-day window.
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_60_days
+        description: Number of distinct days with sales in the latest 60-day window.
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_90_days
+        description: Number of distinct days with sales in the latest 90-day window.
+        tests:
+          - not_null
+
+      - name: last_sale_date
+        description: Most recent sale date for the product variant and location.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id
