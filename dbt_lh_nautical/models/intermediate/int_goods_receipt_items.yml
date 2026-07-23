@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: int_goods_receipt_items
+    description: "Intermediate goods receipt lines with fractional and zero-quantity volume flags."
+    columns:
+      - name: goods_receipt_item_id
+        description: "Primary key of the goods receipt item line."
+        tests:
+          - unique
+          - not_null
+      - name: goods_receipt_id
+        description: "Foreign key linking back to the main receipt document."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('int_goods_receipts')
+              field: goods_receipt_id

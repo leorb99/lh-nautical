@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: int_employees
+    description: "Intermediate employees table with cleaned names, normalized CPF identifiers, and active lifecycle tracking."
+    columns:
+      - name: employee_id
+        description: "Primary key of the employee."
+        tests:
+          - unique
+          - not_null
+
+      - name: employee_full_name
+        description: "Standardized and capitalized employee full name."
+        tests:
+          - not_null
+
+      - name: employee_cpf
+        description: "Alphanumeric-only CPF identifier with special characters removed."
+        tests:
+          - unique
+          - not_null
+
+      - name: employee_email
+        description: "Lowercased and trimmed operational email address."
+        tests:
+          - not_null
+
+      - name: is_active
+        description: "Boolean flag representing current employment status."
+        tests:
+          - not_null
