@@ -17,6 +17,7 @@ with
             , payments.payment_installments
             , payments.payment_amount
             , payments.payment_status
+            , case when payments.created_at > current_timestamp() then null else payments.created_at end as payment_created_at
         from payments
         left join dim_payment_method
             on payments.payment_method = dim_payment_method.payment_method_name

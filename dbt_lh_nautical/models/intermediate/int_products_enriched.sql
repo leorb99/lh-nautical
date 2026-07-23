@@ -15,8 +15,8 @@ with
             child.category_id
             , child.category_name
             , child.category_url_slug
-            , child.created_at
-            , child.updated_at
+            , case when child.created_at > current_timestamp() then null else child.created_at end as category_created_at
+            , case when child.updated_at > current_timestamp() then null else child.updated_at end as category_updated_at
             , parent.category_id as parent_category_id
             , parent.category_name as parent_category_name
         from {{ ref('stg_categories') }} as child
@@ -40,8 +40,8 @@ with
             , products.product_ncm_code
             , products.product_unit_of_measure
             , products.is_active as is_product_active
-            , products.created_at as product_created_at
-            , products.updated_at as product_updated_at
+            , case when products.created_at > current_timestamp() then null else products.created_at end as product_created_at
+            , case when products.updated_at > current_timestamp() then null else products.updated_at end as product_updated_at
         from products
     )
 
@@ -59,8 +59,8 @@ with
             , brands.brand_name
             , brands.brand_country
             , brands.is_active as is_brand_active
-            , brands.created_at as brand_created_at
-            , brands.updated_at as brand_updated_at
+            , case when brands.created_at > current_timestamp() then null else brands.created_at end as brand_created_at
+            , case when brands.updated_at > current_timestamp() then null else brands.updated_at end as brand_updated_at
             , categories.category_id
             , categories.category_name
             , categories.category_url_slug

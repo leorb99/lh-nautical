@@ -33,3 +33,6 @@ models:
 
       - name: payment_status
         description: "Status of the payment."
+
+      - name: payment_created_at
+        description: "Timestamp when the payment was created. If the timestamp is in the future, it will be set to null to avoid future-dated records."
