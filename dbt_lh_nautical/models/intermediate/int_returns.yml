@@ -37,8 +37,15 @@ models:
           Total refund amount for the returned item, calculated as returned
           quantity multiplied by unit refund amount.
 
+      - name: is_future_return_date
+        description: >
+          Indicates whether the original return timestamp is later than the
+          current pipeline execution timestamp.
+
       - name: is_effective_return
-        description: "Indicates whether the return status is completed"
+        description: >
+          Indicates whether the return is completed and its return timestamp
+          is not in the future.
 
       - name: is_exchange
         description: "Indicates whether the returned item resulted in an exchange"

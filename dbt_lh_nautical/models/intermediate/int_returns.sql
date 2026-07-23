@@ -38,11 +38,23 @@ with
             ) as return_item_total_refund_amount
 
             , returns.return_total_refund_amount
-            , returns.created_at as returned_at
+
+            , case
+                when returns.created_at > current_timestamp() then null
+                else returns.created_at
+            end as returned_at
+
             , returns.updated_at
 
             , case
-                when returns.return_status = 'completed' then true
+                when returns.created_at > current_timestamp() then true
+                else false
+            end as is_future_return_date
+
+            , case
+                when returns.return_status = 'completed'
+                 and returns.created_at <= current_timestamp()
+                then true
                 else false
             end as is_effective_return
 
