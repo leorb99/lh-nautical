@@ -37,8 +37,30 @@ models:
           Total refund amount for the returned item, calculated as returned
           quantity multiplied by unit refund amount.
 
+      - name: returned_at
+        description: >
+          Analytical return timestamp derived from the source created_at field.
+          Future-dated values are nullified until the registered date is reached.
+
+      - name: is_future_return_date
+        description: >
+          Indicates whether the source created_at timestamp is later than the
+          current execution timestamp.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
       - name: is_effective_return
-        description: "Indicates whether the return status is completed"
+        description: >
+          Indicates whether the return is completed and has a valid,
+          non-future analytical return date.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: is_exchange
         description: "Indicates whether the returned item resulted in an exchange"

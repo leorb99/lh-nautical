@@ -74,12 +74,29 @@ models:
         description: "Calculated total refund amount for the returned item"
 
       - name: returned_at
-        description: "Timestamp when the return was registered"
+        description: >
+          Analytical return timestamp derived from the source created_at field.
+          Future-dated values remain null until the registered date is reached.
+
+      - name: is_future_return_date
+        description: >
+          Indicates whether the source return timestamp is later than the
+          current execution timestamp.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: is_effective_return
         description: >
-          Indicates whether the return is completed and should affect net
-          revenue calculations.
+          Indicates whether the return is completed, has a valid non-future
+          return date and is eligible to affect net revenue calculations.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: is_exchange
         description: "Indicates whether the return item is an exchange"
