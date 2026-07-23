@@ -109,29 +109,34 @@ with
             , enriched_invoices.created_at as fiscal_invoice_created_at
             , enriched_invoices.updated_at as fiscal_invoice_updated_at
 
-            -- Centralized rule for what counts as an effective/completed sale: the order must be paid AND have an authorized fiscal invoice.
+            -- Centralized rule for what counts as an effective/completed sale: the order must be paid, have an authorized fiscal invoice,
+            -- and a valid (non-future) placed_at! 
             -- Orders paid but with a cancelled/rejected invoice are excluded, since they lack valid fiscal documentation for the sale, 
-            -- even though payment was received.
+            -- even though payment was received. Orders whose placed_at was nullified for being in the future are also excluded: 
+            -- nullifying alone doesn't stop their order_total_amount from being summed into KPIs, so this needs to be enforced here explicitly.
             , case
                 when
                     cleaned_orders.order_status = 'paid'
                     and enriched_invoices.fiscal_invoice_status = 'authorized'
+                    and cleaned_orders.placed_at is not null
                     then true
                 else false
             end as is_effective_sale
 
-            -- TODO: consider a separate flag for order_status = 'paid' with fiscal_invoice_status = 'rejected' (~1,071 orders, ~R$30.9M): 
-            -- payment was received but the invoice failed fiscal validation and could still be reissued, 
-            -- so this may be revenue pending regularization rather than lost.
-            -- 'cancelled' invoices are a separate (~R$50M), more ambiguous case (the invoice was deliberately voided, 
-            -- possibly meaning the sale itself was reversed).
-            -- , case
-            --     when
-            --         cleaned_orders.order_status = 'paid'
-            --         and enriched_invoices.fiscal_invoice_status = 'rejected'
-            --         then true
-            --     else false
-            -- end as is_paid_sale_pending_invoice_fix 
+            -- Orders paid but with a rejected invoice (~1,071 orders, ~R$30.9M): payment was
+            -- received but the invoice failed fiscal validation and could still be reissued,
+            -- so this is revenue pending regularization, not lost revenue. Excluded from
+            -- is_effective_sale above, since the invoice isn't valid yet. 'cancelled' invoices
+            -- are a separate, more ambiguous case (the invoice was deliberately voided,
+            -- possibly meaning the sale itself was reversed) and are not covered by this flag.
+            , case
+                when
+                    cleaned_orders.order_status = 'paid'
+                    and enriched_invoices.fiscal_invoice_status = 'rejected'
+                    and cleaned_orders.placed_at is not null
+                    then true
+                else false
+            end as is_paid_sale_pending_invoice_fix
         from cleaned_orders
         left join enriched_invoices
             on cleaned_orders.order_id = enriched_invoices.order_id
