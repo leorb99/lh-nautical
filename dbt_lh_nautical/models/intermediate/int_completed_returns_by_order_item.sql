@@ -11,7 +11,7 @@ with valid_returns as (
         is_refund,
         is_exchange
 
-    from {{ ref('fct_returns') }}
+    from {{ ref('int_returns') }}
 
     where is_effective_return = true
       and cast(returned_at as date) <= current_date()
