@@ -52,3 +52,16 @@ models:
 
       - name: is_refund
         description: "Indicates whether the returned item resulted in a refund"
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(not is_future_return_date) or returned_at is null"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(not is_future_return_date) or is_effective_return = false"
+
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(not is_effective_return) or returned_at is not null"
