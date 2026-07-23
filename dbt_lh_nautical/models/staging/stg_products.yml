@@ -24,16 +24,18 @@ models:
         tests:
           - not_null
           - relationships:
-              field: brand_id
-              to: ref('stg_brands')
+              arguments:
+                field: brand_id
+                to: ref('stg_brands')
 
       - name: category_id
         description: "Foreign key to the product category."
         tests:
           - not_null
           - relationships:
-              field: category_id
-              to: ref('stg_categories')
+              arguments:
+                field: category_id
+                to: ref('stg_categories')
       
       - name: product_ncm_code
         description: "NCM classification code for the product."
@@ -44,8 +46,9 @@ models:
         description: "Unit of measure for the product (e.g., L, M, PC, UN)."
         tests:
           - accepted_values:
-              values: ['L', 'M', 'PC', 'UN']
-              quote: true
+              arguments:
+                values: ['L', 'M', 'PC', 'UN']
+                quote: true
       
       - name: is_active
         description: "Boolean flag that indicates whether the product is active."
@@ -77,5 +80,6 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+                quote: true

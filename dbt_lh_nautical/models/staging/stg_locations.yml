@@ -20,7 +20,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['store', 'warehouse']
+              arguments:
+                values: ['store', 'warehouse']
 
       - name: is_active
         description: "Flag indicating whether the location is currently operational."

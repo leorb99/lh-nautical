@@ -7,9 +7,10 @@ models:
 
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - product_variant_id
-            - supplier_id
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - supplier_id
 
     columns:
       - name: product_variant_id
@@ -17,16 +18,18 @@ models:
         tests:
           - not_null
           - relationships:
-              field: product_variant_id
-              to: ref('stg_product_variants')
+              arguments:
+                field: product_variant_id
+                to: ref('stg_product_variants')
       
       - name: supplier_id
         description: "Foreign key to the supplier."
         tests:
           - not_null
           - relationships:
-              field: supplier_id
-              to: ref('stg_suppliers')
+              arguments:
+                field: supplier_id
+                to: ref('stg_suppliers')
       
       - name: product_suppliers_supplier_sku
         description: "Supplier-specific SKU for the product variant."
@@ -62,5 +65,6 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+                quote: true
