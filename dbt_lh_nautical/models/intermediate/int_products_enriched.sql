@@ -19,6 +19,7 @@ with
             , case when child.updated_at > current_timestamp() then null else child.updated_at end as category_updated_at
             , parent.category_id as parent_category_id
             , parent.category_name as parent_category_name
+            , child.is_active as is_category_active
         from {{ ref('stg_categories') }} as child
         left join {{ ref('stg_categories') }} as parent
             on child.parent_category_id = parent.category_id
@@ -53,8 +54,8 @@ with
             , cleaned_products.product_ncm_code
             , cleaned_products.product_unit_of_measure
             , cleaned_products.is_product_active
-            , cleaned_products.created_at as product_created_at
-            , cleaned_products.updated_at as product_updated_at
+            , cleaned_products.product_created_at
+            , cleaned_products.product_updated_at
             , brands.brand_id
             , brands.brand_name
             , brands.brand_country
@@ -66,9 +67,9 @@ with
             , categories.category_url_slug
             , categories.parent_category_id
             , categories.parent_category_name
-            , categories.is_active as is_category_active
-            , categories.created_at as category_created_at
-            , categories.updated_at as category_updated_at
+            , categories.is_category_active
+            , categories.category_created_at
+            , categories.category_updated_at
         from cleaned_products
         left join brands
             on cleaned_products.brand_id = brands.brand_id
