@@ -1,0 +1,112 @@
+version: 2
+
+models:
+  - name: dim_products
+    description: "Product dimension derived from cleaned and enriched product variant data."
+    columns:
+      - name: product_sk
+        description: "Surrogate key generated from product_variant_id and product_id."
+        tests:
+          - unique
+          - not_null
+      
+      - name: product_variant_id
+        description: "Primary key for the product variant."
+        tests:
+          - unique
+          - not_null
+      
+      - name: product_id
+        description: "Identifier for the parent product."
+        tests:
+          - not_null
+      
+      - name: product_variant_sku
+        description: "SKU code for the product variant."
+      
+      - name: product_variant_barcode_ean
+        description: "EAN barcode for the product variant."
+      
+      - name: product_name
+        description: "Normalized product name for the product variant."
+      
+      - name: product_description
+        description: "Normalized product description for the product variant."
+      
+      - name: unit_of_measure
+        description: "Unit of measure for the product variant."
+      
+      - name: product_ncm_code
+        description: "NCM classification code for the product."
+      
+      - name: category_name
+        description: "Name of the product category."
+      
+      - name: category_url_slug
+        description: "URL slug for the product category."
+      
+      - name: parent_category_name
+        description: "Name of the parent category for the product category."
+      
+      - name: brand_name
+        description: "Name of the product brand."
+      
+      - name: brand_country
+        description: "Country of origin for the product brand."
+      
+      - name: product_variant_weight_kg
+        description: "Weight of the product variant in kilograms."
+      
+      - name: product_variant_sale_price
+        description: "Sale price of the product variant."
+      
+      - name: product_variant_cost_price
+        description: "Cost price of the product variant."
+      
+      - name: product_variant_icms_rate
+        description: "ICMS tax rate for the product variant."
+      
+      - name: product_variant_ipi_rate
+        description: "IPI tax rate for the product variant."
+      
+      - name: attr_color
+        description: "Cleaned color attribute for the product variant."
+      
+      - name: attr_size
+        description: "Cleaned size attribute for the product variant."
+      
+      - name: attr_length_m
+        description: "Length attribute in meters for the product variant."
+      
+      - name: attr_power_hp
+        description: "Power attribute in horsepower for the product variant."
+      
+      - name: attr_voltage_v
+        description: "Voltage attribute in volts for the product variant."
+      
+      - name: attr_weight_kg
+        description: "Weight attribute in kilograms for the product variant."
+      
+      - name: attr_waterproof
+        description: "Boolean flag indicating whether the product variant is waterproof."
+      
+      - name: attr_material
+        description: "Material attribute for the product variant."
+      
+      - name: is_variant_active
+        description: "Indicates whether the product variant is active."
+
+      - name: is_product_active
+        description: "Indicates whether the parent product is active."
+      
+      - name: is_brand_active
+        description: "Indicates whether the related brand is active."
+      
+      - name: is_category_active
+        description: "Indicates whether the related category is active."
+      
+      - name: product_created_at
+        description: "Creation timestamp of the source product record."
+      
+      - name: brand_created_at
+        description: "Creation timestamp of the source brand record."
