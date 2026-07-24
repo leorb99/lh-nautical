@@ -48,7 +48,7 @@ with
             , enriched_products.is_category_active
             , enriched_products.product_created_at
             , enriched_products.brand_created_at
-        from product_variants 
+        from product_variants
         left join enriched_products
             on product_variants.product_id = enriched_products.product_id
         left join variant_attributes
