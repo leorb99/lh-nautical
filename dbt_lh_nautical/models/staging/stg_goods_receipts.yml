@@ -15,16 +15,18 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_purchase_orders')
-              field: purchase_order_id
+              arguments:
+                to: ref('stg_purchase_orders')
+                field: purchase_order_id
 
       - name: received_by_employee_id
         description: "Foreign key identifying the employee who received and processed the goods."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_employees')
-              field: employee_id
+              arguments:
+                to: ref('stg_employees')
+                field: employee_id
 
       - name: received_at
         description: "The timestamp when the goods were physically received."

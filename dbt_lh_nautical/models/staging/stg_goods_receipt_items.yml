@@ -15,16 +15,18 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_goods_receipts')
-              field: goods_receipt_id
+              arguments:
+                to: ref('stg_goods_receipts')
+                field: goods_receipt_id
 
       - name: purchase_order_item_id
         description: "Foreign key mapping to the purchase order items table"
         tests:
           - not_null
           - relationships:
-              to: ref('stg_purchase_order_items')
-              field: purchase_order_item_id
+              arguments:
+                to: ref('stg_purchase_order_items')
+                field: purchase_order_item_id
       
       - name: goods_receipt_item_quantity_received
         description: "The physical quantity of items received and checked into inventory."
