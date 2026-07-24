@@ -34,3 +34,16 @@ models:
         description: "Text value assigned to the attribute for the product variant."
         tests:
           - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. CARGA_INICIAL, INSERT_OU_UPDATE)."

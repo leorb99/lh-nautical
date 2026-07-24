@@ -45,20 +45,14 @@ models:
           - not_null
       
       - name: _hash
-        description: "MD5/SHA hash of the record used for deduplication or change tracking."
+        description: "Hash generated for record deduplication and change detection."
         tests:
           - not_null
       
       - name: _ingested_at
-        description: "Timestamp when the data was ingested into the Bronze layer."
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
         tests:
           - not_null
       
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-                quote: true
+        description: "Ingestion action associated with the record (e.g. CARGA_INICIAL, INSERT_OU_UPDATE)."

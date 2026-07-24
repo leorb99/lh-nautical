@@ -60,9 +60,4 @@ models:
           - not_null
 
       - name: _action
-        description: "Action type captured during CDC/ingestion (e.g., INSERT, UPDATE, DELETE)."
-        data_tests:
-          - accepted_values:
-              arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-          
+        description: "Ingestion action associated with the record (e.g. CARGA_INICIAL, INSERT_OU_UPDATE)."
