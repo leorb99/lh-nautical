@@ -29,3 +29,13 @@ models:
 
       - name: created_at
         description: "Timestamp when the goods receipt record was created in the source system. Nullified when found in the future"
+
+      - name: is_future_receipt_date
+        description: >
+          Indicates that the original received_at timestamp was later than
+          the current execution timestamp.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]

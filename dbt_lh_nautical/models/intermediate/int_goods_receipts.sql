@@ -21,6 +21,12 @@ with
             -- ahead of now; keeps the rest of the row, as this is an isolated field-level issue
             , case when received_at > current_timestamp() then null else received_at end as received_at
             , case when created_at > current_timestamp() then null else created_at end as created_at
+
+            -- Preserves the original data-quality finding for auditing.
+            , case
+                when received_at > current_timestamp() then true
+                else false
+            end as is_future_receipt_date
         from goods_receipts
     )
 
