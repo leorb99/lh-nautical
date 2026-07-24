@@ -4,7 +4,7 @@ resources:
       name: "Ingestão Completa (JDBC + Autoloader)" 
       # Executar o Job todos os dias a 1h da manhã
       schedule:
-        quartz_cron_expression: "0 0 1 * * ?"
+        quartz_cron_expression: "0 30 4 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
 
@@ -18,45 +18,45 @@ resources:
           #- "time-dados@suaempresa.com" # Pode colocar mais de um e-mail se quiser
   
       tasks:
-      #  - task_key: "jdbc_ingestao"
-      #    notebook_task:
-      #      notebook_path: ../src/bronze/ingestao_jdbc.ipynb
-      #      base_parameters:
-      #        catalog_name: ${var.catalog_name}
-      #        schema: bronze
-      #        numPartitions: "4"
+        - task_key: "jdbc_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/ingestao_jdbc.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name}
+              schema: bronze
+              numPartitions: "4"
 
-      #  - task_key: "autoloader_ingestao"
-      #    depends_on:
-      #      - task_key: "jdbc_ingestao"
-      #    notebook_task:
-      #      notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
-      #      base_parameters:
-      #        catalog_name: ${var.catalog_name} 
-      #        schema: bronze
+        - task_key: "autoloader_ingestao"
+          depends_on:
+            - task_key: "jdbc_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/ingestao_bucket_autoloader.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name} 
+              schema: bronze
 
-      #  - task_key: "ingestion_currency"
-      #    depends_on:
-      #      - task_key: "autoloader_ingestao"
-      #    notebook_task:
-      #      notebook_path: ../src/bronze/currency_ingestion.ipynb
-      #      base_parameters:
-      #        catalog_name: ${var.catalog_name} 
-      #        schema: bronze
+        - task_key: "ingestion_currency"
+          depends_on:
+            - task_key: "autoloader_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/currency_ingestion.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name} 
+              schema: bronze
 
-      #  - task_key: "testes_ingestao"
-      #    depends_on:
-      #      - task_key: "ingestion_currency"
-      #    environment_key: default
-      #    spark_python_task:
-      #      python_file: ../tests/run_tests.py
-      #      parameters:
-      #        - "--catalog"
-      #        - ${var.catalog_name}
+        - task_key: "testes_ingestao"
+          depends_on:
+            - task_key: "ingestion_currency"
+          environment_key: default
+          spark_python_task:
+            python_file: ../tests/run_tests.py
+            parameters:
+              - "--catalog"
+              - ${var.catalog_name}
 
         - task_key: "dbt_transformacao"
-          #depends_on:
-          # - task_key: "Ingestion_SQL_Server"
+          depends_on:
+           - task_key: "testes_ingestao"
           dbt_task:
             project_directory: ../dbt_lh_nautical
             warehouse_id: e792e2cd0d725b8c
@@ -64,7 +64,7 @@ resources:
               - "dbt deps"
               - "dbt seed --profiles-dir . --vars '{\"catalog_name\": \"${var.catalog_name}\", \"schema_name\": \"bronze\"}'"
               - "dbt run --profiles-dir . --vars '{\"catalog_name\": \"${var.catalog_name}\", \"schema_name\": \"bronze\"}'"
-              #- "dbt test --profiles-dir . --vars '{\"catalog_name\": \"${var.catalog_name}\", \"schema_name\": \"bronze\"}'"
+              - "dbt test --profiles-dir . --vars '{\"catalog_name\": \"${var.catalog_name}\", \"schema_name\": \"bronze\"}'"
           environment_key: dbt_env
           
       environments:

@@ -7,5 +7,5 @@ dbt_lh_nautical:
       schema: "{{ var('schema_name') }}"
       host: "{{ env_var('DBT_HOST') }}"
       http_path: /sql/1.0/warehouses/e792e2cd0d725b8c
-      token: "{{ env_var('DBT_ACCESS_TOKEN') }}"
+      token: "{{ env_var('DBT_TOKEN') }}"
       threads: 4
