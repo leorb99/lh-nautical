@@ -21,7 +21,7 @@ with
             order_item_id
             , max(order_id) as order_id
             , max(product_variant_id) as product_variant_id
-            , max(received_at_location_id) as received_at_location_id
+            , max_by(received_at_location_id, returned_at) as received_at_location_id
             , sum(return_item_quantity) as completed_returned_quantity
             , sum(
                 case

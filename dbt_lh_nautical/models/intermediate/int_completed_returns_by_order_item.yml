@@ -25,7 +25,7 @@ models:
         description: "Identifier of the returned product variant"
 
       - name: received_at_location_id
-        description: "Identifier of the location where the returned item was received"
+        description: "Identifier of the location associated with the most recent effective return"
 
       - name: completed_returned_quantity
         description: "Total quantity effectively returned for the order item"
