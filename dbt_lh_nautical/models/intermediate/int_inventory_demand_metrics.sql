@@ -2,9 +2,15 @@ with
     stock_movements as (
         select *
         from {{ ref('int_stock_movements') }}
+
+        -- Future-dated movements are excluded so they cannot shift the
+        -- analysis date or affect any downstream demand windows.
         where movement_business_category = 'sale'
+            and occurred_at <= current_timestamp()
     )
 
+    -- Uses the most recent valid sale date as the common reference date
+    -- for all product variants and inventory locations.
     , reference_date as (
         select
             max(movement_date) as inventory_analysis_date
@@ -126,6 +132,8 @@ with
 
             , last_sale_date
 
+            -- Calendar-day averages include days without sales by dividing
+            -- cumulative demand by the full 30, 60 and 90-day windows.
             , cast(
                 sales_quantity_last_30_days / 30.0
                 as decimal(14, 3)

@@ -3,8 +3,9 @@ version: 2
 models:
   - name: int_inventory_demand_metrics
     description: >
-      Calculates inventory demand metrics by product variant and location
-      using 30-day, 60-day and 90-day sales windows.
+      Calculates demand metrics at the product-variant and inventory-location
+      grain using 30-day, 60-day and 90-day calendar windows. The windows are
+      anchored to the most recent valid, non-future sale movement date.
 
     columns:
       - name: product_variant_id
@@ -18,57 +19,79 @@ models:
           - not_null
 
       - name: inventory_analysis_date
-        description: Latest available sales movement date used as the reference date.
+        description: >
+          Most recent valid, non-future sale movement date used as the common
+          reference date for all demand windows.
         tests:
           - not_null
 
       - name: sales_quantity_last_30_days
-        description: Total quantity sold in the latest 30-day window.
+        description: >
+          Total quantity sold during the 30-day calendar window ending on the
+          inventory analysis date.
         tests:
           - not_null
 
       - name: sales_quantity_last_60_days
-        description: Total quantity sold in the latest 60-day window.
+        description: >
+          Total quantity sold during the 60-day calendar window ending on the
+          inventory analysis date.
         tests:
           - not_null
 
       - name: sales_quantity_last_90_days
-        description: Total quantity sold in the latest 90-day window.
-        tests:
-          - not_null
-
-      - name: average_daily_sales_30d
-        description: Average daily sales across the latest 30 calendar days.
-        tests:
-          - not_null
-
-      - name: average_daily_sales_60d
-        description: Average daily sales across the latest 60 calendar days.
-        tests:
-          - not_null
-
-      - name: average_daily_sales_90d
-        description: Average daily sales across the latest 90 calendar days.
+        description: >
+          Total quantity sold during the 90-day calendar window ending on the
+          inventory analysis date.
         tests:
           - not_null
 
       - name: days_with_sales_last_30_days
-        description: Number of distinct days with sales in the latest 30-day window.
+        description: >
+          Number of distinct dates with sales during the 30-day calendar
+          window ending on the inventory analysis date.
         tests:
           - not_null
 
       - name: days_with_sales_last_60_days
-        description: Number of distinct days with sales in the latest 60-day window.
+        description: >
+          Number of distinct dates with sales during the 60-day calendar
+          window ending on the inventory analysis date.
         tests:
           - not_null
 
       - name: days_with_sales_last_90_days
-        description: Number of distinct days with sales in the latest 90-day window.
+        description: >
+          Number of distinct dates with sales during the 90-day calendar
+          window ending on the inventory analysis date.
         tests:
           - not_null
 
       - name: last_sale_date
-        description: Most recent sale date for the product variant and location.
+        description: >
+          Most recent valid sale date for the product variant and inventory
+          location within the 90-day demand window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_30d
+        description: >
+          Average daily quantity sold across the full 30-day calendar window,
+          including dates without sales.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_60d
+        description: >
+          Average daily quantity sold across the full 60-day calendar window,
+          including dates without sales.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_90d
+        description: >
+          Average daily quantity sold across the full 90-day calendar window,
+          including dates without sales.
         tests:
           - not_null
 
