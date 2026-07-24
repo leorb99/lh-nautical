@@ -85,5 +85,5 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+                values: ['CARGA_INICIAL', 'INSERT_OU_UPDATE']
           
