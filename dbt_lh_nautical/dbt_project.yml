@@ -48,6 +48,3 @@ models:
       bridge:
         +materialized: table
         +schema: gold
-      aggregation:
-        +materialized: table
-        +schema: gold
