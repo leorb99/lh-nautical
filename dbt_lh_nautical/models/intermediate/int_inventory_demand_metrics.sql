@@ -5,15 +5,15 @@ with
 
         -- Future-dated movements are excluded so they cannot shift the
         -- analysis date or affect any downstream demand windows.
-        where movement_business_category = 'sale'
+        where
+            movement_business_category = 'sale'
             and occurred_at <= current_timestamp()
     )
 
     -- Uses the most recent valid sale date as the common reference date
     -- for all product variants and inventory locations.
     , reference_date as (
-        select
-            max(movement_date) as inventory_analysis_date
+        select max(movement_date) as inventory_analysis_date
         from stock_movements
     )
 
@@ -25,76 +25,82 @@ with
 
             , sum(
                 case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            29
+                            reference_date.inventory_analysis_date
+                            , 29
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_quantity_absolute
+                        then stock_movements.movement_quantity_absolute
                     else 0
                 end
             ) as sales_quantity_last_30_days
 
             , sum(
                 case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            59
+                            reference_date.inventory_analysis_date
+                            , 59
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_quantity_absolute
+                        then stock_movements.movement_quantity_absolute
                     else 0
                 end
             ) as sales_quantity_last_60_days
 
             , sum(
                 case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            89
+                            reference_date.inventory_analysis_date
+                            , 89
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_quantity_absolute
+                        then stock_movements.movement_quantity_absolute
                     else 0
                 end
             ) as sales_quantity_last_90_days
 
             , count(
                 distinct case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            29
+                            reference_date.inventory_analysis_date
+                            , 29
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_date
+                        then stock_movements.movement_date
                 end
             ) as days_with_sales_last_30_days
 
             , count(
                 distinct case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            59
+                            reference_date.inventory_analysis_date
+                            , 59
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_date
+                        then stock_movements.movement_date
                 end
             ) as days_with_sales_last_60_days
 
             , count(
                 distinct case
-                    when stock_movements.movement_date
+                    when
+                        stock_movements.movement_date
                         between date_sub(
-                            reference_date.inventory_analysis_date,
-                            89
+                            reference_date.inventory_analysis_date
+                            , 89
                         )
                         and reference_date.inventory_analysis_date
-                    then stock_movements.movement_date
+                        then stock_movements.movement_date
                 end
             ) as days_with_sales_last_90_days
 
@@ -103,10 +109,11 @@ with
         from stock_movements
         cross join reference_date
 
-        where stock_movements.movement_date
+        where
+            stock_movements.movement_date
             between date_sub(
-                reference_date.inventory_analysis_date,
-                89
+                reference_date.inventory_analysis_date
+                , 89
             )
             and reference_date.inventory_analysis_date
 

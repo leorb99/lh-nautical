@@ -1,7 +1,7 @@
 with
     locations as (
         select *
-        from {{ source('bronze','locations')}}
+        from {{ source('bronze','locations') }}
     )
 
     , renamed as (
@@ -20,7 +20,6 @@ with
             , cast(is_active as boolean) as is_active
             , cast(created_at as timestamp) as created_at
             , cast(updated_at as timestamp) as updated_at
-
 
             -- internal ingestion metadata
             , cast(_hash as string) as _hash
