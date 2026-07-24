@@ -16,7 +16,7 @@ pipelines:
                 echo "Destino não é develop ($BITBUCKET_PR_DESTINATION_BRANCH), pulando."
                 exit 0
               fi
-              pip install -r requirements.txt
+              pip install dbt-databricks==1.12.1 sqlfluff==4.2.2 sqlfluff-templater-dbt==4.2.2
               cd dbt_lh_nautical
               export DBT_PROFILES_DIR=./ci
               dbt deps
