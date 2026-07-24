@@ -48,6 +48,22 @@ models:
         tests:
           - not_null
 
+      - name: open_purchase_order_quantity
+        description: >
+          Quantity already ordered and still expected for the same product
+          variant and location. Includes only sent and partially_received
+          purchase orders and is calculated as ordered quantity minus quantity
+          already received, limited to zero.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_item_count
+        description: >
+          Number of sent or partially received purchase order items contributing
+          to the open purchase quantity for the product variant and location.
+        tests:
+          - not_null
+
       - name: inventory_analysis_date
         description: Reference date used to calculate recent demand metrics.
 
@@ -109,7 +125,13 @@ models:
           - not_null
 
       - name: lead_time_confidence
-        description: Qualitative confidence assigned to the selected lead-time estimate.
+        description: >
+          Qualitative operational confidence based on source specificity and
+          valid observation count. Product-location history is high with at
+          least 10 observations, medium with 3 to 9, and low with 1 or 2.
+          Product-level and global fallbacks are low, while the fixed seven-day
+          fallback is assumed. This classification is not a statistical
+          confidence interval.
         tests:
           - not_null
           - accepted_values:

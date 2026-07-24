@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: int_open_purchase_order_quantities
+    description: >
+      Intermediate model containing purchase quantities already ordered but not
+      yet received. The model contains one row per product variant and destination
+      location. Only purchase orders with status sent or partially_received are
+      included. Draft, cancelled and fully received orders are excluded.
+
+    columns:
+      - name: product_variant_id
+        description: Identifier of the product variant with open purchase quantity.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Destination inventory location of the open purchase order.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_quantity
+        description: >
+          Total quantity still expected from active purchase orders. Calculated
+          as ordered quantity minus quantity already received, limited to zero.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_item_count
+        description: Number of open purchase order items contributing to the quantity.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id

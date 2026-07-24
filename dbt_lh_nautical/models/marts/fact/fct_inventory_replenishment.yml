@@ -42,6 +42,20 @@ models:
         tests:
           - not_null
 
+      - name: open_purchase_order_quantity
+        description: >
+          Quantity already ordered and still expected from sent or partially
+          received purchase orders for the same product variant and location.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_item_count
+        description: >
+          Number of active purchase order items contributing to the open
+          purchase quantity.
+        tests:
+          - not_null
+
       - name: source_reorder_point
         description: Reorder point supplied by the source system.
 
@@ -133,7 +147,11 @@ models:
           - not_null
 
       - name: suggested_reorder_quantity
-        description: Recommended purchase quantity required to reach the target stock.
+        description: >
+          Analytical purchase recommendation calculated as the recommended stock
+          target minus current stock and open purchase-order quantity, limited
+          to zero. The result does not apply package multiples, minimum order
+          quantities or operational rounding.
         tests:
           - not_null
 
@@ -149,7 +167,9 @@ models:
 
       - name: is_replenishment_required
         description: >
-          Indicates that replenishment is recommended based on demand, current
-          inventory, source reorder point and safety stock.
+          Indicates that replenishment is recommended when average 90-day demand
+          is positive and current stock is at or below the source reorder point,
+          or when current stock plus open purchase-order quantity remains below
+          the recommended stock target.
         tests:
           - not_null

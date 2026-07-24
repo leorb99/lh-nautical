@@ -16,6 +16,8 @@ with
             , current_inventory_snapshot_sk
 
             , quantity_on_hand
+            , open_purchase_order_quantity
+            , open_purchase_order_item_count
             , reorder_point as source_reorder_point
             , snapshot_date as inventory_reference_date
 
@@ -66,7 +68,8 @@ with
                 greatest(
                     demand_during_lead_time
                     + safety_stock_quantity
-                    - quantity_on_hand,
+                    - quantity_on_hand
+                    - open_purchase_order_quantity,
                     0
                 )
                 as decimal(14, 3)
@@ -96,8 +99,10 @@ with
                         quantity_on_hand
                         <= coalesce(source_reorder_point, 0)
 
-                        or quantity_on_hand
-                        < (
+                        or (
+                            quantity_on_hand
+                            + open_purchase_order_quantity
+                        ) < (
                             demand_during_lead_time
                             + safety_stock_quantity
                         )

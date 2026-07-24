@@ -24,6 +24,11 @@ with
         from {{ ref('int_global_lead_time_metrics') }}
     )
 
+    , open_purchase_order_quantities as (
+        select *
+        from {{ ref('int_open_purchase_order_quantities') }}
+    )
+
     , replenishment_inputs as (
         select
             current_inventory.current_inventory_snapshot_sk
@@ -35,6 +40,16 @@ with
             , current_inventory.is_out_of_stock
             , current_inventory.is_below_reorder_point
             , current_inventory.snapshot_date
+
+            , coalesce(
+                open_purchase_order_quantities.open_purchase_order_quantity,
+                0
+            ) as open_purchase_order_quantity
+
+            , coalesce(
+                open_purchase_order_quantities.open_purchase_order_item_count,
+                0
+            ) as open_purchase_order_item_count
 
             , demand_metrics.inventory_analysis_date
             , demand_metrics.last_sale_date
@@ -114,17 +129,17 @@ with
             , case
                 when inventory_lead_time_metrics.median_lead_time_days
                     is not null
-                 and inventory_lead_time_metrics.lead_time_observation_count >= 3
+                 and inventory_lead_time_metrics.lead_time_observation_count >= 10
                     then 'high'
 
                 when inventory_lead_time_metrics.median_lead_time_days
                     is not null
+                 and inventory_lead_time_metrics.lead_time_observation_count >= 3
                     then 'medium'
 
-                when product_lead_time_metrics.median_product_lead_time_days
+                when inventory_lead_time_metrics.median_lead_time_days
                     is not null
-                 and product_lead_time_metrics.product_lead_time_observation_count >= 3
-                    then 'medium'
+                    then 'low'
 
                 when product_lead_time_metrics.median_product_lead_time_days
                     is not null
@@ -167,6 +182,12 @@ with
         left join product_lead_time_metrics
             on current_inventory.product_variant_id
             = product_lead_time_metrics.product_variant_id
+
+        left join open_purchase_order_quantities
+            on current_inventory.product_variant_id
+            = open_purchase_order_quantities.product_variant_id
+            and current_inventory.location_id
+            = open_purchase_order_quantities.location_id
 
         cross join global_lead_time_metrics
     )
