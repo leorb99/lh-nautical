@@ -1,8 +1,21 @@
 image: ghcr.io/databricks/cli:0.298.0
 
 pipelines:
-  # Cenário A: Alguém abriu um Pull Request de 'develop' -> 'main' 
   pull-requests:
+    # Cenário A: alguém abriu um Pull Request de feature/* -> 'develop'
+    develop:
+      - step:
+          name: "Lint + dbt build (Pré-Merge)"
+          image: python:3.11
+          script:
+            - pip install -r requirements.txt
+            - cd dbt_lh_nautical
+            - export DBT_PROFILES_DIR=./ci
+            - dbt deps
+            - sqlfluff lint models/
+            - dbt build
+
+    # Cenário B: alguém abriu um Pull Request de 'develop' -> 'main'
     main:
       - step:
           name: "Validação Estrutural do Bundle (Pré-Merge)"
