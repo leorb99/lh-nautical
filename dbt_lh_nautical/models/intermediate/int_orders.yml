@@ -30,6 +30,8 @@ models:
 
       - name: order_subtotal_amount
         description: "The order amount before discounts"
+        tests:
+          - not_null
 
       - name: order_discount_amount
         description: "The discount amount applied to the order"
@@ -112,3 +114,6 @@ models:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "order_discount_amount <= order_subtotal_amount"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_subtotal_amount > 0"

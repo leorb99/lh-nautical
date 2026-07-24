@@ -67,9 +67,11 @@ with
             -- order's gross subtotal), then subtracted from the item's net revenue. Used to
             -- correctly break net revenue down by product/category/brand, since order_total_amount
             -- alone can't be split across items when an order has more than one product.
+            -- nullif guards the division if order_subtotal_amount is ever 0 (turning a hard crash into a null result); 
+            -- (ps: the int_orders test on order_subtotal_amount > 0 is what actually surfaces this as a visible data quality issue, not this nullif.
             , order_items.order_item_net_revenue - (
                 orders.order_discount_amount * order_items.order_item_line_total
-                / orders.order_subtotal_amount
+                / nullif(orders.order_subtotal_amount, 0)
             ) as order_item_net_revenue_after_discount
 
         from order_items

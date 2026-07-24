@@ -91,6 +91,8 @@ models:
           order-level discount (allocated by the item's share of the order's
           gross subtotal). Needed to correctly break net revenue down by
           product, category, or brand.
+        tests:
+          - not_null
 
     tests:
       - dbt_utils.equal_rowcount:
