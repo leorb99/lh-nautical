@@ -44,7 +44,7 @@ models:
         +schema: gold
       fact:
         +materialized: table
-        +schema: gold
-      aggregation:
+
+      bridge:
         +materialized: table
         +schema: gold

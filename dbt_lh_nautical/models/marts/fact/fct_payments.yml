@@ -33,3 +33,9 @@ models:
 
       - name: payment_status
         description: "Status of the payment."
+
+      - name: payment_paid_at
+        description: "Timestamp when the payment was made. If the timestamp is in the future, it will be set to null to avoid future-dated records."
+
+      - name: is_effective_paid
+        description: "Indicates whether the payment was effectively made. If the timestamp is in the future, it will be set to null to avoid future-dated records."

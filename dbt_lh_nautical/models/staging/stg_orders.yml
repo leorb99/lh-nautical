@@ -47,14 +47,16 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['ecommerce', 'pos']
+              arguments:
+                values: ['ecommerce', 'pos']
 
       - name: order_status
         description: "The current lifecycle status of the order."
         data_tests:
           - not_null
           - accepted_values:
-              values: ['paid', 'confirmed', 'draft', 'cancelled']
+              arguments:
+                values: ['paid', 'confirmed', 'draft', 'cancelled']
 
       - name: order_subtotal_amount
         description: "The gross total amount of items before discounts."

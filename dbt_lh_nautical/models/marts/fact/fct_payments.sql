@@ -17,6 +17,8 @@ with
             , payments.payment_installments
             , payments.payment_amount
             , payments.payment_status
+            , case when payments.paid_at > current_timestamp() then null else payments.paid_at end as payment_paid_at
+            , case when payments.paid_at <= current_timestamp() then true else false end as is_effective_paid
         from payments
         left join dim_payment_method
             on payments.payment_method = dim_payment_method.payment_method_name
