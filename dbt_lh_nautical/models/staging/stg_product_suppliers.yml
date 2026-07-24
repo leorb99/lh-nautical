@@ -50,5 +50,4 @@ models:
         tests:
           - accepted_values:
               arguments:
-                values:
-                  - CARGA_INICIAL
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']

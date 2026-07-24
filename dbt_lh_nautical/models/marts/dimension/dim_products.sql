@@ -22,7 +22,7 @@ with
             , product_variants.product_variant_barcode_ean
             , enriched_products.product_name
             , enriched_products.product_description
-            , enriched_products.unit_of_measure
+            , enriched_products.product_unit_of_measure
             , enriched_products.product_ncm_code
             , enriched_products.category_name
             , enriched_products.category_url_slug
@@ -42,7 +42,7 @@ with
             , variant_attributes.attr_weight_kg
             , variant_attributes.attr_waterproof
             , variant_attributes.attr_material
-            , variant_attributes.is_variant_active
+            , product_variants.is_active as is_variant_active
             , enriched_products.is_product_active
             , enriched_products.is_brand_active
             , enriched_products.is_category_active
