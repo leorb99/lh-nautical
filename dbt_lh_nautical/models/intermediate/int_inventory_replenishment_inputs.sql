@@ -29,6 +29,8 @@ with
         from {{ ref('int_open_purchase_order_quantities') }}
     )
 
+    -- Current inventory is the driving dataset so every existing
+    -- product-variant and location record is preserved.
     , replenishment_inputs as (
         select
             current_inventory.current_inventory_snapshot_sk
@@ -84,6 +86,8 @@ with
                 0
             ) as average_daily_sales_90d
 
+            -- Lead time falls back from product-location history to product
+            -- history, global history and finally a fixed seven-day default.
             , cast(
                 coalesce(
                     inventory_lead_time_metrics.median_lead_time_days,
@@ -126,6 +130,8 @@ with
                 else 0
             end as lead_time_observation_count
 
+            -- Only product-location history can receive high or medium
+            -- confidence because it is the most specific replenishment history.
             , case
                 when inventory_lead_time_metrics.median_lead_time_days
                     is not null
@@ -183,6 +189,8 @@ with
             on current_inventory.product_variant_id
             = product_lead_time_metrics.product_variant_id
 
+        -- Open purchase orders are joined at the same product-location grain
+        -- and default to zero when no committed inbound quantity exists.
         left join open_purchase_order_quantities
             on current_inventory.product_variant_id
             = open_purchase_order_quantities.product_variant_id

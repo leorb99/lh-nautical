@@ -4,6 +4,8 @@ with
         from {{ ref('int_inventory_replenishment_inputs') }}
     )
 
+    -- Replenishment metrics are calculated at the product-variant
+    -- and location grain inherited from the input model.
     , replenishment_calculations as (
         select
             {{ dbt_utils.generate_surrogate_key([
@@ -39,12 +41,16 @@ with
             , is_lead_time_estimated
             , is_demand_history_missing
 
+            -- Expected demand during replenishment is based on the
+            -- 90-day average daily demand and the selected lead time.
             , cast(
                 average_daily_sales_90d
                 * selected_lead_time_days
                 as decimal(14, 3)
             ) as demand_during_lead_time
 
+            -- Safety stock represents seven additional calendar days
+            -- of demand based on the 90-day average.
             , cast(
                 average_daily_sales_90d
                 * 7
@@ -64,6 +70,8 @@ with
                 as decimal(14, 3)
             ) as recommended_stock_target
 
+            -- Open purchase orders are subtracted to avoid recommending
+            -- duplicate purchases for inventory already in transit.
             , cast(
                 greatest(
                     demand_during_lead_time
@@ -93,6 +101,8 @@ with
                 else false
             end as will_stockout_before_replenishment
 
+            -- Replenishment is not recommended when no valid demand
+            -- exists in the 90-day demand window.
             , case
                 when average_daily_sales_90d > 0
                  and (

@@ -3,10 +3,17 @@ version: 2
 models:
   - name: fct_inventory_replenishment
     description: >
-      Inventory replenishment recommendation fact table with one row per
-      product variant and location. Combines current stock, recent demand and
-      hierarchical lead-time estimates to calculate replenishment requirements.
-      A seven-day safety-stock assumption is used in this initial version.
+      Inventory replenishment recommendation fact table derived from
+      int_inventory_replenishment_inputs with one row per product variant and
+      location. The model combines current stock, committed inbound purchase
+      quantities, 30-, 60- and 90-day demand metrics, and hierarchical lead-time
+      estimates. It calculates expected demand during lead time, seven days of
+      safety stock, the recommended stock target, the net suggested reorder
+      quantity and operational replenishment flags. Open purchase orders are
+      deducted from the recommendation to avoid duplicate purchases. This
+      analytical version does not apply minimum order quantities, package
+      multiples, supplier constraints, storage capacity, maximum-stock limits,
+      seasonality adjustments or operational rounding.
 
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -131,18 +138,25 @@ models:
           - not_null
 
       - name: demand_during_lead_time
-        description: Expected demand during the selected replenishment lead time.
+        description: >
+          Expected demand during replenishment, calculated as
+          average_daily_sales_90d * selected_lead_time_days and stored as
+          decimal(14, 3).
         tests:
           - not_null
 
       - name: safety_stock_quantity
         description: >
-          Safety-stock quantity calculated from seven days of average 90-day demand.
+          Additional inventory buffer calculated as
+          average_daily_sales_90d * 7 calendar days and stored as
+          decimal(14, 3).
         tests:
           - not_null
 
       - name: recommended_stock_target
-        description: Demand during lead time plus safety stock.
+        description: >
+          Target inventory quantity calculated as
+          demand_during_lead_time + safety_stock_quantity.
         tests:
           - not_null
 
@@ -156,12 +170,17 @@ models:
           - not_null
 
       - name: estimated_days_until_stockout
-        description: Estimated inventory coverage based on 90-day average demand.
+        description: >
+          Estimated calendar-day coverage calculated as
+          quantity_on_hand / average_daily_sales_90d. Null when the 90-day
+          average daily demand is zero.
 
       - name: will_stockout_before_replenishment
         description: >
-          Indicates whether current inventory is insufficient to cover expected
-          demand during the selected lead time.
+          True when average_daily_sales_90d is greater than zero and
+          quantity_on_hand is lower than demand_during_lead_time. Open purchase
+          orders are not included in this flag because it measures exposure
+          before replenishment arrives.
         tests:
           - not_null
 

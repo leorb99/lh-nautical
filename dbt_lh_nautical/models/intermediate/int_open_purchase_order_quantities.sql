@@ -4,6 +4,8 @@ with
         from {{ ref('int_purchase_order_receipts') }}
     )
 
+    -- Only sent and partially received purchase orders represent
+    -- committed inbound inventory.
     , open_purchase_order_items as (
         select
             product_variant_id
@@ -12,6 +14,8 @@ with
             , purchase_order_status
             , purchase_order_item_quantity_ordered
             , total_quantity_received
+            -- Negative balances are capped at zero so over-receipts do not
+            -- reduce the total inbound inventory quantity.
             , greatest(
                 purchase_order_item_quantity_ordered
                 - total_quantity_received
@@ -21,6 +25,7 @@ with
         where purchase_order_status in ('sent', 'partially_received')
     )
 
+    -- The final grain is one row per product variant and destination location.
     , aggregated_open_quantities as (
         select
             product_variant_id
