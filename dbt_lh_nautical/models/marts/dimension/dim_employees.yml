@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: dim_employees
+    description: "Employee dimension table containing surrogate keys, cleaned employee attributes, status flags, and timestamps."
+    columns:
+      - name: employee_sk
+        description: "Surrogate key generated via hash from employee_id."
+        tests:
+          - unique
+          - not_null
+
+      - name: employee_id
+        description: "Natural/Business key for the employee."
+        tests:
+          - unique
+          - not_null
+
+      - name: employee_full_name
+        description: "Full name of the employee, properly formatted and standardized."
+
+      - name: employee_cpf
+        description: "Employee's CPF document number with non-alphanumeric characters removed."
+
+      - name: employee_email
+        description: "Cleaned and standardized corporate email address of the employee."
+        tests:
+          - not_null
+
+      - name: employee_role
+        description: "Job title or role of the employee in Proper Case."
+
+      - name: employee_hire_date
+        description: "Date when the employee was officially hired."
+
+      - name: employee_termination_date
+        description: "Date when the employee was terminated, if applicable."
+
+      - name: is_active
+        description: "Boolean flag indicating whether the employee is currently active (true/false)."
+        tests:
+          - not_null
+
+      - name: created_at
+        description: "Timestamp indicating when the employee record was created in the source system."
+
+      - name: updated_at
+        description: "Timestamp indicating when the employee record was last updated in the source system."
