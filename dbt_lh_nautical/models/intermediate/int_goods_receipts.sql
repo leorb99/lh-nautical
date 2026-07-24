@@ -19,8 +19,8 @@ with
 
             -- Nullifies future timestamps, since a receipt can't be received/created
             -- ahead of now; keeps the rest of the row, as this is an isolated field-level issue
-            , {{ nullify_future_date(received_at) }} as received_at
-            , {{ nullify_future_date(created_at) }} as created_at
+            , {{ nullify_future_date('received_at') }} as received_at
+            , {{ nullify_future_date('created_at') }} as created_at
         from goods_receipts
     )
 

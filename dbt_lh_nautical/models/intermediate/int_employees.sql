@@ -14,8 +14,8 @@ with
             , {{ initcap_trim('employee_role') }} as employee_role
             , employee_hire_date
             , employee_termination_date
-            , {{ nullify_future_date(created_at) }} as created_at
-            , {{ nullify_future_date(update_at)}} as updated_at
+            , {{ nullify_future_date('created_at') }} as created_at
+            , {{ nullify_future_date('updated_at')}} as updated_at
             , is_active
         from employees
     )
