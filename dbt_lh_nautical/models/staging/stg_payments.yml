@@ -17,18 +17,16 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                field: order_id
-                to: ref('stg_orders')
+              field: order_id
+              to: ref('stg_orders')
       
       - name: payment_method
         description: "The method used to pay (e.g., credit_card, pix, debit_card)."
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
-                quote: true
+              values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
+              quote: true
       
       - name: payment_installments
         description: "Number of installments for the payment."
@@ -45,9 +43,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['pending', 'approved', 'refunded', 'refused']
-                quote: true
+              values: ['pending', 'approved', 'refunded', 'refused']
+              quote: true
       
       - name: paid_at
         description: "Timestamp when the payment was actually approved/cleared."
@@ -77,6 +74,5 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-                quote: true
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true

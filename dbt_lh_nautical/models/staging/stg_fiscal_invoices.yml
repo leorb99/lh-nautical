@@ -37,8 +37,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              arguments: 
-                values: ['authorized', 'rejected', 'cancelled']
+              values: ['authorized', 'rejected', 'cancelled']
 
       - name: fiscal_invoice_total_amount
         description: "The total monetary value of the fiscal invoice."

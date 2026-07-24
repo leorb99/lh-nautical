@@ -1,5 +1,6 @@
+
 target/
 dbt_packages/
 logs/
-load_env.ps1
 dbt_internal_packages/
+load_env.ps1

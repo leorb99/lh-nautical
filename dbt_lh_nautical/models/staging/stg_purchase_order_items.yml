@@ -16,18 +16,16 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                field: purchase_order_id
-                to: ref('stg_purchase_orders')
+              field: purchase_order_id
+              to: ref('stg_purchase_orders')
       
       - name: product_variant_id
         description: "Foreign key to the purchased product variant."
         tests:
           - not_null
           - relationships:
-              arguments:
-                field: product_variant_id
-                to: ref('stg_product_variants')
+              field: product_variant_id
+              to: ref('stg_product_variants')
       
       - name: purchase_order_item_quantity_ordered
         description: "Quantity ordered for this purchase order line item."
@@ -59,6 +57,5 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-                quote: true
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true

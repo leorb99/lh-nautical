@@ -6,10 +6,9 @@ models:
 
     tests:
       - dbt_utils.unique_combination_of_columns:
-          arguments:
-            combination_of_columns:
-              - product_variant_id
-              - attribute_id
+          combination_of_columns:
+            - product_variant_id
+            - attribute_id
 
     columns:
       - name: product_variant_id
@@ -17,18 +16,16 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('stg_product_variants')
-                field: product_variant_id
+              to: ref('stg_product_variants')
+              field: product_variant_id
 
       - name: attribute_id
         description: "Foreign key identifying the attribute represented by the value."
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('stg_attributes')
-                field: attribute_id
+              to: ref('stg_attributes')
+              field: attribute_id
 
       - name: attribute_value
         description: "Text value assigned to the attribute for the product variant."

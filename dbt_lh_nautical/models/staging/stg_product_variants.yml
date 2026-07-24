@@ -16,9 +16,8 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                field: product_id
-                to: ref('stg_products')
+              field: product_id
+              to: ref('stg_products')
       
       - name: product_variant_sku
         description: "SKU code for the product variant."
@@ -75,6 +74,5 @@ models:
         tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-                quote: true
+              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+              quote: true

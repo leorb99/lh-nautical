@@ -18,7 +18,7 @@ with
         select
             product_variant_id
             , attribute_id
-            , {{ nullify_garbage('attribute_value') }} as raw_value
+            , {{ nullify_garbage('value') }} as raw_value
         from variant_values
     )
 

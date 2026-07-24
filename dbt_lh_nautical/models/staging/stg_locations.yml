@@ -20,8 +20,7 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              arguments:
-                values: ['store', 'warehouse']
+              values: ['store', 'warehouse']
 
       - name: location_postal_code
         description: "The postal or ZIP code of the location."
