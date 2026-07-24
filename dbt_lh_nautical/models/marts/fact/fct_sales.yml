@@ -43,6 +43,24 @@ models:
       - name: placed_at
         description: "Timestamp when the order was placed"
 
+      - name: is_effective_sale
+        description: >
+          Indicates whether the parent order counts as an effective/completed
+          sale (paid, with an authorized fiscal invoice, and a valid, non-future
+          placed_at).
+
+      - name: is_paid_sale_pending_invoice_fix
+        description: >
+          Indicates a parent order that was paid but whose fiscal invoice was
+          rejected (revenue pending regularization, not lost revenue). Does not
+          cover orders with a cancelled invoice, a separate, more ambiguous case.
+
+      - name: order_total_amount
+        description: >
+          The order's official total amount (after discount), repeated per
+          item. Do not sum directly across items of the same order, it would
+          double-count; aggregate by order_id first (e.g. for average ticket).
+
       - name: order_item_quantity
         description: "Quantity sold for this line item"
 
@@ -66,6 +84,15 @@ models:
 
       - name: order_item_net_revenue
         description: "The actual income the business keeps from this line item, after taxes"
+
+      - name: order_item_net_revenue_after_discount
+        description: >
+          order_item_net_revenue minus this item's proportional share of the
+          order-level discount (allocated by the item's share of the order's
+          gross subtotal). Needed to correctly break net revenue down by
+          product, category, or brand.
+        tests:
+          - not_null
 
     tests:
       - dbt_utils.equal_rowcount:
