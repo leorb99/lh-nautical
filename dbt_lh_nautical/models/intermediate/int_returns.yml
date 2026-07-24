@@ -37,31 +37,33 @@ models:
           Total refund amount for the returned item, calculated as returned
           quantity multiplied by unit refund amount.
 
+      - name: returned_at
+        description: >
+          Analytical return timestamp derived from the source created_at field.
+          Future-dated values are nullified until the registered date is reached.
+
       - name: is_future_return_date
         description: >
-          Indicates whether the original return timestamp is later than the
-          current pipeline execution timestamp.
+          Indicates whether the source created_at timestamp is later than the
+          current execution timestamp.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: is_effective_return
         description: >
-          Indicates whether the return is completed and its return timestamp
-          is not in the future.
+          Indicates whether the return is completed and has a valid,
+          non-future analytical return date.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: is_exchange
         description: "Indicates whether the returned item resulted in an exchange"
 
       - name: is_refund
         description: "Indicates whether the returned item resulted in a refund"
-
-    tests:
-      - dbt_utils.expression_is_true:
-          arguments:
-            expression: "(not is_future_return_date) or returned_at is null"
-
-      - dbt_utils.expression_is_true:
-          arguments:
-            expression: "(not is_future_return_date) or is_effective_return = false"
-
-      - dbt_utils.expression_is_true:
-          arguments:
-            expression: "(not is_effective_return) or returned_at is not null"

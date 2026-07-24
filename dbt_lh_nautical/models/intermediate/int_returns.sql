@@ -39,6 +39,9 @@ with
 
             , returns.return_total_refund_amount
 
+            -- The source does not provide a dedicated return-event timestamp.
+            -- The record creation timestamp is used as the analytical return
+            -- date, but future dates remain invalid until they are reached.
             , case
                 when returns.created_at > current_timestamp() then null
                 else returns.created_at
@@ -46,15 +49,19 @@ with
 
             , returns.updated_at
 
+            -- Distinguishes a future date invalidated by the quality rule
+            -- from a date that was originally missing in the source.
             , case
                 when returns.created_at > current_timestamp() then true
                 else false
             end as is_future_return_date
 
+            -- Only completed returns with a valid event date are effective
+            -- and eligible to affect downstream return and net-sales metrics.
             , case
                 when returns.return_status = 'completed'
                  and returns.created_at <= current_timestamp()
-                then true
+                    then true
                 else false
             end as is_effective_return
 

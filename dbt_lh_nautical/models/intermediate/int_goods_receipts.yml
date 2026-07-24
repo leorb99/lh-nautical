@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_goods_receipts
+    description: >
+      Intermediate model for goods receipt headers, one row per physical
+      receiving event of a purchase order's items. Applies data cleaning
+      rules discovered during profiling of stg_goods_receipts.
+    columns:
+      - name: goods_receipt_id
+        description: "Unique identifier for the goods receipt event"
+        tests:
+          - unique
+          - not_null
+
+      - name: purchase_order_id
+        description: "Foreign key pointing to the purchase order these goods were received against"
+
+      - name: received_by_employee_id
+        description: "Foreign key pointing to the employee who received and processed the goods"
+
+      - name: goods_receipt_notes
+        description: >
+          Free-text notes recorded at receiving time. Punctuation-only values
+          ('...', '—') found in the source are converted to null.
+
+      - name: received_at
+        description: "Timestamp when the goods were physically received. Nullified when found in the future"
+
+      - name: created_at
+        description: "Timestamp when the goods receipt record was created in the source system. Nullified when found in the future"

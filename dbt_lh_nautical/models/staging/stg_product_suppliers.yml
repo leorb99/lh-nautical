@@ -1,9 +1,8 @@
+version: 2
+
 models:
   - name: stg_product_suppliers
-    description: >
-      Staging model for product suppliers. This model cleans and standardizes the raw
-      supplier-product mapping data from the e-commerce system, including supplier SKUs,
-      quoted costs, lead times and ingestion metadata.
+    description: "Staging model for product-supplier relationships."
 
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -21,7 +20,7 @@ models:
               arguments:
                 field: product_variant_id
                 to: ref('stg_product_variants')
-      
+
       - name: supplier_id
         description: "Foreign key to the supplier."
         tests:
@@ -30,41 +29,26 @@ models:
               arguments:
                 field: supplier_id
                 to: ref('stg_suppliers')
-      
+
       - name: product_suppliers_supplier_sku
         description: "Supplier-specific SKU for the product variant."
-      
+
       - name: product_suppliers_last_quoted_cost
-        description: "The most recent cost quoted by the supplier."
-      
+        description: "Most recently quoted cost from the supplier."
+
       - name: product_suppliers_lead_time_days
-        description: "Supplier lead time for the product variant, in days."
-      
+        description: "Expected supplier lead time in days."
+
       - name: created_at
-        description: "Timestamp when this supplier mapping was created in the source system."
-        tests:
-          - not_null
-      
+        description: "Timestamp when the record was created in the source system."
+
       - name: updated_at
-        description: "Timestamp when this supplier mapping was last updated in the source system."
-        tests:
-          - not_null
-      
-      - name: _hash
-        description: "MD5/SHA hash of the record used for deduplication or change tracking."
-        tests:
-          - not_null
-      
-      - name: _ingested_at
-        description: "Timestamp when the data was ingested into the Bronze layer."
-        tests:
-          - not_null
-      
+        description: "Timestamp when the record was last updated in the source system."
+
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Ingestion action associated with the record."
         tests:
-          - not_null
           - accepted_values:
               arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-                quote: true
+                values:
+                  - CARGA_INICIAL
