@@ -3,6 +3,7 @@ templater = dbt
 dialect = databricks
 sql_file_exts = .sql
 max_line_length = 150
+max_parse_depth = 0
 exclude_rules = structure.column_order, structure.simple_case
 
 [sqlfluff:templater:dbt]

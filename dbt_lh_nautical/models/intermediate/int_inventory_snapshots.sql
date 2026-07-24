@@ -29,9 +29,10 @@ with
             end as is_out_of_stock
 
             , case
-                when stock_level_reorder_point is not null
+                when
+                    stock_level_reorder_point is not null
                     and stock_level_quantity_on_hand
-                        <= stock_level_reorder_point
+                    <= stock_level_reorder_point
                     then true
                 else false
             end as is_below_reorder_point
