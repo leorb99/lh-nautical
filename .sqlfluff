@@ -7,9 +7,7 @@ exclude_rules = structure.column_order, structure.simple_case
 
 [sqlfluff:templater:dbt]
 project_dir = ./dbt_lh_nautical
-profiles_dir = ~/.dbt
 profile = dbt_lh_nautical
-target = dev
 
 [sqlfluff:indentation]
 indent_unit = space
