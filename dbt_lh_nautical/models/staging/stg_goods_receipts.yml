@@ -6,13 +6,13 @@ models:
     columns:
       - name: goods_receipt_id
         description: "Primary key of the goods receipts table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: purchase_order_id
         description: "Foreign key linking to the original purchase order."
-        tests:
+        data_tests:
           - not_null
           - relationships:
               arguments:
@@ -21,7 +21,7 @@ models:
 
       - name: received_by_employee_id
         description: "Foreign key identifying the employee who received and processed the goods."
-        tests:
+        data_tests:
           - not_null
           - relationships:
               arguments:
@@ -30,6 +30,28 @@ models:
 
       - name: received_at
         description: "The timestamp when the goods were physically received."
-        tests:
+        data_tests:
           - not_null
-          
+
+      - name: goods_receipt_notes
+        description: "Additional comments or observations recorded during goods reception."
+
+      - name: created_at
+        description: "Timestamp when the record was created in the source system."
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
