@@ -3,44 +3,55 @@ version: 2
 models:
   - name: int_completed_returns_by_order_item
     description: >
-      Aggregates effective completed returns by order item, considering only
-      returns whose return date is not in the future.
+      Intermediate model that aggregates effective returns to one row per order
+      item. It includes only completed returns with a valid, non-future return
+      date and prepares return metrics for downstream models.
 
     columns:
       - name: order_item_id
-        description: "Unique identifier of the original order item."
+        description: "Unique identifier of the original order item"
         tests:
-          - not_null
           - unique
+          - not_null
           - relationships:
               arguments:
                 to: ref('int_order_items')
                 field: order_item_id
 
       - name: order_id
-        description: "Identifier of the original order."
+        description: "Identifier of the original order"
 
       - name: product_variant_id
-        description: "Identifier of the returned product variant."
+        description: "Identifier of the returned product variant"
 
       - name: received_at_location_id
-        description: "Location where the returned item was received."
+        description: "Identifier of the location where the returned item was received"
 
       - name: completed_returned_quantity
-        description: "Total quantity effectively returned up to the current date."
+        description: "Total quantity effectively returned for the order item"
         tests:
           - not_null
 
       - name: completed_refund_amount
-        description: "Total refund amount for completed refund actions."
+        description: "Total refund amount from effective refund actions"
         tests:
           - not_null
 
       - name: latest_returned_at
-        description: "Most recent effective return timestamp for the order item."
+        description: "Most recent effective return timestamp for the order item"
 
       - name: has_refund
-        description: "Indicates whether the order item has at least one refund."
+        description: "Indicates whether the order item has at least one effective refund"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
       - name: has_exchange
-        description: "Indicates whether the order item has at least one exchange."
+        description: "Indicates whether the order item has at least one effective exchange"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
