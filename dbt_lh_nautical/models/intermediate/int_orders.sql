@@ -27,9 +27,9 @@ with
 
             -- Nullifies future timestamps, since an order can't be placed/created/updated
             -- ahead of now; keeps the rest of the row, as this is an isolated field-level issue
-            , case when placed_at > current_timestamp() then null else placed_at end as placed_at
-            , case when created_at > current_timestamp() then null else created_at end as created_at
-            , case when updated_at > current_timestamp() then null else updated_at end as updated_at
+            , {{ nullify_future_date(placed_at) }} as placed_at
+            , {{ nullify_future_date(created_at) }} as created_at
+            , {{ nullify_future_date(update_at) }} as updated_at
         from orders
     )
 

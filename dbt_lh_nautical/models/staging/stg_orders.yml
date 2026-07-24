@@ -6,46 +6,92 @@ models:
     columns:
       - name: order_id
         description: "Primary key of the orders table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: customer_id
         description: "Foreign key linking to the customer who placed the order."
-        tests:
+        data_tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+
+      - name: salesperson_id
+        description: "Foreign key identifying the salesperson who processed the order."
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_employees')
+                field: employee_id
 
       - name: location_id
         description: "Foreign key linking to the physical or virtual warehouse/store location."
-        tests:
+        data_tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_locations')
+                field: location_id
 
       - name: order_number
         description: "The human-readable unique identifier for the order."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: order_channel
         description: "The sales channel where the order originated (e.g., ecommerce, pos)."
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               values: ['ecommerce', 'pos']
 
       - name: order_status
         description: "The current lifecycle status of the order."
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               values: ['paid', 'confirmed', 'draft', 'cancelled']
 
+      - name: order_subtotal_amount
+        description: "The gross total amount of items before discounts."
+
+      - name: order_discount_amount
+        description: "The total discount amount applied to the order."
+
       - name: order_total_amount
         description: "The final total amount of the order after discounts."
-        tests:
+        data_tests:
           - not_null
 
       - name: placed_at
-        tests:
+        description: "Timestamp when the order was placed by the customer."
+        data_tests:
           - not_null
+
+      - name: created_at
+        description: "Timestamp when the record was created in the source system."
+
+      - name: updated_at
+        description: "Timestamp when the record was last updated in the source system."
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
           

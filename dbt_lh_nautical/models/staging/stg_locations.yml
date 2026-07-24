@@ -6,24 +6,83 @@ models:
     columns:
       - name: location_id
         description: "Primary key of the locations table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: location_name
         description: "The commercial or internal name of the location."
-        tests:
+        data_tests:
           - not_null
 
       - name: location_type
         description: "The categorization of the location (e.g., store, warehouse)."
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               values: ['store', 'warehouse']
 
+      - name: location_postal_code
+        description: "The postal or ZIP code of the location."
+        data_tests:
+          - not_null
+
+      - name: location_street
+        description: "The street name or thoroughfare of the location address."
+        data_tests:
+          - not_null
+
+      - name: location_number
+        description: "The street or building number of the location."
+        data_tests:
+          - not_null
+
+      - name: location_complement
+        description: "Additional address detail (e.g., Suite, Apartment, Building unit)."
+
+      - name: location_district
+        description: "The neighborhood or district where the location resides."
+
+      - name: location_city
+        description: "The city where the location is situated."
+        data_tests:
+          - not_null
+
+      - name: location_state
+        description: "The state, province, or federal unit of the location."
+        data_tests:
+          - not_null
+
+      - name: location_country
+        description: "The country where the location is situated."
+        data_tests:
+          - not_null
+
       - name: is_active
         description: "Flag indicating whether the location is currently operational."
-        tests:
+        data_tests:
           - not_null
+
+      - name: created_at
+        description: "Timestamp when the record was created in the source system."
+
+      - name: updated_at
+        description: "Timestamp when the record was last updated in the source system."
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
           

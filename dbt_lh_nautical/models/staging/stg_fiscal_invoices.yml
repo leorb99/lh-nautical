@@ -6,33 +6,70 @@ models:
     columns:
       - name: fiscal_invoice_id
         description: "Primary key of the fiscal invoices table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: order_id
         description: "Foreign key mapping to the orders table."
-        tests:
+        data_tests:
           - not_null
           # Relationship test example (if you have stg_orders)
-          # - relationships:
-          #     to: ref('stg_orders')
-          #     field: order_id
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+      - name: fiscal_invoice_nfe_number
+        description: "The sequential invoice number (Número da NF-e)."
 
       - name: fiscal_invoice_nfe_access_key
         description: "The unique 44-digit access key of the electronic fiscal invoice."
-        tests:
+        data_tests:
           - unique
           - not_null
 
+      - name: fiscal_invoice_series
+        description: "The series number of the fiscal invoice (Série da NF-e)."
+
       - name: fiscal_invoice_status
         description: "The current status of the fiscal invoice."
-        tests:
+        data_tests:
           - not_null
           - accepted_values:
               values: ['authorized', 'rejected', 'cancelled']
-              
+
       - name: fiscal_invoice_total_amount
         description: "The total monetary value of the fiscal invoice."
-        tests:
+        data_tests:
           - not_null
+
+      - name: fiscal_invoice_xml_storage_uri
+        description: "URI/URL location where the NF-e XML payload is stored."
+
+      - name: issued_at
+        description: "Timestamp when the fiscal invoice was officially issued."
+
+      - name: created_at
+        description: "Timestamp when the record was created in the source system."
+
+      - name: updated_at
+        description: "Timestamp when the record was last updated in the source system."
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']

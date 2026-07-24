@@ -31,8 +31,8 @@ with
 
             -- Nullifies future timestamps, since a record can't be created/updated ahead
             -- of now; keeps the rest of the row, as this is an isolated field-level issue
-            , case when created_at > current_timestamp() then null else created_at end as created_at
-            , case when updated_at > current_timestamp() then null else updated_at end as updated_at
+            , {{ nullify_future_date(created_at) }} as created_at
+            , {{ nullify_future_date(update_at)}} as updated_at
         from locations
     )
 
