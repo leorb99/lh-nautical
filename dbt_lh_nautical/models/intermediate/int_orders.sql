@@ -46,9 +46,9 @@ with
 
             -- Nullifies future timestamps, since an invoice can't be issued/created/updated
             -- ahead of now; keeps the rest of the row, as this is an isolated field-level issue
-            , {{ nullify_future_date('issued_at') }} issued_at
-            , {{ nullify_future_date('created_at') }} created_at
-            , {{ nullify_future_date('updated_at') }} updated_at
+            , {{ nullify_future_date('issued_at') }} as issued_at
+            , {{ nullify_future_date('created_at') }} as created_at
+            , {{ nullify_future_date('updated_at') }} as updated_at
 
             -- Internal ingestion metadata, not carried past this layer
             -- , _hash
