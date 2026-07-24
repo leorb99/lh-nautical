@@ -91,9 +91,9 @@ models:
           - not_null
 
       - name: _action
-        description: "Action type captured during CDC/ingestion."
+        description: "Action type captured during ingestion or CDC, using the source-system values CARGA_INICIAL and INSERT_OU_UPDATE."
         data_tests:
           - accepted_values:
               arguments:
-                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
+                values: ['CARGA_INICIAL', 'INSERT_OU_UPDATE']
           
