@@ -4,10 +4,9 @@ models:
   - name: fct_current_inventory
     description: >
       Current inventory position fact table with one row per product variant
-      and location. Combines the current quantity on hand with sales demand
-      from the latest 30-day period available in the dataset. Provides
-      inventory coverage and stockout-risk indicators for the inventory
-      dashboard.
+      and location. Combines the current quantity on hand with demand metrics
+      calculated over 30-day, 60-day and 90-day windows. The primary inventory
+      health and stockout-risk indicators use the 90-day demand window.
 
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -25,63 +24,103 @@ models:
           - not_null
 
       - name: product_variant_id
-        description: "Identifier of the product variant."
+        description: Identifier of the product variant.
         tests:
           - not_null
 
       - name: location_id
-        description: "Identifier of the inventory location."
+        description: Identifier of the inventory location.
         tests:
           - not_null
 
       - name: quantity_on_hand
-        description: "Current physical quantity available at the location."
+        description: Current physical quantity available at the location.
         tests:
           - not_null
 
       - name: source_reorder_point
-        description: >
-          Reorder point provided by the source system. The field is currently
-          null in the available source records and is preserved for future use.
+        description: Reorder point provided by the source system.
 
       - name: inventory_reference_date
-        description: "Source date associated with the current inventory position."
+        description: Source date associated with the current inventory position.
         tests:
           - not_null
 
       - name: sales_quantity_last_30_days
-        description: "Quantity sold during the latest 30-day analysis window."
+        description: Quantity sold during the latest 30-day analysis window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_60_days
+        description: Quantity sold during the latest 60-day analysis window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_90_days
+        description: Quantity sold during the latest 90-day analysis window.
         tests:
           - not_null
 
       - name: average_daily_sales_30d
-        description: "Average sales quantity per calendar day over the 30-day window."
+        description: Average sales quantity per calendar day over 30 days.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_60d
+        description: Average sales quantity per calendar day over 60 days.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_90d
+        description: Average sales quantity per calendar day over 90 days.
         tests:
           - not_null
 
       - name: days_with_sales_last_30_days
-        description: "Number of distinct days with sales during the analysis window."
+        description: Number of distinct days with sales in the 30-day window.
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_60_days
+        description: Number of distinct days with sales in the 60-day window.
+        tests:
+          - not_null
+
+      - name: days_with_sales_last_90_days
+        description: Number of distinct days with sales in the 90-day window.
+        tests:
+          - not_null
 
       - name: last_sale_date
-        description: "Most recent sale date for the variant and location."
+        description: Most recent sale date for the variant and location.
 
       - name: inventory_analysis_date
         description: >
-          Latest stock movement date available and ending date of the analysis
-          window.
+          Latest sales movement date available and ending date of the demand
+          analysis windows.
 
-      - name: inventory_coverage_days
+      - name: inventory_coverage_days_30d
         description: >
-          Estimated number of days the current inventory can cover, based on
-          average daily sales over the latest 30 days.
+          Estimated inventory coverage based on average daily demand over
+          the latest 30 days.
+
+      - name: inventory_coverage_days_60d
+        description: >
+          Estimated inventory coverage based on average daily demand over
+          the latest 60 days.
+
+      - name: inventory_coverage_days_90d
+        description: >
+          Estimated inventory coverage based on average daily demand over
+          the latest 90 days.
 
       - name: inventory_health_status
         description: >
-          Inventory health classification. Thresholds are analytical premises:
-          out_of_stock for zero inventory, critical for up to 7 days of
-          coverage, attention for more than 7 and up to 15 days, healthy for
-          more than 15 days, and no_recent_sales when there was no demand in
-          the analysis window.
+          Inventory health classification based on the 90-day average demand.
+          Values are out_of_stock for zero inventory, critical for coverage of
+          up to 7 days, attention for coverage above 7 and up to 15 days,
+          healthy for coverage above 15 days, and no_recent_sales when no
+          demand exists in the 90-day analysis window.
         tests:
           - accepted_values:
               arguments:
@@ -94,6 +133,7 @@ models:
 
       - name: is_stockout_risk
         description: >
-          Indicates zero inventory or estimated coverage of seven days or less.
+          Indicates zero inventory or estimated 90-day-based coverage of
+          seven days or less.
         tests:
           - not_null
