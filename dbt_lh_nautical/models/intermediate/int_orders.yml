@@ -30,6 +30,8 @@ models:
 
       - name: order_subtotal_amount
         description: "The order amount before discounts"
+        tests:
+          - not_null
 
       - name: order_discount_amount
         description: "The discount amount applied to the order"
@@ -79,6 +81,26 @@ models:
       - name: fiscal_invoice_updated_at
         description: "Timestamp when the fiscal invoice record was last updated in the source system. Nullified when found in the future"
 
+      - name: is_effective_sale
+        description: >
+          Indicates whether this order counts as an effective/completed sale:
+          order_status is 'paid', fiscal_invoice_status is 'authorized', and
+          placed_at is not null. Orders paid but with a cancelled or rejected
+          invoice are excluded, since they lack valid fiscal documentation for
+          the sale. Orders whose placed_at was nullified for being in the
+          future are also excluded, since nullifying alone doesn't stop their
+          order_total_amount from being summed into KPIs.
+
+      - name: is_paid_sale_pending_invoice_fix
+        description: >
+          Indicates an order that was paid but whose fiscal invoice was
+          rejected (fails fiscal validation, but could still be reissued).
+          This is revenue pending regularization, not lost revenue, and is
+          tracked separately from is_effective_sale since the invoice isn't
+          valid yet. Does not cover orders with a cancelled invoice, a
+          separate and more ambiguous case (possibly meaning the sale itself
+          was reversed).
+
     tests:
       - dbt_utils.equal_rowcount:
           arguments:
@@ -86,3 +108,12 @@ models:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "order_subtotal_amount - order_discount_amount = order_total_amount"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "fiscal_invoice_status != 'authorized' or order_total_amount = fiscal_invoice_total_amount"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_discount_amount <= order_subtotal_amount"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_subtotal_amount > 0"

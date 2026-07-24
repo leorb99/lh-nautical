@@ -26,11 +26,17 @@ with
             , orders.order_status
             , orders.fiscal_invoice_status
             , orders.placed_at
+            , orders.is_effective_sale
+            , orders.is_paid_sale_pending_invoice_fix
 
-            -- Order-level monetary totals, excluded: not additive at item grain, would be double-counted if summed across an order's items
+            -- Official order-level revenue field, repeated per item: do not SUM directly
+            -- across items of the same order, it would double-count. Aggregate by
+            -- order_id first (e.g. count(distinct order_id) for average ticket).
+            , orders.order_total_amount
+
+            -- Other order-level monetary totals, excluded: not additive at item grain, would be double-counted if summed across an order's items
             -- , orders.order_subtotal_amount
             -- , orders.order_discount_amount
-            -- , orders.order_total_amount
             -- , orders.fiscal_invoice_total_amount
             -- , orders.authorized_fiscal_invoice_amount
 
@@ -56,6 +62,17 @@ with
             , order_items.order_item_icms_amount
             , order_items.order_item_ipi_amount
             , order_items.order_item_net_revenue
+
+            -- Order-level discount allocated proportionally to this item (by its share of the
+            -- order's gross subtotal), then subtracted from the item's net revenue. Used to
+            -- correctly break net revenue down by product/category/brand, since order_total_amount
+            -- alone can't be split across items when an order has more than one product.
+            -- nullif guards the division if order_subtotal_amount is ever 0 (turning a hard crash into a null result); 
+            -- (ps: the int_orders test on order_subtotal_amount > 0 is what actually surfaces this as a visible data quality issue, not this nullif.
+            , order_items.order_item_net_revenue - (
+                orders.order_discount_amount * order_items.order_item_line_total
+                / nullif(orders.order_subtotal_amount, 0)
+            ) as order_item_net_revenue_after_discount
 
         from order_items
         left join orders
