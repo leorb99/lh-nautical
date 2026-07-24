@@ -1,0 +1,148 @@
+version: 2
+
+models:
+  - name: int_inventory_replenishment_inputs
+    description: >
+      Consolidates current inventory, recent demand and historical replenishment
+      lead time at the product-variant and location grain. The model preserves
+      every current inventory record and applies hierarchical lead-time
+      fallbacks for migrated products without complete purchasing history.
+
+    columns:
+      - name: current_inventory_snapshot_sk
+        description: Identifier of the current inventory snapshot record.
+        tests:
+          - not_null
+          - unique
+
+      - name: product_variant_id
+        description: Identifier of the product variant.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Identifier of the inventory location.
+        tests:
+          - not_null
+
+      - name: quantity_on_hand
+        description: Current quantity available in inventory.
+        tests:
+          - not_null
+
+      - name: reorder_point
+        description: Source-defined inventory reorder threshold.
+
+      - name: is_out_of_stock
+        description: Indicates whether current inventory is zero.
+        tests:
+          - not_null
+
+      - name: is_below_reorder_point
+        description: Indicates whether inventory is at or below the source reorder point.
+        tests:
+          - not_null
+
+      - name: snapshot_date
+        description: Date associated with the current inventory snapshot.
+        tests:
+          - not_null
+
+      - name: inventory_analysis_date
+        description: Reference date used to calculate recent demand metrics.
+
+      - name: last_sale_date
+        description: Most recent sale date found within the 90-day demand window.
+
+      - name: sales_quantity_last_30_days
+        description: Quantity sold during the most recent 30-day calendar window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_60_days
+        description: Quantity sold during the most recent 60-day calendar window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_90_days
+        description: Quantity sold during the most recent 90-day calendar window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_30d
+        description: Average calendar-day demand over the latest 30-day window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_60d
+        description: Average calendar-day demand over the latest 60-day window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_90d
+        description: Average calendar-day demand over the latest 90-day window.
+        tests:
+          - not_null
+
+      - name: selected_lead_time_days
+        description: >
+          Lead time selected through the product-location, product, global and
+          seven-day default fallback hierarchy.
+        tests:
+          - not_null
+
+      - name: lead_time_source
+        description: Source used to determine the selected replenishment lead time.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - product_location_history
+                  - product_history
+                  - global_history
+                  - default_7_days
+
+      - name: lead_time_observation_count
+        description: Number of historical observations supporting the selected lead time.
+        tests:
+          - not_null
+
+      - name: lead_time_confidence
+        description: Qualitative confidence assigned to the selected lead-time estimate.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - high
+                  - medium
+                  - low
+                  - assumed
+
+      - name: is_lead_time_estimated
+        description: >
+          Indicates that product-location-specific lead-time history was unavailable
+          and a broader fallback or default value was used.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+      - name: is_demand_history_missing
+        description: >
+          Indicates that the product variant and location had no valid sales
+          movements within the 90-day demand window.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id
