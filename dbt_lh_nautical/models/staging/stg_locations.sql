@@ -11,7 +11,7 @@ with
             , cast(location_type as string) as location_type
             , cast(postal_code as string) as location_postal_code
             , cast(street as string) as location_street
-            , cast(number as int) as location_number
+            , cast(number as string) as location_number
             , cast(complement as string) as location_complement
             , cast(district as string) as location_district
             , cast(city as string) as location_city
