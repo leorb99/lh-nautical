@@ -73,4 +73,4 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['CARGA_INICIAL', 'INSERT_OU_UPDATE']
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
