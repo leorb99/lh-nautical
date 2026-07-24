@@ -31,14 +31,16 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['ecommerce', 'pos']
+              arguments:
+                values: ['ecommerce', 'pos']
 
       - name: order_status
         description: "The current lifecycle status of the order."
         tests:
           - not_null
           - accepted_values:
-              values: ['paid', 'confirmed', 'draft', 'cancelled']
+              arguments:
+                values: ['paid', 'confirmed', 'draft', 'cancelled']
 
       - name: order_total_amount
         description: "The final total amount of the order after discounts."
