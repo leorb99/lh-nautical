@@ -6,27 +6,47 @@ models:
     columns:
       - name: goods_receipt_item_id
         description: "Primary key of the goods_receipt_items table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: goods_receipt_id
         description: "Foreign key mapping to the goods receipt table."
-        tests:
+        data_tests:
           - not_null
           - relationships:
-              to: ref('stg_goods_receipts')
-              field: goods_receipt_id
+              arguments:
+                to: ref('stg_goods_receipts')
+                field: goods_receipt_id
 
       - name: purchase_order_item_id
         description: "Foreign key mapping to the purchase order items table"
-        tests:
+        data_tests:
           - not_null
           - relationships:
-              to: ref('stg_purchase_order_items')
-              field: purchase_order_item_id
+              arguments:
+                to: ref('stg_purchase_order_items')
+                field: purchase_order_item_id
       
       - name: goods_receipt_item_quantity_received
         description: "The physical quantity of items received and checked into inventory."
-        tests:
+        data_tests:
           - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion (e.g., INSERT, UPDATE, DELETE)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']

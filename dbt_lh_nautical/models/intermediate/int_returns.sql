@@ -59,8 +59,9 @@ with
             -- Only completed returns with a valid event date are effective
             -- and eligible to affect downstream return and net-sales metrics.
             , case
-                when returns.return_status = 'completed'
-                 and returns.created_at <= current_timestamp()
+                when
+                    returns.return_status = 'completed'
+                    and returns.created_at <= current_timestamp()
                     then true
                 else false
             end as is_effective_return

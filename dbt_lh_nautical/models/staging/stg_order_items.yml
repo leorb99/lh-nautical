@@ -6,40 +6,63 @@ models:
     columns:
       - name: order_item_id
         description: "Primary key of the order items table."
-        tests:
+        data_tests:
           - unique
           - not_null
 
       - name: order_id
         description: "Foreign key linking to the parent order header."
-        tests:
+        data_tests:
           - not_null
-          # Relationship test example (if you have stg_orders)
-          #- relationships:
-          #  to: ref('stg_orders')
-          #  field: order_id
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
 
       - name: product_variant_id
         description: "Foreign key linking to the specific product variant item."
-        tests:
+        data_tests:
           - not_null
-          # Relationship test example (if you have stg_product_variant)
-          #- relationships:
-          #  to: ref('stg_product_variant')
-          #  field: product_variant_id
+          - relationships:
+              arguments:
+                to: ref('stg_product_variants')
+                field: product_variant_id
 
       - name: order_item_quantity
         description: "The number of units ordered for this specific item line."
-        tests:
+        data_tests:
           - not_null
 
       - name: order_item_unit_price
         description: "The price per single unit of the product variant."
-        tests:
+        data_tests:
           - not_null
+
+      - name: order_item_icms_rate
+        description: "ICMS tax rate percentage applied to the order line item."
+
+      - name: order_item_ipi_rate
+        description: "IPI tax rate percentage applied to the order line item."
 
       - name: order_item_line_total
         description: "The calculated total amount for this line item (usually quantity * unit_price + taxes)."
-        tests:
+        data_tests:
           - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Action type captured during CDC/ingestion (e.g., INSERT, UPDATE, DELETE)."
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
           
