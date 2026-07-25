@@ -23,7 +23,7 @@ targets:
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
     variables:
-      catalog_name: dev_adriano_takata_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
+      catalog_name: dev_${workspace.current_user.short_name}_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
     presets:
       artifacts_dynamic_version: true
 
