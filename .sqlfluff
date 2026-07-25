@@ -3,13 +3,12 @@ templater = dbt
 dialect = databricks
 sql_file_exts = .sql
 max_line_length = 150
+max_parse_depth = 0
 exclude_rules = structure.column_order, structure.simple_case
 
 [sqlfluff:templater:dbt]
 project_dir = ./dbt_lh_nautical
-profiles_dir = ~/.dbt
 profile = dbt_lh_nautical
-target = dev
 
 [sqlfluff:indentation]
 indent_unit = space

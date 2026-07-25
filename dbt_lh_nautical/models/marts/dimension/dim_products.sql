@@ -22,7 +22,7 @@ with
             , product_variants.product_variant_barcode_ean
             , enriched_products.product_name
             , enriched_products.product_description
-            , enriched_products.unit_of_measure
+            , enriched_products.product_unit_of_measure
             , enriched_products.product_ncm_code
             , enriched_products.category_name
             , enriched_products.category_url_slug

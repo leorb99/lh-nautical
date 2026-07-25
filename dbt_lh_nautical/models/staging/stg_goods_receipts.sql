@@ -13,7 +13,6 @@ with
             , cast(notes as string) as goods_receipt_notes
             , cast(created_at as timestamp) as created_at
 
-
             -- internal ingestion metadata
             , cast(_hash as string) as _hash
             , cast(_ingested_at as timestamp) as _ingested_at
