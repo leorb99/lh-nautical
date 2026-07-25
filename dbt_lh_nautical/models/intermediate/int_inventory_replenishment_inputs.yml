@@ -1,0 +1,188 @@
+version: 2
+
+models:
+  - name: int_inventory_replenishment_inputs
+    description: >
+      Intermediate model that consolidates current inventory, recent demand,
+      historical replenishment lead time and committed inbound purchase quantities.
+      The model is driven by int_current_inventory, preserving one row for every
+      current product-variant and location record. Demand is sourced from
+      int_inventory_demand_metrics, lead time is selected from
+      int_inventory_lead_time_metrics, int_product_lead_time_metrics and
+      int_global_lead_time_metrics, and inbound inventory is sourced from
+      int_open_purchase_order_quantities. Missing demand and open purchase-order
+      values are defaulted to zero. Lead time follows a hierarchy from
+      product-location history to product history, global history and finally
+      a fixed seven-day default.
+
+    columns:
+      - name: current_inventory_snapshot_sk
+        description: Identifier of the current inventory snapshot record.
+        tests:
+          - not_null
+          - unique
+
+      - name: product_variant_id
+        description: Identifier of the product variant.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Identifier of the inventory location.
+        tests:
+          - not_null
+
+      - name: quantity_on_hand
+        description: >
+          Current inventory quantity sourced from int_current_inventory at the
+          product-variant and location grain.
+        tests:
+          - not_null
+
+      - name: reorder_point
+        description: Source-defined inventory reorder threshold.
+
+      - name: is_out_of_stock
+        description: Indicates whether current inventory is zero.
+        tests:
+          - not_null
+
+      - name: is_below_reorder_point
+        description: Indicates whether inventory is at or below the source reorder point.
+        tests:
+          - not_null
+
+      - name: snapshot_date
+        description: Date associated with the current inventory snapshot.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_quantity
+        description: >
+          Committed inbound quantity sourced from
+          int_open_purchase_order_quantities for the same product variant and
+          location. Includes only sent and partially_received purchase orders.
+          It is calculated upstream as the sum of
+          greatest(purchase_order_item_quantity_ordered -
+          total_quantity_received, 0). Defaults to zero when no active inbound
+          purchase order exists.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_item_count
+        description: >
+          Number of sent or partially received purchase order items contributing
+          to the open purchase quantity for the product variant and location.
+        tests:
+          - not_null
+
+      - name: inventory_analysis_date
+        description: Reference date used to calculate recent demand metrics.
+
+      - name: last_sale_date
+        description: Most recent sale date found within the 90-day demand window.
+
+      - name: sales_quantity_last_30_days
+        description: Quantity sold during the most recent 30-day calendar window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_60_days
+        description: Quantity sold during the most recent 60-day calendar window.
+        tests:
+          - not_null
+
+      - name: sales_quantity_last_90_days
+        description: Quantity sold during the most recent 90-day calendar window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_30d
+        description: Average calendar-day demand over the latest 30-day window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_60d
+        description: Average calendar-day demand over the latest 60-day window.
+        tests:
+          - not_null
+
+      - name: average_daily_sales_90d
+        description: Average calendar-day demand over the latest 90-day window.
+        tests:
+          - not_null
+
+      - name: selected_lead_time_days
+        description: >
+          Replenishment lead time in calendar days selected using the median
+          value from the most specific available source. The hierarchy is
+          product-location history, product history, global history and finally
+          a fixed seven-day default. The result is stored as decimal(14, 2).
+        tests:
+          - not_null
+
+      - name: lead_time_source
+        description: Source used to determine the selected replenishment lead time.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - product_location_history
+                  - product_history
+                  - global_history
+                  - default_7_days
+
+      - name: lead_time_observation_count
+        description: >
+          Number of valid historical receipt observations supporting the selected
+          lead time source. Set to zero when the fixed seven-day default is used.
+        tests:
+          - not_null
+
+      - name: lead_time_confidence
+        description: >
+          Qualitative operational confidence based on source specificity and
+          valid observation count. Product-location history is high with at
+          least 10 observations, medium with 3 to 9, and low with 1 or 2.
+          Product-level and global fallbacks are low, while the fixed seven-day
+          fallback is assumed. This classification is not a statistical
+          confidence interval.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - high
+                  - medium
+                  - low
+                  - assumed
+
+      - name: is_lead_time_estimated
+        description: >
+          Indicates that product-location-specific lead-time history was unavailable
+          and a broader fallback or default value was used.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+      - name: is_demand_history_missing
+        description: >
+          Indicates that int_inventory_demand_metrics contained no matching
+          product-variant and location record for the 90-day demand window.
+          When true, sales quantities and average daily demand metrics are
+          defaulted to zero.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id

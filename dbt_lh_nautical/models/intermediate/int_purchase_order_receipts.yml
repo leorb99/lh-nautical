@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: int_purchase_order_receipts
+    description: >
+      Intermediate model consolidating purchase-order receipts at the purchase
+      order item grain. Each purchase order item appears once, preventing
+      partial receipts from disproportionately influencing replenishment
+      lead-time metrics.
+
+    columns:
+      - name: purchase_order_item_id
+        description: Unique identifier of the purchase order item.
+        tests:
+          - unique
+          - not_null
+
+      - name: purchase_order_id
+        description: Identifier of the purchase order.
+        tests:
+          - not_null
+
+      - name: supplier_id
+        description: Identifier of the supplier responsible for the purchase order.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Destination location of the purchase order.
+        tests:
+          - not_null
+
+      - name: product_variant_id
+        description: Identifier of the purchased product variant.
+        tests:
+          - not_null
+
+      - name: purchase_order_status
+        description: Current status of the purchase order.
+
+      - name: placed_at
+        description: Timestamp when the purchase order was placed.
+
+      - name: first_received_at
+        description: Earliest valid physical receipt timestamp for the purchase order item.
+
+      - name: last_received_at
+        description: Most recent valid physical receipt timestamp for the purchase order item.
+
+      - name: receipt_event_count
+        description: Number of distinct physical receipt events associated with the item.
+
+      - name: purchase_order_item_quantity_ordered
+        description: Quantity originally ordered for the purchase order item.
+        tests:
+          - not_null
+
+      - name: total_quantity_received
+        description: Total quantity received across all valid receipt events.
+        tests:
+          - not_null
+
+      - name: receipt_fill_rate
+        description: >
+          Ratio between the total quantity received and the quantity originally
+          ordered. Values above one indicate over-receipt.
+
+      - name: lead_time_days
+        description: >
+          Calendar days between purchase-order placement and the first valid
+          physical receipt. Null when either date is unavailable or inconsistent.
+
+      - name: has_future_receipt_date
+        description: >
+          Indicates whether any source receipt associated with the item contained
+          a future received_at timestamp.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]

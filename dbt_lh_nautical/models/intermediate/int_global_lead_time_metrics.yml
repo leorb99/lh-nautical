@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: int_global_lead_time_metrics
+    description: >
+      Global historical replenishment lead-time metrics calculated from
+      valid purchase receipt observations. Used as the final fallback when
+      neither product-location nor product-level history is available.
+
+    columns:
+      - name: median_global_lead_time_days
+        description: Global median historical replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: average_global_lead_time_days
+        description: Global average historical replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: minimum_global_lead_time_days
+        description: Minimum valid replenishment lead time observed.
+        tests:
+          - not_null
+
+      - name: maximum_global_lead_time_days
+        description: Maximum valid replenishment lead time observed.
+        tests:
+          - not_null
+
+      - name: global_lead_time_observation_count
+        description: Number of valid observations used in the global metrics.
+        tests:
+          - not_null

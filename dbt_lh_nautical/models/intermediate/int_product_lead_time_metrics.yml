@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: int_product_lead_time_metrics
+    description: >
+      Historical replenishment lead-time metrics aggregated by product
+      variant across all receiving locations. This model provides a
+      fallback when no product-location-specific lead-time history exists.
+
+    columns:
+      - name: product_variant_id
+        description: Product variant represented by the lead-time metrics.
+        tests:
+          - not_null
+          - unique
+
+      - name: median_product_lead_time_days
+        description: Median historical replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: average_product_lead_time_days
+        description: Average historical replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: minimum_product_lead_time_days
+        description: Minimum observed replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: maximum_product_lead_time_days
+        description: Maximum observed replenishment lead time in days.
+        tests:
+          - not_null
+
+      - name: product_lead_time_observation_count
+        description: Number of valid receipt observations used.
+        tests:
+          - not_null
+
+      - name: product_lead_time_location_count
+        description: Number of locations contributing observations.
+        tests:
+          - not_null
+
+      - name: product_lead_time_supplier_count
+        description: Number of suppliers represented in the observations.
+        tests:
+          - not_null
