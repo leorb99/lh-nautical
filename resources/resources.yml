@@ -4,7 +4,7 @@ resources:
       name: "Ingestão Completa (JDBC + Autoloader)" 
       # Executar o Job todos os dias a 1h da manhã
       schedule:
-        quartz_cron_expression: "0 0 1 * * ?"
+        quartz_cron_expression: "0 30 4 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
 
@@ -54,9 +54,28 @@ resources:
               - "--catalog"
               - ${var.catalog_name}
 
+        - task_key: "dbt_transformacao"
+          depends_on:
+           - task_key: "testes_ingestao"
+          dbt_task:
+            project_directory: ../dbt_lh_nautical
+            warehouse_id: e792e2cd0d725b8c
+            catalog: ${var.catalog_name}    
+            schema: bronze                 
+            commands:
+              - "dbt deps"
+              - "dbt build --select staging+ --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
+          environment_key: dbt_env
+          
       environments:
         - environment_key: default
           spec:
             environment_version: "3"
             dependencies:
               - pytest
+
+        - environment_key: dbt_env
+          spec:
+            environment_version: "3"
+            dependencies:
+              - dbt-databricks 
