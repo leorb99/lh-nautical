@@ -3,7 +3,7 @@ version: 2
 models:
   - name: agg_daily_financial_metrics
     description: >
-      Daily financial metrics fact table with exactly one row per metric_date.
+      Daily financial metrics aggregate with exactly one row per metric_date.
 
       The model consolidates effective sales, item-level net revenue after
       completed refunds, average ticket, quantity-based return rate, and paid
