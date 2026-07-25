@@ -1,9 +1,9 @@
-with 
+with
     orders as (
-        select * 
+        select *
         from {{ source('bronze', 'orders') }}
     )
-    
+
     , renamed as (
         select
             cast(id as int) as order_id
@@ -13,20 +13,19 @@ with
             , cast(order_number as string) as order_number
             , cast(channel as string) as order_channel
             , cast(status as string) as order_status
-            , cast(subtotal as decimal(14,2)) as order_subtotal_amount
-            , cast(discount_amount as decimal(14,2)) as order_discount_amount
-            , cast(total as decimal(14,2)) as order_total_amount
+            , cast(subtotal as decimal(14, 2)) as order_subtotal_amount
+            , cast(discount_amount as decimal(14, 2)) as order_discount_amount
+            , cast(total as decimal(14, 2)) as order_total_amount
             , cast(placed_at as timestamp) as placed_at
             , cast(created_at as timestamp) as created_at
             , cast(updated_at as timestamp) as updated_at
-            
-            
+
             -- internal ingestion metadata
             , cast(_hash as string) as _hash
             , cast(_ingested_at as timestamp) as _ingested_at
             , cast(_action as string) as _action
         from orders
-)
+    )
 
 select *
 from renamed

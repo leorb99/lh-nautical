@@ -32,7 +32,7 @@ with
             -- Nullifies future timestamps, since a record can't be created/updated ahead
             -- of now; keeps the rest of the row, as this is an isolated field-level issue
             , {{ nullify_future_date('created_at') }} as created_at
-            , {{ nullify_future_date('updated_at')}} as updated_at
+            , {{ nullify_future_date('updated_at') }} as updated_at
         from locations
     )
 

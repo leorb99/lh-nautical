@@ -36,22 +36,23 @@ with
             snapshot_periods.inventory_snapshot_sk
             , sum(
                 coalesce(
-                    stock_movements.movement_quantity_signed,
-                    0
+                    stock_movements.movement_quantity_signed
+                    , 0
                 )
             ) as net_movement_quantity
 
         from snapshot_periods
 
         left join {{ ref('int_stock_movements') }} as stock_movements
-            on snapshot_periods.product_variant_id
+            on
+                snapshot_periods.product_variant_id
                 = stock_movements.product_variant_id
-            and snapshot_periods.location_id
+                and snapshot_periods.location_id
                 = stock_movements.location_id
-            and stock_movements.occurred_at
-                > snapshot_periods.previous_snapshot_valid_from
-            and stock_movements.occurred_at
-                <= snapshot_periods.snapshot_valid_from
+                and snapshot_periods.previous_snapshot_valid_from
+                < stock_movements.occurred_at
+                and snapshot_periods.snapshot_valid_from
+                >= stock_movements.occurred_at
 
         where snapshot_periods.previous_snapshot_valid_from is not null
 
@@ -69,32 +70,33 @@ with
             , snapshot_periods.quantity_on_hand as observed_quantity_on_hand
 
             , snapshot_periods.quantity_on_hand
-                - snapshot_periods.previous_quantity_on_hand
+            - snapshot_periods.previous_quantity_on_hand
                 as observed_quantity_change
 
             , coalesce(
-                movements_between_snapshots.net_movement_quantity,
-                0
+                movements_between_snapshots.net_movement_quantity
+                , 0
             ) as net_movement_quantity
 
             , (
                 snapshot_periods.quantity_on_hand
                 - snapshot_periods.previous_quantity_on_hand
             ) - coalesce(
-                movements_between_snapshots.net_movement_quantity,
-                0
+                movements_between_snapshots.net_movement_quantity
+                , 0
             ) as reconciliation_difference
 
             , case
-                when abs(
-                    (
-                        snapshot_periods.quantity_on_hand
-                        - snapshot_periods.previous_quantity_on_hand
-                    ) - coalesce(
-                        movements_between_snapshots.net_movement_quantity,
-                        0
-                    )
-                ) < 0.001
+                when
+                    abs(
+                        (
+                            snapshot_periods.quantity_on_hand
+                            - snapshot_periods.previous_quantity_on_hand
+                        ) - coalesce(
+                            movements_between_snapshots.net_movement_quantity
+                            , 0
+                        )
+                    ) < 0.001
                     then 'reconciled'
                 else 'difference_detected'
             end as reconciliation_status
@@ -102,7 +104,8 @@ with
         from snapshot_periods
 
         left join movements_between_snapshots
-            on snapshot_periods.inventory_snapshot_sk
+            on
+                snapshot_periods.inventory_snapshot_sk
                 = movements_between_snapshots.inventory_snapshot_sk
 
         where snapshot_periods.previous_snapshot_valid_from is not null

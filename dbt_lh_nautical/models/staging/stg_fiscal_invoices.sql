@@ -12,7 +12,7 @@ with
             , cast(nfe_access_key as string) as fiscal_invoice_nfe_access_key
             , cast(series as string) as fiscal_invoice_series
             , cast(status as string) as fiscal_invoice_status
-            , cast(total_amount as decimal(14,2)) as fiscal_invoice_total_amount
+            , cast(total_amount as decimal(14, 2)) as fiscal_invoice_total_amount
             , cast(xml_storage_uri as string) as fiscal_invoice_xml_storage_uri
             , cast(issued_at as timestamp) as issued_at
             , cast(created_at as timestamp) as created_at

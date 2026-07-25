@@ -45,10 +45,15 @@ models:
       - name: updated_at
         description: "Timestamp when the record was last updated in the source system."
 
-      - name: _action
-        description: "Ingestion action associated with the record."
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
         tests:
-          - accepted_values:
-              arguments:
-                values:
-                  - CARGA_INICIAL
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."

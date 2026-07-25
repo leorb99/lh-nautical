@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: int_inventory_lead_time_metrics
+    description: >
+      Intermediate model containing historical replenishment lead-time metrics
+      by product variant and destination location. Only valid, non-future receipt
+      observations are included. The model contains one row per product variant
+      and location.
+
+    columns:
+      - name: product_variant_id
+        description: "Identifier of the product variant."
+        tests:
+          - not_null
+
+      - name: location_id
+        description: "Identifier of the destination location."
+        tests:
+          - not_null
+
+      - name: median_lead_time_days
+        description: >
+          Median number of calendar days between purchase-order placement and
+          physical receipt for the product variant and location.
+        tests:
+          - not_null
+
+      - name: average_lead_time_days
+        description: >
+          Average number of calendar days between purchase-order placement and
+          physical receipt.
+        tests:
+          - not_null
+
+      - name: minimum_lead_time_days
+        description: "Minimum valid replenishment lead time observed."
+        tests:
+          - not_null
+
+      - name: maximum_lead_time_days
+        description: "Maximum valid replenishment lead time observed."
+        tests:
+          - not_null
+
+      - name: lead_time_observation_count
+        description: "Number of valid receipt observations used in the metrics."
+        tests:
+          - not_null
+
+      - name: supplier_count
+        description: >
+          Number of distinct suppliers observed for the product variant and
+          location.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id

@@ -14,8 +14,8 @@ with
             , supplier_trade_name
 
             , coalesce(
-                supplier_trade_name,
-                supplier_legal_name
+                supplier_trade_name
+                , supplier_legal_name
             ) as supplier_display_name
 
             , supplier_country
