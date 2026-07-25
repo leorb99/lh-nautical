@@ -35,10 +35,13 @@ models:
     staging:
       +materialized: view
       +schema: silver
+      +tags: staging
     intermediate:
       +materialized: view
       +schema: silver
+      +tags: intermediate
     marts:
+      +tags: marts
       dimension:
         +materialized: table
         +schema: gold

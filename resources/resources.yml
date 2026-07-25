@@ -44,19 +44,19 @@ resources:
               catalog_name: ${var.catalog_name} 
               schema: bronze
 
-        #- task_key: "testes_ingestao"
-        #  depends_on:
-        #    - task_key: "ingestion_currency"
-        #  environment_key: default
-        #  spark_python_task:
-        #    python_file: ../tests/run_tests.py
-        #    parameters:
-        #      - "--catalog"
-        #      - ${var.catalog_name}
+        - task_key: "testes_ingestao"
+          depends_on:
+            - task_key: "ingestion_currency"
+          environment_key: default
+          spark_python_task:
+            python_file: ../tests/run_tests.py
+            parameters:
+              - "--catalog"
+              - ${var.catalog_name}
 
         - task_key: "dbt_transformacao"
           depends_on:
-           - task_key: "ingestion_currency"
+           - task_key: "testes_ingestao"
           dbt_task:
             project_directory: ../dbt_lh_nautical
             warehouse_id: e792e2cd0d725b8c
