@@ -37,3 +37,16 @@ models:
         description: "The total monetary value of the fiscal invoice."
         tests:
           - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
