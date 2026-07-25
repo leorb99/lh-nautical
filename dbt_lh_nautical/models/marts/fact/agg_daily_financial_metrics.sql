@@ -96,7 +96,7 @@ with
         select metric_date
         from daily_effective_item_metrics
 
-        union
+        union distinct
 
         select metric_date
         from daily_pending_invoice_metrics
@@ -149,16 +149,19 @@ with
         from metric_dates
 
         left join daily_effective_item_metrics
-            on metric_dates.metric_date
-            = daily_effective_item_metrics.metric_date
+            on
+                metric_dates.metric_date
+                = daily_effective_item_metrics.metric_date
 
         left join daily_effective_order_metrics
-            on metric_dates.metric_date
-            = daily_effective_order_metrics.metric_date
+            on
+                metric_dates.metric_date
+                = daily_effective_order_metrics.metric_date
 
         left join daily_pending_invoice_metrics
-            on metric_dates.metric_date
-            = daily_pending_invoice_metrics.metric_date
+            on
+                metric_dates.metric_date
+                = daily_pending_invoice_metrics.metric_date
     )
 
     , final as (
