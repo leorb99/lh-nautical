@@ -1,0 +1,169 @@
+version: 2
+
+models:
+  - name: agg_daily_financial_metrics
+    description: >
+      Daily financial metrics aggregate with exactly one row per metric_date.
+
+      The model consolidates effective sales, item-level net revenue after
+      completed refunds, average ticket, quantity-based return rate, and paid
+      revenue pending fiscal regularization.
+
+      Business purpose:
+
+      This model directly supports the financial questions defined by the
+      business stakeholder:
+
+      1. What is the net revenue?
+      2. What is the average ticket?
+      3. What is the return rate?
+
+      Grain:
+
+      One row per calendar date represented by metric_date.
+
+      Date attribution:
+
+      Sales, completed returns, and completed refunds are attributed to the
+      original order placed_at date. This provides a sales-cohort view of
+      financial performance. It does not represent the operational date on
+      which a return was physically processed.
+
+      Effective-sale rule:
+
+      Official financial KPIs include only orders classified upstream as
+      effective sales. An effective sale must be paid, have an authorized fiscal
+      invoice, and have a valid non-future placed_at timestamp.
+
+      Net-revenue rule:
+
+      net_revenue_amount is calculated from item-level net revenue after the
+      proportional allocation of order discounts and the deduction of completed
+      monetary refunds.
+
+      Average-ticket rule:
+
+      average_ticket_amount uses the official order_total_amount of effective
+      orders divided by the number of effective orders. Order values are reduced
+      to one row per order_id before aggregation to prevent double counting.
+
+      Return-rate rule:
+
+      return_quantity_rate is quantity based. It divides the number of units
+      effectively returned by the number of units sold in effective sales.
+
+      Pending fiscal regularization:
+
+      Paid orders with rejected fiscal invoices are excluded from effective
+      sales and reported separately through pending_invoice_order_count and
+      pending_invoice_revenue_amount.
+
+      Aggregation guidance:
+
+      The monetary amounts, counts, and quantities are additive across dates.
+
+      average_ticket_amount and return_quantity_rate are non-additive metrics.
+      For weekly, monthly, quarterly, or annual analysis, they must be
+      recalculated from their exposed numerators and denominators instead of
+      being summed or averaged across daily rows.
+
+    columns:
+      - name: metric_date
+        description: >
+          Calendar date of the original sales order, derived from placed_at.
+          This column defines the grain of the model.
+        tests:
+          - unique
+          - not_null
+
+      - name: effective_order_count
+        description: >
+          Number of distinct orders classified as effective sales on the
+          metric date. Each order is counted exactly once regardless of how many
+          order items it contains.
+
+      - name: effective_order_revenue_amount
+        description: >
+          Sum of the official order_total_amount for effective sales.
+
+          Orders are first reduced to one row per order_id to prevent the
+          order-level value from being counted once for every order item.
+
+      - name: net_revenue_amount
+        description: >
+          Additive item-level net revenue from effective sales after allocating
+          parent-order discounts and deducting completed monetary refunds.
+
+          This measure answers the business question: What is the net revenue?
+
+      - name: completed_refund_amount
+        description: >
+          Total monetary amount refunded through completed and effective refund
+          returns associated with effective sales on the metric date.
+
+          Exchange-only returns do not increase this measure unless a monetary
+          refund is also recorded.
+
+      - name: sold_item_quantity
+        description: >
+          Total number of product units sold through effective sales before
+          completed returns are deducted.
+
+      - name: returned_item_quantity
+        description: >
+          Total number of product units effectively returned from effective
+          sales. Both refund and exchange returns are included when they satisfy
+          the completed-return business rule.
+
+      - name: pending_invoice_order_count
+        description: >
+          Number of paid orders whose fiscal invoice was rejected and remains
+          pending fiscal regularization.
+
+          These orders are excluded from effective sales and official revenue
+          KPIs.
+
+      - name: pending_invoice_revenue_amount
+        description: >
+          Official order value associated with paid orders whose fiscal invoice
+          was rejected.
+
+          This amount represents revenue pending fiscal regularization and is
+          reported separately from effective sales revenue.
+
+      - name: average_ticket_amount
+        description: >
+          Average official order value for effective sales.
+
+          Calculation:
+
+          effective_order_revenue_amount
+          divided by
+          effective_order_count.
+
+          The value is zero when no effective orders exist on the metric date.
+
+          For analysis across multiple dates, recalculate the metric using the
+          summed revenue amount divided by the summed order count. Do not average
+          this daily percentage-like result.
+
+          This measure answers the business question: What is the average ticket?
+
+      - name: return_quantity_rate
+        description: >
+          Quantity-based return rate for effective sales.
+
+          Calculation:
+
+          returned_item_quantity
+          divided by
+          sold_item_quantity.
+
+          The value is expressed as a decimal ratio between zero and one and is
+          zero when no sold quantity exists.
+
+          For analysis across multiple dates, recalculate the metric using the
+          summed returned quantity divided by the summed sold quantity. Do not
+          average the daily rates.
+
+          This measure answers the business question: What is the return rate?
