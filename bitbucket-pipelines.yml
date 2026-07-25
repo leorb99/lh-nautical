@@ -22,6 +22,35 @@ pipelines:
               dbt deps
               sqlfluff lint models/
               dbt build
+          after-script:
+            # Roda mesmo se o build acima falhar, pra não deixar sujeira acumulada no
+            # catálogo compartilhado do CI. Mantém só a bronze (populada manualmente,
+            # fora do pipeline); silver/gold são reconstruídas do zero a cada PR. O macro
+            # é gerado só dentro do container do pipeline (nunca commitado no projeto dbt).
+            - |
+              if [ "$BITBUCKET_PR_DESTINATION_BRANCH" != "develop" ]; then
+                exit 0
+              fi
+              pip install dbt-databricks==1.12.1
+              cd dbt_lh_nautical
+              export DBT_PROFILES_DIR=./ci
+              mkdir -p macros/_ci_tmp
+              cat > macros/_ci_tmp/drop_ci_transformed_schemas.sql << 'EOF'
+              {% macro drop_ci_transformed_schemas() %}
+                  {% if target.name != 'ci' %}
+                      {{ exceptions.raise_compiler_error("refusing to run against target: " ~ target.name) }}
+                  {% endif %}
+                  {% set drops = [
+                      "drop schema if exists " ~ target.database ~ ".silver cascade",
+                      "drop schema if exists " ~ target.database ~ ".gold cascade"
+                  ] %}
+                  {% for stmt in drops %}
+                      {% do run_query(stmt) %}
+                      {{ log("Executed: " ~ stmt, info=true) }}
+                  {% endfor %}
+              {% endmacro %}
+              EOF
+              dbt run-operation drop_ci_transformed_schemas || true
 
     # Cenário B: alguém abriu um Pull Request de 'develop' -> 'main'. Aqui a origem do PR realmente
     # é 'develop', então a chave já casa direto com o cenário pretendido, sem precisar de checagem em runtime.
