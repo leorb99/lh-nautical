@@ -31,8 +31,9 @@ with
         from goods_receipt_items
 
         inner join goods_receipts
-            on goods_receipt_items.goods_receipt_id
-            = goods_receipts.goods_receipt_id
+            on
+                goods_receipt_items.goods_receipt_id
+                = goods_receipts.goods_receipt_id
     )
 
     , receipts_by_purchase_order_item as (
@@ -76,48 +77,51 @@ with
 
             , purchase_order_items.purchase_order_item_quantity_ordered
             , coalesce(
-                receipts_by_purchase_order_item.total_quantity_received,
-                0
+                receipts_by_purchase_order_item.total_quantity_received
+                , 0
             ) as total_quantity_received
 
             , cast(
                 coalesce(
-                    receipts_by_purchase_order_item.total_quantity_received,
-                    0
+                    receipts_by_purchase_order_item.total_quantity_received
+                    , 0
                 )
                 / nullif(
-                    purchase_order_items.purchase_order_item_quantity_ordered,
-                    0
+                    purchase_order_items.purchase_order_item_quantity_ordered
+                    , 0
                 )
                 as decimal(14, 4)
             ) as receipt_fill_rate
 
             , case
-                when purchase_orders.placed_at is not null
-                 and receipts_by_purchase_order_item.first_received_at is not null
-                 and receipts_by_purchase_order_item.first_received_at
-                     >= purchase_orders.placed_at
-                then datediff(
-                    day,
-                    purchase_orders.placed_at,
-                    receipts_by_purchase_order_item.first_received_at
-                )
+                when
+                    purchase_orders.placed_at is not null
+                    and receipts_by_purchase_order_item.first_received_at is not null
+                    and receipts_by_purchase_order_item.first_received_at
+                    >= purchase_orders.placed_at
+                    then datediff(
+                        day
+                        , purchase_orders.placed_at
+                        , receipts_by_purchase_order_item.first_received_at
+                    )
             end as lead_time_days
 
             , coalesce(
-                receipts_by_purchase_order_item.has_future_receipt_date,
-                false
+                receipts_by_purchase_order_item.has_future_receipt_date
+                , false
             ) as has_future_receipt_date
 
         from purchase_order_items
 
         inner join purchase_orders
-            on purchase_order_items.purchase_order_id
-            = purchase_orders.purchase_order_id
+            on
+                purchase_order_items.purchase_order_id
+                = purchase_orders.purchase_order_id
 
         left join receipts_by_purchase_order_item
-            on purchase_order_items.purchase_order_item_id
-            = receipts_by_purchase_order_item.purchase_order_item_id
+            on
+                purchase_order_items.purchase_order_item_id
+                = receipts_by_purchase_order_item.purchase_order_item_id
     )
 
 select *

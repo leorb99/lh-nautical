@@ -10,8 +10,8 @@ with
             product_variant_id
 
             , percentile_approx(
-                lead_time_days,
-                0.5
+                lead_time_days
+                , 0.5
             ) as median_product_lead_time_days
 
             , cast(

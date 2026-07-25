@@ -77,8 +77,8 @@ with
                     demand_during_lead_time
                     + safety_stock_quantity
                     - quantity_on_hand
-                    - open_purchase_order_quantity,
-                    0
+                    - open_purchase_order_quantity
+                    , 0
                 )
                 as decimal(14, 3)
             ) as suggested_reorder_quantity
@@ -90,12 +90,12 @@ with
                         / average_daily_sales_90d
                         as decimal(14, 2)
                     )
-                else null
             end as estimated_days_until_stockout
 
             , case
-                when average_daily_sales_90d > 0
-                 and quantity_on_hand
+                when
+                    average_daily_sales_90d > 0
+                    and quantity_on_hand
                     < demand_during_lead_time
                     then true
                 else false
@@ -104,8 +104,9 @@ with
             -- Replenishment is not recommended when no valid demand
             -- exists in the 90-day demand window.
             , case
-                when average_daily_sales_90d > 0
-                 and (
+                when
+                    average_daily_sales_90d > 0
+                    and (
                         quantity_on_hand
                         <= coalesce(source_reorder_point, 0)
 

@@ -1,7 +1,6 @@
 with
     valid_purchase_receipts as (
-        select
-            lead_time_days
+        select lead_time_days
         from {{ ref('int_purchase_order_receipts') }}
         where lead_time_days is not null
     )
@@ -9,8 +8,8 @@ with
     , global_lead_time_metrics as (
         select
             percentile_approx(
-                lead_time_days,
-                0.5
+                lead_time_days
+                , 0.5
             ) as median_global_lead_time_days
 
             , cast(
