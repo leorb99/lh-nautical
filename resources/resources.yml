@@ -64,11 +64,7 @@ resources:
             schema: bronze                 
             commands:
               - "dbt deps"
-              - "dbt seed --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
-              - "dbt run --select tag:staging --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
-              - "dbt run --select tag:intermediate --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
-              - "dbt run --select tag:marts --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
-              - "dbt test --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
+              - "dbt build --select staging+ --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
           environment_key: dbt_env
           
       environments:
