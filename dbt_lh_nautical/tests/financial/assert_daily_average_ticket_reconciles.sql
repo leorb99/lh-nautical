@@ -2,7 +2,7 @@
 -- exposed revenue numerator and effective-order denominator.
 
 select *
-from {{ ref('fct_daily_financial_metrics') }}
+from {{ ref('agg_daily_financial_metrics') }}
 where
     (
         effective_order_count = 0

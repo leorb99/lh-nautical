@@ -2,7 +2,7 @@
 -- expected business domains.
 
 select *
-from {{ ref('fct_daily_financial_metrics') }}
+from {{ ref('agg_daily_financial_metrics') }}
 where
     effective_order_count < 0
     or effective_order_revenue_amount < 0

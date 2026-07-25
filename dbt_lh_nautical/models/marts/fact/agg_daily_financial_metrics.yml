@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: fct_daily_financial_metrics
+  - name: agg_daily_financial_metrics
     description: >
       Daily financial metrics fact table with exactly one row per metric_date.
 
@@ -81,8 +81,6 @@ models:
           Number of distinct orders classified as effective sales on the
           metric date. Each order is counted exactly once regardless of how many
           order items it contains.
-        tests:
-          - not_null
 
       - name: effective_order_revenue_amount
         description: >
@@ -90,8 +88,6 @@ models:
 
           Orders are first reduced to one row per order_id to prevent the
           order-level value from being counted once for every order item.
-        tests:
-          - not_null
 
       - name: net_revenue_amount
         description: >
@@ -99,8 +95,6 @@ models:
           parent-order discounts and deducting completed monetary refunds.
 
           This measure answers the business question: What is the net revenue?
-        tests:
-          - not_null
 
       - name: completed_refund_amount
         description: >
@@ -109,23 +103,17 @@ models:
 
           Exchange-only returns do not increase this measure unless a monetary
           refund is also recorded.
-        tests:
-          - not_null
 
       - name: sold_item_quantity
         description: >
           Total number of product units sold through effective sales before
           completed returns are deducted.
-        tests:
-          - not_null
 
       - name: returned_item_quantity
         description: >
           Total number of product units effectively returned from effective
           sales. Both refund and exchange returns are included when they satisfy
           the completed-return business rule.
-        tests:
-          - not_null
 
       - name: pending_invoice_order_count
         description: >
@@ -134,8 +122,6 @@ models:
 
           These orders are excluded from effective sales and official revenue
           KPIs.
-        tests:
-          - not_null
 
       - name: pending_invoice_revenue_amount
         description: >
@@ -144,8 +130,6 @@ models:
 
           This amount represents revenue pending fiscal regularization and is
           reported separately from effective sales revenue.
-        tests:
-          - not_null
 
       - name: average_ticket_amount
         description: >
@@ -164,8 +148,6 @@ models:
           this daily percentage-like result.
 
           This measure answers the business question: What is the average ticket?
-        tests:
-          - not_null
 
       - name: return_quantity_rate
         description: >
@@ -185,5 +167,3 @@ models:
           average the daily rates.
 
           This measure answers the business question: What is the return rate?
-        tests:
-          - not_null

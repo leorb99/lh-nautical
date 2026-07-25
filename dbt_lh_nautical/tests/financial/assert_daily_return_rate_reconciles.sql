@@ -2,7 +2,7 @@
 -- exposed returned-quantity numerator and sold-quantity denominator.
 
 select *
-from {{ ref('fct_daily_financial_metrics') }}
+from {{ ref('agg_daily_financial_metrics') }}
 where
     (
         sold_item_quantity = 0
