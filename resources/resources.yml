@@ -1,7 +1,7 @@
 resources:
   jobs:
     job_ingestao_completa:
-      name: "Ingestão Completa (JDBC + Autoloader)" 
+      name: "Ingestion and Transformation" 
       # Executar o Job todos os dias a 1h da manhã
       schedule:
         quartz_cron_expression: "0 30 4 * * ?"
@@ -25,6 +25,10 @@ resources:
               catalog_name: ${var.catalog_name}
               schema: bronze
               numPartitions: "4"
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
 
         - task_key: "autoloader_ingestao"
           depends_on:
@@ -34,6 +38,10 @@ resources:
             base_parameters:
               catalog_name: ${var.catalog_name} 
               schema: bronze
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
 
         - task_key: "ingestion_currency"
           depends_on:
@@ -43,6 +51,10 @@ resources:
             base_parameters:
               catalog_name: ${var.catalog_name} 
               schema: bronze
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
 
         - task_key: "testes_ingestao"
           depends_on:
@@ -53,6 +65,11 @@ resources:
             parameters:
               - "--catalog"
               - ${var.catalog_name}
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
+          
 
         - task_key: "dbt_transformacao"
           depends_on:
@@ -64,7 +81,12 @@ resources:
             schema: bronze                 
             commands:
               - "dbt deps"
+              - "dbt seed --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
               - "dbt build --select staging+ --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
           environment_key: dbt_env
           
       environments:
