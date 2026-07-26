@@ -25,6 +25,9 @@ models:
         tests:
           - not_null
 
+      - name: return_number
+        description: "Business-facing number identifying the return transaction."
+
       - name: order_id
         description: "Identifier of the original order"
         tests:
@@ -55,12 +58,20 @@ models:
               arguments:
                 values: ['completed', 'cancelled', 'open']
 
+      - name: return_reason
+        description: "Reason reported for the return."
+
       - name: return_item_action
         description: "Action applied to the returned item"
         tests:
           - accepted_values:
               arguments:
                 values: ['refund', 'exchange']
+
+      - name: exchange_variant_id
+        description: >
+          Identifier of the replacement product variant when the returned
+          item is processed as an exchange.
 
       - name: return_item_quantity
         description: "Quantity returned"
@@ -72,6 +83,12 @@ models:
 
       - name: return_item_total_refund_amount
         description: "Calculated total refund amount for the returned item"
+
+      - name: return_total_refund_amount
+        description: >
+          Total refund amount recorded for the parent return transaction.
+          This return-level value may be repeated across returned items and
+          must not be summed directly at the return-item grain.
 
       - name: returned_at
         description: >
