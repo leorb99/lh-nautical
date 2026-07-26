@@ -23,16 +23,23 @@ CREATE FUNCTION :catalog_name.gold.mask_pii(val STRING)
 RETURNS STRING
 RETURN '***MASKED***';
 
--- 3. Policy: any column tagged data_classification = 'pii', on any table in this
--- catalog, gets masked for every user -- no exceptions.
+-- 3. Policy: any column tagged data_classification = 'pii' OR 'sensitive', on any
+-- table in this catalog, gets masked for every user -- no exceptions.
 CREATE POLICY mask_pii_columns
 ON CATALOG :catalog_name
 COLUMN MASK :catalog_name.gold.mask_pii
 TO `account users`
 FOR TABLES
-MATCH COLUMNS has_tag_value('data_classification', 'pii') AS sensitive_col
+MATCH COLUMNS (
+    has_tag_value('data_classification', 'pii')
+    OR has_tag_value('data_classification', 'sensitive')
+) AS sensitive_col
 ON COLUMN sensitive_col;
 
 -- Verify it worked:
 -- select customer_id, customer_legal_name, customer_email from :catalog_name.gold.dim_customers limit 5;
--- customer_legal_name and customer_email should come back as '***MASKED***'.
+-- select supplier_id, supplier_legal_name, supplier_tax_id from :catalog_name.gold.dim_suppliers limit 5;
+-- customer_legal_name, customer_email, supplier_legal_name and supplier_tax_id should all come back as '***MASKED***'.
+
+-- To update the policy later (e.g. this exact change), drop and recreate it:
+-- DROP POLICY mask_pii_columns ON CATALOG :catalog_name;

@@ -322,7 +322,7 @@ configurada uma única vez por catálogo em
 2. Uma função (`mask_pii`) retorna um valor fixo (`***MASKED***`) para qualquer
    coluna à qual for aplicada.
 3. Uma **policy** aplica essa função automaticamente a toda coluna com a tag
-   `pii`, para qualquer usuário, sem exceção.
+   `pii` ou `sensitive`, para qualquer usuário, sem exceção.
 
 O script usa widgets do SQL editor (`:catalog_name`) e deve ser executado uma
 vez por catálogo (cada dev pessoal, e produção).
