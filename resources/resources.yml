@@ -81,6 +81,7 @@ resources:
             schema: bronze                 
             commands:
               - "dbt deps"
+              - "dbt seed --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
               - "dbt build --select staging+ --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
           # Configuração de Retry
           max_retries: 3
