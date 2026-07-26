@@ -1,18 +1,11 @@
--- Grain: one row per customer.
+-- Grain: one row per customer
 --
 -- Business purpose:
 -- RFM (Recency, Frequency, Monetary) segmentation of customers based on effective sales, 
 -- powering customer segmentation and retention-targeting analysis in BI
 --
--- Reference date rule:
--- Uses the latest placed_at among effective sales as "today" instead of
--- current_date(), consistent with int_inventory_demand_metrics -- avoids
--- skewed recency if the most recently ingested data isn't from today.
---
 -- Scoring:
--- Each metric is scored 1-5 by quintile (ntile) across the customer base.
--- Recency is ordered so the most recent customers score 5, not 1.
-
+-- Each metric is scored 1-5 by quintile (ntile) across the customer basee
 with
     sales as (
         select *
@@ -20,8 +13,7 @@ with
         where is_effective_sale = true
     )
 
-    -- Order-level measures, reduced from item grain to prevent
-    -- order_total_amount from being summed once per item.
+    -- Order-level measures, reduced from item grain to prevent order_total_amount from being summed once per item
     , customer_orders as (
         select
             customer_id
@@ -52,41 +44,58 @@ with
         group by customer_orders.customer_id
     )
 
+    -- Recency is ordered descendinglyy so the most recent customers score 5, not 1
     , scored as (
         select
-            *
+            customer_id
+            , last_order_at
+            , recency_days
+            , frequency_orders
+            , monetary_amount
             , ntile(5) over (order by recency_days desc) as recency_score
             , ntile(5) over (order by frequency_orders asc) as frequency_score
             , ntile(5) over (order by monetary_amount asc) as monetary_score
         from customer_metrics
     )
 
-    -- Segments are evaluated in priority order: the first matching rule wins.
-    , segmented as (
+    -- Segments are evaluated in priority order: the first matching rule wins
+    , final as (
         select
-            *
+            customer_id
+            , last_order_at
+            , recency_days
+            , frequency_orders
+            , monetary_amount
+            , recency_score
+            , frequency_score
+            , monetary_score
             , case
-                when recency_score >= 4
-                 and frequency_score >= 4
-                 and monetary_score >= 4
+                when
+                    recency_score >= 4
+                    and frequency_score >= 4
+                    and monetary_score >= 4
                     then 'champions'
 
-                when recency_score <= 2
-                 and frequency_score >= 4
-                 and monetary_score >= 4
+                when
+                    recency_score <= 2
+                    and frequency_score >= 4
+                    and monetary_score >= 4
                     then 'at_risk'
 
-                when frequency_score >= 3
-                 and monetary_score >= 3
+                when
+                    frequency_score >= 3
+                    and monetary_score >= 3
                     then 'loyal'
 
-                when recency_score >= 4
-                 and frequency_score <= 2
+                when
+                    recency_score >= 4
+                    and frequency_score <= 2
                     then 'new'
 
-                when recency_score <= 2
-                 and frequency_score <= 2
-                 and monetary_score <= 2
+                when
+                    recency_score <= 2
+                    and frequency_score <= 2
+                    and monetary_score <= 2
                     then 'hibernating'
 
                 else 'needs_attention'
@@ -94,14 +103,5 @@ with
         from scored
     )
 
-select
-    customer_id
-    , last_order_at
-    , recency_days
-    , frequency_orders
-    , monetary_amount
-    , recency_score
-    , frequency_score
-    , monetary_score
-    , customer_segment
-from segmented
+select *
+from final
