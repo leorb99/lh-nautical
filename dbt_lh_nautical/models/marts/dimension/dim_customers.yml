@@ -27,21 +27,31 @@ models:
 
       - name: customer_legal_name
         description: "Legal name of the customer"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: customer_trade_name
         description: "Trade name (fantasy name) of the customer, applicable only to PJ customers"
 
       - name: customer_tax_id
         description: "Tax identification number of the customer (CPF for individuals, CNPJ for companies)"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: customer_state_registration
         description: "State registration number of the customer, applicable only to PJ customers"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: customer_email
         description: "Email address of the customer"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: customer_phone
         description: "Phone number of the customer"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: is_active
         description: "Indicates whether the customer is currently active"
@@ -54,24 +64,40 @@ models:
 
       - name: primary_address_postal_code
         description: "Postal code of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_street_name
         description: "Street name of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_number
         description: "Address number of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_complement
         description: "Complement of the primary address (e.g. apartment, block)"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_district
         description: "District/neighborhood of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_city
         description: "City of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_state
         description: "State of the primary address"
+        databricks_tags:
+          data_classification: "pii"
 
       - name: primary_address_country
         description: "Country of the primary address"
+        databricks_tags:
+          data_classification: "pii"
