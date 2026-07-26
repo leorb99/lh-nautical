@@ -33,8 +33,8 @@ models:
       - name: product_description
         description: "Normalized product description for the product variant."
       
-      - name: unit_of_measure
-        description: "Unit of measure for the product variant."
+      - name: product_unit_of_measure
+        description: "Unit of measure for the product."
       
       - name: product_ncm_code
         description: "NCM classification code for the product."
