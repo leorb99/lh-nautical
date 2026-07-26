@@ -6,7 +6,7 @@ with
 
     , addresses as (
         select *
-        from {{ ref('stg_addresses')}}
+        from {{ ref('stg_addresses') }}
     )
 
     , cleaned_customers as (
@@ -39,16 +39,19 @@ with
 
             -- Nullifies placeholder phone numbers (e.g. '0000000000', '1234567890', 'tel.: 0000') confirmed via discovery
             -- Valid phones follow the pattern '55' + DDD + number (12-13 digits)
-            , case 
+            , case
                 when length(regexp_replace(customer_phone, '[^0-9]', '')) < 12 then null
-            else trim(customer_phone)
+                else trim(customer_phone)
             end as customer_phone
-            
+
             , is_active
-            , created_at
-            , updated_at
+
+            -- Nullifies future timestamps, since a record can't be created/updated ahead
+            -- of now; keeps the rest of the row, as this is an isolated field-level issue
+            , case when created_at > current_timestamp() then null else created_at end as created_at
+            , case when updated_at > current_timestamp() then null else updated_at end as updated_at
         from customers
-    )       
+    )
 
     , cleaned_addresses as (
         select
@@ -64,10 +67,10 @@ with
             , trim(address_street_name) as address_street_name
 
             , address_number
-            
+
             -- Nullifies placeholder values found via discovery: pure punctuation ('.', '-', '?', and variations)
             -- and common placeholders ('TBD', 'FIXME', 'TODO', 'test', 'asdf', 'xxx', 'N/A').
-            , case 
+            , case
                 when trim(address_complement) rlike '^[.\\-?]+$' then null
                 when lower(trim(address_complement)) in ('tbd', 'fixme', 'todo', 'test', 'asdf', 'xxx', 'n/a') then null
                 else address_complement
@@ -83,13 +86,13 @@ with
             , _hash
             , _ingested_at
             , _action
-        from addresses            
+        from addresses
     )
 
     , primary_addresses_filtered as (
         select
             address_id as primary_address_id
-            , customer_id 
+            , customer_id
             , address_type as primary_address_type
             , address_postal_code as primary_address_postal_code
             , address_street_name as primary_address_street_name
@@ -107,10 +110,15 @@ with
 
         -- To ensure only one record per customer, 
         -- and in case there is more than one address marked as primary by mistake,
-        -- we're using row_number to get the the most recent primary address
-        qualify row_number() over(
+        -- we're using row_number to get the the most recent primary address.
+        -- On the initial load, every row shares the same _ingested_at,
+        -- so without it the pick would be non-deterministic whenever a customer
+        -- has multiple primary addresses. That is also true on any run that
+        -- touches more than one primary address.
+        -- For that reason, address_id is a final deterministic tiebreaker.
+        qualify row_number() over (
             partition by customer_id
-            order by address_is_primary desc, _ingested_at desc
+            order by address_is_primary desc, _ingested_at desc, address_id desc
         ) = 1
     )
 
@@ -147,5 +155,5 @@ with
             on cleaned_customers.customer_id = primary_addresses_filtered.customer_id
     )
 
-    select *
-    from joined
+select *
+from joined

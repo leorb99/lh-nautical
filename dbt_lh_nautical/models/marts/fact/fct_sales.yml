@@ -1,0 +1,235 @@
+version: 2
+
+models:
+  - name: fct_sales
+    description: >
+      Sales fact table at the order-item grain, with exactly one row per
+      order_item_id.
+
+      The model combines order-item sales measures with parent-order attributes,
+      fiscal-document classifications, proportionally allocated order discounts,
+      and completed return information.
+
+      Only completed and effective returns are incorporated into the return
+      measures. Return records are aggregated upstream to one row per
+      order_item_id before being joined, preserving the fact table grain and
+      preventing row multiplication.
+
+      The model supports revenue analysis by product variant, customer,
+      salesperson, location, sales channel, and order date.
+
+      Business rules:
+
+      1. is_effective_sale identifies paid orders with an authorized fiscal
+         invoice and a valid, non-future placed_at timestamp.
+
+      2. is_paid_sale_pending_invoice_fix identifies paid orders whose fiscal
+         invoice was rejected and may still require fiscal regularization.
+
+      3. order-level discounts are allocated proportionally to each item based
+         on the item's share of the order subtotal.
+
+      4. completed_refund_amount includes only monetary refunds from completed
+         and effective returns.
+
+      5. order_item_net_revenue_after_returns represents item-level net revenue
+         after proportional discounts and completed monetary refunds.
+
+      Important aggregation guidance:
+
+      order_total_amount is an order-level measure repeated across all items in
+      the same order. It must not be summed directly at this model's grain.
+      Financial metrics based on order_total_amount must first reduce the data
+      to one row per order_id.
+
+    columns:
+      - name: order_item_id
+        description: >
+          Natural primary key of the sold order item and the grain-defining
+          column of this model. Each order_item_id must occur exactly once.
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: >
+          Foreign key identifying the parent sales order to which the item
+          belongs.
+
+      - name: product_variant_id
+        description: >
+          Foreign key identifying the specific product variant sold in the
+          order item.
+
+      - name: customer_id
+        description: >
+          Foreign key identifying the customer associated with the parent
+          sales order.
+
+      - name: salesperson_id
+        description: >
+          Foreign key identifying the employee responsible for the sale, when
+          a salesperson is associated with the parent order.
+
+      - name: location_id
+        description: >
+          Foreign key identifying the business location associated with the
+          parent order.
+
+      - name: fiscal_invoice_id
+        description: >
+          Foreign key identifying the fiscal invoice associated with the parent
+          order. The value may be null when no fiscal invoice is linked.
+
+      - name: order_number
+        description: >
+          Human-readable natural identifier of the parent sales order.
+
+      - name: order_channel
+        description: >
+          Sales channel through which the order originated, such as ecommerce
+          or point of sale.
+
+      - name: order_status
+        description: >
+          Current lifecycle status of the parent order in the operational
+          system.
+
+      - name: fiscal_invoice_status
+        description: >
+          Current status of the fiscal invoice associated with the order, such
+          as authorized, rejected, or cancelled.
+
+      - name: placed_at
+        description: >
+          Timestamp when the order was placed. Future source-system timestamps
+          are nullified upstream and are not considered valid for effective
+          sales.
+
+      - name: is_effective_sale
+        description: >
+          Business classification indicating whether the parent order qualifies
+          as an effective sale. The flag is true only when the order is paid,
+          has an authorized fiscal invoice, and has a valid, non-future
+          placed_at timestamp.
+
+      - name: is_paid_sale_pending_invoice_fix
+        description: >
+          Business classification indicating that payment was received but the
+          fiscal invoice was rejected. These orders are excluded from effective
+          sales and represent revenue pending fiscal regularization rather than
+          confirmed lost revenue. Cancelled fiscal invoices are not included in
+          this classification.
+
+      - name: order_total_amount
+        description: >
+          Official total amount of the parent order after order-level discounts.
+
+          This is an order-level measure repeated across every item belonging to
+          the same order. It must not be summed directly at the order-item grain.
+          Aggregate to one row per order_id before using this field in revenue
+          or average-ticket calculations.
+
+      - name: order_item_quantity
+        description: >
+          Quantity of units sold in the order item before completed returns are
+          deducted.
+
+      - name: order_item_unit_price
+        description: >
+          Unit selling price recorded for the order item.
+
+      - name: order_item_line_total
+        description: >
+          Gross line amount for the order item before allocating the parent
+          order discount.
+
+      - name: order_item_icms_rate
+        description: >
+          ICMS tax rate applied to the order item.
+
+      - name: order_item_ipi_rate
+        description: >
+          IPI tax rate applied to the order item.
+
+      - name: order_item_icms_amount
+        description: >
+          ICMS tax amount calculated for the order item.
+
+      - name: order_item_ipi_amount
+        description: >
+          IPI tax amount calculated for the order item.
+
+      - name: order_item_net_revenue
+        description: >
+          Item-level revenue after the taxes represented in the source
+          order-item calculation, but before allocating the parent-order
+          discount and before deducting completed refunds.
+
+      - name: order_item_net_revenue_after_discount
+        description: >
+          Item-level net revenue after allocating the parent-order discount
+          proportionally according to the item's share of the order subtotal.
+
+          Calculation:
+
+          order_item_net_revenue
+          minus
+          order_discount_amount multiplied by the ratio between
+          order_item_line_total and order_subtotal_amount.
+        tests:
+          - not_null
+
+      - name: completed_returned_quantity
+        description: >
+          Total quantity effectively returned for the order item.
+
+          The measure includes only returns classified upstream as completed and
+          effective. It includes quantities associated with both refunds and
+          exchanges. The value is zero when the order item has no effective
+          completed return.
+        tests:
+          - not_null
+
+      - name: completed_refund_amount
+        description: >
+          Total monetary amount refunded for the order item through completed
+          and effective refund returns.
+
+          Exchange-only returns do not increase this measure unless they also
+          contain a monetary refund. The value is zero when no completed refund
+          exists.
+        tests:
+          - not_null
+
+      - name: has_refund
+        description: >
+          Indicates whether the order item has at least one completed and
+          effective return classified as a monetary refund.
+
+      - name: has_exchange
+        description: >
+          Indicates whether the order item has at least one completed and
+          effective return classified as an exchange.
+
+      - name: order_item_net_revenue_after_returns
+        description: >
+          Item-level revenue remaining after allocating the parent-order
+          discount and deducting completed monetary refunds.
+
+          Calculation:
+
+          order_item_net_revenue_after_discount
+          minus
+          completed_refund_amount.
+
+          This is the preferred additive item-level measure for net-revenue
+          analysis by product, category, brand, location, customer, channel, or
+          other dimensions available at the order-item grain.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('int_order_items')

@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: int_employees
+    description: "Intermediate employees table with cleaned names, normalized CPF identifiers, and active lifecycle tracking."
+    columns:
+      - name: employee_id
+        description: "Primary key of the employee."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: employee_full_name
+        description: "Standardized and capitalized employee full name."
+        data_tests:
+          - not_null
+
+      - name: employee_cpf
+        description: "Alphanumeric-only CPF identifier with special characters removed."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: employee_email
+        description: "Lowercased and trimmed operational email address."
+        data_tests:
+          - not_null
+
+      - name: employee_role
+        description: "Standardized operational job title or role of the employee."
+
+      - name: employee_hire_date
+        description: "Date when the employee was officially hired."
+
+      - name: employee_termination_date
+        description: "Date when the employee was terminated, if applicable."
+
+      - name: created_at
+        description: "Timestamp when the record was created, cleaned of future dates."
+
+      - name: updated_at
+        description: "Timestamp when the record was last updated, cleaned of future dates."
+
+      - name: is_active
+        description: "Boolean flag representing current employment status."
+        data_tests:
+          - not_null

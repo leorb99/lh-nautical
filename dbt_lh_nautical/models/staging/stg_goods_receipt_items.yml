@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: stg_goods_receipt_items
+    description: "Staging table containing cleaned and standardized items from goods receipts items table."
+    columns:
+      - name: goods_receipt_item_id
+        description: "Primary key of the goods_receipt_items table."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: goods_receipt_id
+        description: "Foreign key mapping to the goods receipt table."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_goods_receipts')
+                field: goods_receipt_id
+
+      - name: purchase_order_item_id
+        description: "Foreign key mapping to the purchase order items table"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_purchase_order_items')
+                field: purchase_order_item_id
+      
+      - name: goods_receipt_item_quantity_received
+        description: "The physical quantity of items received and checked into inventory."
+        data_tests:
+          - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
+        data_tests:
+          - not_null

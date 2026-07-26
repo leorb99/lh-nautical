@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: int_open_purchase_order_quantities
+    description: >
+      Intermediate model derived from int_purchase_order_receipts that calculates
+      committed inbound inventory not yet received. The model filters purchase
+      orders to sent and partially_received statuses, calculates the remaining
+      quantity for each purchase order item, and aggregates the result to one row
+      per product variant and destination location. Draft, cancelled and fully
+      received purchase orders are excluded because they do not represent active
+      inbound inventory.
+
+    columns:
+      - name: product_variant_id
+        description: Identifier of the product variant with open purchase quantity.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Destination inventory location of the open purchase order.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_quantity
+        description: >
+          Total committed inbound quantity for the product variant and destination
+          location. At purchase-order-item level, it is calculated as
+          greatest(purchase_order_item_quantity_ordered - total_quantity_received, 0).
+          The item-level balances are then summed at the final model grain.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_item_count
+        description: >
+          Count of distinct sent or partially received purchase order items
+          contributing to the open purchase quantity at the product-variant and
+          destination-location grain.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id

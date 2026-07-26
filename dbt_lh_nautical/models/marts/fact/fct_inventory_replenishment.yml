@@ -1,0 +1,154 @@
+version: 2
+
+models:
+  - name: fct_inventory_replenishment
+    description: >
+      Inventory replenishment recommendation fact table derived from
+      int_inventory_replenishment_inputs with one row per product variant and
+      location. The model combines current stock, committed inbound purchase
+      quantities, 30-, 60- and 90-day demand metrics, and hierarchical lead-time
+      estimates. It calculates expected demand during lead time, seven days of
+      safety stock, the recommended stock target, the net suggested reorder
+      quantity and operational replenishment flags. Open purchase orders are
+      deducted from the recommendation to avoid duplicate purchases. This
+      analytical version does not apply minimum order quantities, package
+      multiples, supplier constraints, storage capacity, maximum-stock limits,
+      seasonality adjustments or operational rounding.
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - location_id
+
+    columns:
+      - name: inventory_replenishment_sk
+        description: Surrogate key generated from product variant and location.
+        tests:
+          - unique
+          - not_null
+
+      - name: product_variant_id
+        description: Identifier of the product variant.
+        tests:
+          - not_null
+
+      - name: location_id
+        description: Identifier of the inventory location.
+        tests:
+          - not_null
+
+      - name: current_inventory_snapshot_sk
+        description: Identifier of the current inventory snapshot record.
+        tests:
+          - not_null
+
+      - name: quantity_on_hand
+        description: Current quantity available in inventory.
+        tests:
+          - not_null
+
+      - name: open_purchase_order_quantity
+        description: >
+          Quantity already ordered and still expected from sent or partially
+          received purchase orders for the same product variant and location.
+
+      - name: open_purchase_order_item_count
+        description: >
+          Number of active purchase order items contributing to the open
+          purchase quantity.
+
+      - name: source_reorder_point
+        description: Reorder point supplied by the source system.
+
+      - name: inventory_reference_date
+        description: Date associated with the current inventory snapshot.
+        tests:
+          - not_null
+
+      - name: inventory_analysis_date
+        description: Reference date used for the demand windows.
+
+      - name: last_sale_date
+        description: Most recent sale date within the 90-day window.
+
+      - name: sales_quantity_last_30_days
+        description: Quantity sold in the latest 30-day window.
+
+      - name: sales_quantity_last_60_days
+        description: Quantity sold in the latest 60-day window.
+
+      - name: sales_quantity_last_90_days
+        description: Quantity sold in the latest 90-day window.
+
+      - name: average_daily_sales_30d
+        description: Average calendar-day sales over 30 days.
+
+      - name: average_daily_sales_60d
+        description: Average calendar-day sales over 60 days.
+
+      - name: average_daily_sales_90d
+        description: Average calendar-day sales over 90 days.
+
+      - name: selected_lead_time_days
+        description: Lead time selected through the fallback hierarchy.
+
+      - name: lead_time_source
+        description: Source used to determine the selected lead time.
+
+      - name: lead_time_observation_count
+        description: Number of historical observations supporting the lead time.
+
+      - name: lead_time_confidence
+        description: Confidence classification for the selected lead time.
+
+      - name: is_lead_time_estimated
+        description: Indicates whether a fallback lead time was used.
+
+      - name: is_demand_history_missing
+        description: Indicates absence of valid demand history in the 90-day window.
+
+      - name: demand_during_lead_time
+        description: >
+          Expected demand during replenishment, calculated as
+          average_daily_sales_90d * selected_lead_time_days and stored as
+          decimal(14, 3).
+
+      - name: safety_stock_quantity
+        description: >
+          Additional inventory buffer calculated as
+          average_daily_sales_90d * 7 calendar days and stored as
+          decimal(14, 3).
+
+      - name: recommended_stock_target
+        description: >
+          Target inventory quantity calculated as
+          demand_during_lead_time + safety_stock_quantity.
+
+      - name: suggested_reorder_quantity
+        description: >
+          Analytical purchase recommendation calculated as the recommended stock
+          target minus current stock and open purchase-order quantity, limited
+          to zero. The result does not apply package multiples, minimum order
+          quantities or operational rounding.
+
+      - name: estimated_days_until_stockout
+        description: >
+          Estimated calendar-day coverage calculated as
+          quantity_on_hand / average_daily_sales_90d. Null when the 90-day
+          average daily demand is zero.
+
+      - name: will_stockout_before_replenishment
+        description: >
+          True when average_daily_sales_90d is greater than zero and
+          quantity_on_hand is lower than demand_during_lead_time. Open purchase
+          orders are not included in this flag because it measures exposure
+          before replenishment arrives.
+
+      - name: is_replenishment_required
+        description: >
+          Indicates that replenishment is recommended when average 90-day demand
+          is positive and current stock is at or below the source reorder point,
+          or when current stock plus open purchase-order quantity remains below
+          the recommended stock target.

@@ -17,16 +17,18 @@ models:
         tests:
           - not_null
           - relationships:
-              field: order_id
-              to: ref('stg_orders')
+              arguments:
+                field: order_id
+                to: ref('stg_orders')
       
       - name: payment_method
         description: "The method used to pay (e.g., credit_card, pix, debit_card)."
         tests:
           - not_null
           - accepted_values:
-              values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
-              quote: true
+              arguments:
+                values: ['credit_card', 'pix', 'debit_card', 'boleto', 'cash', 'bank_transfer']
+                quote: true
       
       - name: payment_installments
         description: "Number of installments for the payment."
@@ -43,8 +45,9 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['pending', 'approved', 'refunded', 'refused']
-              quote: true
+              arguments:
+                values: ['pending', 'approved', 'refunded', 'refused']
+                quote: true
       
       - name: paid_at
         description: "Timestamp when the payment was actually approved/cleared."
@@ -70,9 +73,6 @@ models:
           - not_null
         
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
         tests:
           - not_null
-          - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true

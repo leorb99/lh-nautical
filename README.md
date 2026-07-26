@@ -1,125 +1,408 @@
-# Pipeline de Ingestão de Dados via JDBC (SQL Server - Delta Lake)
+# LH Nautical — Plataforma de Dados (Ingestão + Transformação dbt)
 
 ## Visão Geral
-Este ingestão de dados foi desenvolvido em **PySpark** no Databricks. Ele foi desenhado para automatizar a extração de tabelas de um banco de dados relacional (SQL Server) e carregá-las no **Data Lake** (Delta Lake integrado ao Unity Catalog).
 
-O grande diferencial tecnológico deste script é a implementação de um **CDC Lógico baseado em Hashing** combinado com o **Time Travel do Delta**, garantindo ingestões incrementais de alta performance e baixo consumo de memória (I/O otimizado).
+Este repositório contém a plataforma de dados da **LH Nautical**:
 
----
+1. ingestão de dados do SQL Server para a camada Bronze;
+2. transformação dos dados em modelos Silver e Gold com dbt;
+3. testes, documentação e lineage dos modelos analíticos;
+4. orquestração e implantação por Databricks Asset Bundles.
 
-## Arquitetura e Fluxo de Dados
+O fluxo principal é:
 
-O pipeline segue um padrão de **EL (Extract and Load)** para a camada *Bronze/Staging*, atuando de forma genérica para suportar dezenas de tabelas dinamicamente.
+`SQL Server → Databricks/Delta Bronze → dbt Staging e Intermediate (Silver) → dbt Marts (Gold)`
 
-### 1. Descoberta Dinâmica de Tabelas
-O código não possui uma lista fixa (hardcoded) de tabelas. Ele inicia consultando o `information_schema.tables` diretamente no SQL Server de origem. 
-* Captura dinamicamente apenas tabelas do tipo `Base table` pertencentes ao schema `dbo`.
-* Se uma nova tabela for criada no ERP/Banco Transacional, ela será automaticamente capturada na próxima execução, sem necessidade de deploy de código.
+O Databricks fornece execução, armazenamento e orquestração; o dbt gerencia transformações, dependências, testes e documentação.
 
-### 2. Leitura Particionada e Paralelizada
-Ler grandes volumes de dados via JDBC em uma única thread causa gargalos. O pipeline resolve isso com a função `consulta_tabela_jdbc`.
-* Se uma chave de particionamento for definida, o Spark dispara uma query rápida na origem utilizando `MIN()` e `MAX()`.
-* Usando esses limites e o parâmetro `numPartitions`, o Spark divide a leitura em múltiplas queries concorrentes, acelerando drasticamente o processo.
+## Pipeline de Ingestão
 
-### 3. CDC Hashing e Time Travel
-Ao invés de realizar updates lentos ou ler a tabela inteira do destino para comparar, a função `ingestao_incremental_hash` faz o seguinte:
-* **Na Origem:** Gera um Hash MD5 da linha inteira. Utiliza a função `coalesce` para garantir que valores nulos não quebrem a geração do Hash, e concatena tudo com o separador `||`.
-* **No Destino (Delta):** Descobre a última versão da tabela com `DESCRIBE HISTORY` e carrega para a memória **apenas** a coluna `_hash` dessa versão específica usando a option `versionAsOf`.
-* **O Join:** Executa um `left_anti` join. O Spark compara as origens e mantém apenas os Hashes que são novos ou sofreram alterações (I/O mínimo). 
+### Visão geral
 
----
+A ingestão em PySpark extrai dados do SQL Server por JDBC e os persiste
+como tabelas Delta registradas no Unity Catalog.
 
-## Pré-requisitos e Setup do Ambiente
+O processo segue o padrão EL:
 
-A infraestrutura do projeto utiliza a abordagem de Declarative Automation Bundles (DABs) para a orquestração via código.
+`SQL Server → extração JDBC → Bronze Delta`
 
-Para os desenvolvedores operando com IDEs locais (como VS Code), as dependências do projeto são gerenciadas de forma estrita para garantir total compatibilidade com os clusters do Databricks.
+### Descoberta de tabelas
 
-### 1. Pré-requisito de Linguagem
-Certifique-se de estar utilizando o Python 3.12, versão homologada pela equipe para garantir compatibilidade nativa com os pacotes e bibliotecas em execução no Databricks.
+O pipeline consulta `information_schema.tables` e seleciona tabelas
+`BASE TABLE` pertencentes ao schema `dbo`.
 
-### 2. Gerenciamento de Dependências 
-Em vez de gerenciadores externos, o projeto adota o padrão nativo do Python. Instale as bibliotecas necessárias executando: 
+Isso elimina a necessidade de manter uma lista fixa no código.
 
-```pip install -r requirements.txt```
+### Leitura JDBC
 
-### 3. Databricks CLI
-Instale o Databricks CLI versão 1.2, ferramenta obrigatória para a validação e envio dos bundles de infraestrutura. O próprio Databricks oferece [instruções](https://docs.databricks.com/aws/pt/dev-tools/cli/install) completas para instalação em qualquer sistema operacional.
+A função `query_jdbc` suporta:
 
-### 4. Autenticação Segura 
-Autentique-se via CLI com o comando `databricks auth login`. Esta é a prática recomendada pela arquitetura para evitar a exposição e o tráfego de tokens fixos em arquivos de configuração local (como .env).
+- leitura sequencial quando não existe chave de particionamento adequada;
+- consulta de limites com `MIN()` e `MAX()`;
+- leitura paralela com `lowerBound`, `upperBound` e `numPartitions`;
+- múltiplas consultas concorrentes ao SQL Server.
 
-### 5. Deploy em Produção 
-Com o ambiente devidamente configurado, para realizar o envio da infraestrutura para o ambiente produtivo, execute:\
-`databricks bundle deploy --target prod`
+| Tabelas | Chave de particionamento |
+|---|---|
+| `variant_attribute_values` | Leitura sequencial |
+| `product_suppliers`, `stock_levels` | `updated_at` |
+| Demais tabelas | `id` |
 
-### 6. Databricks Secrets (Credenciais)
-As credenciais do banco nunca ficam expostas no código. O Databricks deve ter um *Secret Scope* configurado com as seguintes chaves:
-* **Escopo:** `databases_lh_nautical`
-* **Chaves Necessárias:** `sql_server_user`, `sql_server_password`, `sql_server_host`, `sql_server_port`.
+### Detecção de alterações
 
-*Nota:* A string de conexão JDBC aponta fixamente para o banco de dados `lh_nautical` e utiliza o driver `com.microsoft.sqlserver.jdbc.SQLServerDriver`.
+A função `incremental_ingenstion_hash` utiliza hashing e recursos do Delta
+Lake para identificar registros novos ou alterados:
 
-### 7. Parâmetros de Orquestração (Widgets)
-O código consome variáveis em tempo de execução via `dbutils.widgets.get`. Esses parâmetros devem ser passados pelo orquestrador:
-* `catalog_name`: Nome do catálogo no Unity Catalog.
-* `schema`: Nome do banco/schema de destino.
-* `numPartitions`: Valor determinando a concorrência do JDBC.
+1. gera um hash MD5 a partir das colunas da origem;
+2. consulta a versão anterior da tabela Delta;
+3. lê os hashes da versão de referência;
+4. aplica `left_anti` join;
+5. grava somente os registros não encontrados na versão anterior.
 
----
+### Estratégia de gravação
 
-## Mergulho Técnico nas Funções Principais
+| Cenário | Comportamento |
+|---|---|
+| Tabela inexistente | Cria a tabela e registra `INITIAL_LOAD` |
+| Tabela legada sem `_hash` | Recria a estrutura com os metadados técnicos |
+| Registros novos ou alterados | Acrescenta registros com `INSERT_OR_UPDATE` |
+| Nenhuma alteração | Encerra sem nova gravação |
 
-### 1. `consulta_tabela_jdbc`
-Responsável por estabelecer a conexão e extrair os dados, aplicando paralelização quando aplicável.
+### Metadados técnicos
 
-**Como funciona sob o capô:**
-1. **Avaliação de Paralelismo:** Checa se uma `coluna_referencia_paralelizacao` foi informada. Se não for (`None`), faz uma leitura JDBC sequencial.
-2. **Descoberta de Limites (Bounds):** Se informada, o Spark envia uma subquery leve para a origem: `SELECT MIN(coluna), MAX(coluna)`.
-3. **Leitura Distribuída:** Os valores extraídos são passados para `lowerBound` e `upperBound` do conector JDBC.
-4. **Fatiamento:** O Spark divide o intervalo e dispara múltiplas queries simultâneas para o SQL Server com base no `numPartitions`.
+| Coluna | Finalidade |
+|---|---|
+| `_hash` | Identificação de alterações no conteúdo do registro |
+| `_ingested_at` | Data e hora da ingestão |
+| `_action` | Classificação como `INITIAL_LOAD` ou `INSERT_OR_UPDATE` |
 
-### 2. `ingestao_incremental_hash`
-O coração lógico do pipeline que decide se os dados devem ser sobrescritos ou apensados.
+### Tratamento de erros
 
-**Árvore de Decisão de Gravação:**
-* **Cenário A (Carga Inicial):** Verifica se a tabela de destino existe. Se não existir, adiciona as colunas `_ingested_at` e `_action` e retorna a instrução `"overwrite"`.
-* **Cenário B (Tabela Legada - Sem Hash):** Se a tabela existir mas não possuir a coluna `_hash`, recria a tabela do zero injetando data/hora (`_ingested_at`) e a flag `"CARGA_INICIAL"` (`_action`) e retorna `"overwrite"` para atualização segura do schema.
-* **Cenário C (Ingestão Incremental via CDC):** * Busca a última versão via `DESCRIBE HISTORY`.
-  * Lê o Data Lake trazendo apenas a coluna `_hash` usando `versionAsOf`.
-  * Faz o `left_anti` join para isolar novos registros ou updates.
-  * Se houver alterações, injeta data/hora (`_ingested_at`) e a flag `"INSERT_OU_UPDATE"` (`_action`) e retorna `"append"`. Caso contrário, retorna `None, None`, poi não houver alterações.
+Falhas individuais são registradas e, ao final, a presença de tabelas
+com erro provoca falha explícita do job e aciona os alertas.
 
----
+### Configuração
 
-## Regras de Negócio e Estratégia de Tabelas
+As credenciais `sql_server_user`, `sql_server_password`,
+`sql_server_host` e `sql_server_port` são mantidas no Secret Scope
+`databases_lh_nautical`. Os notebooks recebem `catalog_name`, `schema` e
+`numPartitions` como parâmetros de orquestração.
 
-Durante a iteração, o script aplica regras para decidir **como** cada tabela deve ser lida:
+## Camada de Transformação dbt
 
-| Tabela(s) | Chave de Partição | Comportamento Explicado |
-| :--- | :--- | :--- |
-| `variant_attribute_values` | *Nenhuma* | Tabela não mapeada com chave confiável. Roda sequencialmente (sem paralelismo). |
-| `product_suppliers`, `stock_levels` | `updated_at` | Usa a coluna de data de atualização para criar as fatias particionadas. |
-| **Demais Tabelas** | `id` | Comportamento padrão. Utiliza a chave primária sequencial `id` da tabela. |
+### Visão geral
 
----
+O projeto `dbt_lh_nautical/` transforma a Bronze em modelos Silver e Gold.
 
-## Metadados Injetados (Auditoria)
+Cada desenvolvedor utiliza um catálogo pessoal no padrão:
 
-As tabelas salvas no Delta Lake contêm colunas extras fundamentais para rastreabilidade:
+`dev_<nome>_lh_nautical`
 
-* **`_hash`** `[String]`: A assinatura MD5 dos dados. Usada puramente para performance na detecção de mudanças futuras.
-* **`_ingested_at`** `[String]`: Registra o momento da inserção no formato `yyyy-MM-dd HH:mm:ss`.
-* **`_action`** `[String]`: Flag indicando o motivo da entrada na base. 
-  * `CARGA_INICIAL`: Ocorreu porque a tabela era nova ou teve seu schema legado atualizado.
-  * `INSERT_OU_UPDATE`: Apenas deltas foram inseridos através do CDC.
+### Arquitetura em camadas
 
----
+| Camada | Pasta | Materialização | Schema | Propósito |
+|---|---|---|---|---|
+| **Staging** | `models/staging/` | `view` | `silver` | Limpeza 1:1, casts, normalização e seleção de colunas |
+| **Intermediate** | `models/intermediate/` | `view` | `silver` | Joins, classificações, reconciliações e regras reutilizáveis |
+| **Marts — Dimension** | `models/marts/dimension/` | `table` | `gold` | Dimensões conformadas |
+| **Marts — Fact** | `models/marts/fact/` | `table` | `gold` | Fatos transacionais, snapshots e agregados |
+| **Marts — Bridge** | `models/marts/bridge/` | `table` | `gold` | Relacionamentos muitos-para-muitos |
 
-## Monitoramento e Tratamento de Erros
+O macro customizado `generate_schema_name` aplica os schemas `silver` e
+`gold` configurados no `dbt_project.yml`.
 
-O script adota uma postura focada em resiliência e propagação de alertas:
-1. Ele encapsula o processamento em blocos `try-except` monitorando `Py4JJavaError`, `PySparkException` e erros gerais.
-2. Se uma tabela falha (ex: erro de JDBC ou schema), o erro é logado e o nome da tabela é adicionado à lista `tabelas_com_erro`.
-3. O laço de repetição continua (`continue`) processando as tabelas restantes para não paralisar toda a carga por causa de um único erro.
-4. **Alerta Final:** Ao término, se a lista `tabelas_com_erro` contiver itens, o pipeline aciona um `raise Exception`, falhando intencionalmente a célula final. Isso garante que a ferramenta de orquestração marque o job como "Failed" e a equipe de engenharia seja alertada.
+### Modelagem
+
+A camada Gold utiliza:
+
+- dimensões conformadas;
+- fatos transacionais;
+- fatos de snapshot;
+- bridge para relacionamentos muitos-para-muitos;
+- chaves substitutas com `dbt_utils.generate_surrogate_key`;
+- agregados próprios para indicadores não aditivos;
+- granularidade documentada nos YAMLs.
+
+## Regras de Negócio Centrais
+
+### Venda efetiva
+
+A flag `is_effective_sale`, definida em `int_orders`, indica quando um pedido
+participa dos indicadores financeiros oficiais.
+
+Uma venda é efetiva quando:
+
+- `order_status = 'paid'`;
+- `fiscal_invoice_status = 'authorized'`;
+- `placed_at` é válido e não futuro.
+
+Pedidos pagos com nota rejeitada usam `is_paid_sale_pending_invoice_fix`
+e não entram na receita oficial.
+
+### Rateio de desconto por item
+
+O desconto do pedido é distribuído proporcionalmente entre os itens:
+
+```text
+desconto_alocado =
+    order_discount_amount
+    * order_item_line_total
+    / order_subtotal_amount
+```
+
+O teste `assert_order_item_discount_allocation_reconciles.sql` valida o rateio.
+
+### Devolução efetiva
+
+A flag `is_effective_return`, definida em `int_returns`, classifica uma
+devolução como efetiva quando:
+
+- `return_status = 'completed'`;
+- `returned_at` é válido e não futuro.
+
+`int_completed_returns_by_order_item` consolida devoluções por
+`order_item_id` antes do join com `fct_sales`.
+
+### Métricas financeiras
+
+`agg_daily_financial_metrics` possui uma linha por data e expõe os
+componentes necessários para calcular:
+
+```text
+faturamento_liquido =
+    order_item_net_revenue_after_discount
+    - completed_refund_amount
+```
+
+```text
+ticket_medio =
+    effective_order_revenue_amount
+    / effective_order_count
+```
+
+```text
+taxa_de_devolucao =
+    returned_item_quantity
+    / sold_item_quantity
+```
+
+Para períodos maiores que um dia, ticket médio e taxa de devolução devem
+ser recalculados a partir da soma de seus componentes.
+
+### Reposição de estoque
+
+`fct_inventory_replenishment` possui uma linha por variante e local:
+
+```text
+suggested_reorder_quantity =
+    demand_during_lead_time
+    + safety_stock_quantity
+    - quantity_on_hand
+    - open_purchase_order_quantity
+```
+
+O lead time segue a cascata:
+
+1. histórico da variante no local;
+2. histórico geral da variante;
+3. histórico global;
+4. padrão de sete dias.
+
+## KPIs Principais
+
+| KPI | Definição | Modelo | Campo |
+|---|---|---|---|
+| Faturamento líquido | Receita das vendas efetivas após descontos alocados e reembolsos concluídos | `agg_daily_financial_metrics` | `net_revenue_amount` |
+| Ticket médio | Valor oficial dos pedidos efetivos dividido pela quantidade de pedidos efetivos | `agg_daily_financial_metrics` | `average_ticket_amount` |
+| Taxa de devolução | Quantidade devolvida efetivamente dividida pela quantidade vendida efetivamente | `agg_daily_financial_metrics` | `return_quantity_rate` |
+
+Os KPIs são calculados diariamente. Para períodos maiores, ticket médio e
+taxa de devolução devem ser recalculados pela soma dos componentes:
+
+```text
+ticket_medio =
+    sum(effective_order_revenue_amount)
+    / sum(effective_order_count)
+
+taxa_de_devolucao =
+    sum(returned_item_quantity)
+    / sum(sold_item_quantity)
+```
+
+## Perguntas Analíticas
+
+As perguntas abaixo explicam os KPIs principais e apoiam decisões comerciais,
+financeiras e operacionais.
+
+| Pergunta | Modelo Gold | Medida principal |
+|---|---|---|
+| Quantos pedidos efetivos foram realizados? | `agg_daily_financial_metrics` | `effective_order_count` |
+| Quantas unidades foram vendidas? | `agg_daily_financial_metrics` | `sold_item_quantity` |
+| Quais produtos tiveram maior volume de vendas? | `fct_sales`, `dim_products` | `order_item_quantity` |
+| Quais produtos mais contribuíram para o faturamento líquido? | `fct_sales`, `dim_products` | `order_item_net_revenue_after_returns` |
+| Qual foi o valor total reembolsado? | `agg_daily_financial_metrics` | `completed_refund_amount` |
+| Quais produtos apresentaram maior taxa de devolução? | `fct_sales`, `dim_products` | Quantidade devolvida ÷ quantidade vendida |
+| Quais itens podem entrar em ruptura? | `fct_inventory_replenishment` | `will_stockout_before_replenishment` |
+| Quanto deve ser reposto por variante e local? | `fct_inventory_replenishment` | `suggested_reorder_quantity` |
+| Qual lead time é utilizado na reposição? | `fct_inventory_replenishment` | `selected_lead_time_days` |
+| Quais fornecedores atendem cada produto? | `bridge_product_suppliers` | `supplier_id`, `last_quoted_cost`, `lead_time_days` |
+
+## Qualidade e Reutilização
+
+### Macros customizadas
+
+O projeto centraliza transformações compartilhadas em macros:
+
+- `clean_and_format_name`;
+- `clean_and_format_name_place`;
+- `lower_trim`;
+- `upper_trim`;
+- `initcap_trim`;
+- `nullify_garbage`;
+- `nullify_future_date`;
+- `generate_schema_name`.
+
+### DRY
+
+O princípio DRY é aplicado por meio de:
+
+- macros reutilizáveis;
+- modelos intermediários compartilhados;
+- regras de negócio calculadas uma única vez;
+- dependências declaradas com `ref()`;
+- fontes declaradas com `source()`.
+
+### Nomenclatura
+
+Os modelos utilizam `stg_`, `int_`, `dim_`, `fct_`, `bridge_` e `agg_`.
+Chaves substitutas terminam em `_sk`, identificadores em `_id` e flags
+booleanas começam com `is_` ou `has_`.
+
+### Testes
+
+Os testes são aplicados conforme o risco analítico:
+
+- `unique` e `not_null` para chaves e granularidade;
+- `relationships` para integridade referencial;
+- `accepted_values` para domínios fechados;
+- testes `dbt_utils` para chaves compostas e invariantes;
+- testes singulares para reconciliações e regras de negócio.
+
+Os testes singulares cobrem, entre outros:
+
+- reconciliação de subtotais;
+- alocação de descontos;
+- limites de reembolso e devolução;
+- consistência de estoque e reposição;
+- seleção e confiança do lead time;
+- reconciliação das métricas financeiras.
+
+## Documentação
+
+As descrições completas de modelos e colunas, os testes aplicados, a
+granularidade e o lineage são mantidos nos arquivos YAML e publicados pelo
+`dbt docs`.
+
+| Artefato | Responsabilidade |
+|---|---|
+| `README.md` | Visão geral, arquitetura, execução e regras centrais |
+| YAML | Modelos, colunas, granularidade e testes |
+| `dbt docs` | Catálogo, lineage, DAG e SQL compilado |
+| Matriz funcional | Cobertura completa das perguntas de negócio |
+
+Para gerar e abrir a documentação:
+
+```bash
+cd dbt_lh_nautical
+
+dbt docs generate \
+  --vars '{"catalog_name": "dev_<seu_nome>_lh_nautical"}'
+
+dbt docs serve
+```
+
+O comando `dbt docs generate` cria o catálogo da documentação. O comando
+`dbt docs serve` inicia o site local para consulta.
+
+## Orquestração e CI/CD
+
+### Databricks Job
+
+A transformação é executada pela task `dbt_transformacao` dentro do job
+`job_ingestao_completa`, após a ingestão e seus testes.
+
+### Resiliência e idempotência
+
+Todas as 5 tasks do job `job_ingestao_completa` — incluindo `dbt_transformacao`
+— possuem `max_retries: 3`, `min_retry_interval_millis: 120000` e
+`retry_on_timeout: true`, permitindo até três novas tentativas automáticas
+em caso de falha.
+
+A idempotência do pipeline é garantida em duas camadas. Na ingestão, a
+função `incremental_ingenstion_hash` compara o hash MD5 da linha de origem
+contra os hashes já gravados no destino (via `left_anti` join) antes de
+gravar qualquer registro: reexecutar a ingestão sobre o mesmo estado da
+origem não produz linhas duplicadas, porque os registros já presentes no
+destino são descartados da escrita. Na transformação, os modelos
+materializados como `view` e `table` são reconstruídos deterministicamente
+a partir do estado atual das fontes a cada `dbt build`, sem depender de
+execuções anteriores. O snapshot de estoque utiliza a estratégia histórica
+do dbt para registrar mudanças sem duplicar versões já processadas.
+
+Falhas de processamento são monitoradas por
+`email_notifications.on_failure`, configurado no nível do Databricks Job.
+
+### Bitbucket Pipelines
+
+O pipeline cobre:
+
+1. lint e build dbt em Pull Requests destinados a `develop`;
+2. validação do Databricks Bundle entre `develop` e `main`;
+3. implantação do bundle após promoção para `main`.
+
+O desenvolvimento utiliza branches de escopo delimitado e revisão por
+Pull Request.
+
+## Execução Local
+
+### Pré-requisitos
+
+São necessários Python compatível, Databricks CLI, autenticação OAuth,
+perfil em `~/.dbt/profiles.yml` e catálogo pessoal com a Bronze carregada.
+
+### Instalar dependências
+
+```bash
+pip install -r requirements.txt
+
+cd dbt_lh_nautical
+dbt deps
+```
+
+### Validar o projeto
+
+```bash
+dbt parse \
+  --vars '{"catalog_name": "dev_<seu_nome>_lh_nautical"}'
+```
+
+### Executar as transformações e testes
+
+```bash
+dbt build \
+  --vars '{"catalog_name": "dev_<seu_nome>_lh_nautical"}'
+```
+
+### Executar um modelo e suas dependências
+
+```bash
+dbt build \
+  --select +nome_do_modelo \
+  --vars '{"catalog_name": "dev_<seu_nome>_lh_nautical"}'
+```
+
+### Validar SQL
+
+```bash
+sqlfluff lint models/
+```

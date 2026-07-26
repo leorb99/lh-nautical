@@ -1,16 +1,67 @@
 image: ghcr.io/databricks/cli:0.298.0
 
 pipelines:
-  # Cenário A: Alguém abriu um Pull Request de 'develop' -> 'main' 
   pull-requests:
-    main:
+    # Cenário A: alguém abriu um Pull Request de feature/* (ou fix/*, refactor/*, etc.) -> 'develop'.
+    # A chave do Bitbucket em pull-requests casa com a branch de ORIGEM do PR, não a de destino, e
+    # não existe uma glob única que cubra todos os prefixos de branch usados no time: por isso
+    # usamos '**' (qualquer origem) e filtramos o destino em runtime via $BITBUCKET_PR_DESTINATION_BRANCH.
+    '**':
+      - step:
+          name: "Lint + dbt build (Pré-Merge)"
+          image: python:3.11
+          script:
+            - |
+              if [ "$BITBUCKET_PR_DESTINATION_BRANCH" != "develop" ]; then
+                echo "Destino não é develop ($BITBUCKET_PR_DESTINATION_BRANCH), pulando."
+                exit 0
+              fi
+              pip install dbt-databricks==1.12.1 sqlfluff==4.2.2 sqlfluff-templater-dbt==4.2.2
+              cd dbt_lh_nautical
+              export DBT_PROFILES_DIR=./ci
+              dbt deps
+              sqlfluff lint models/
+              dbt build
+          after-script:
+            # Roda mesmo se o build acima falhar, pra não deixar sujeira acumulada no
+            # catálogo compartilhado do CI. Mantém só a bronze (populada manualmente,
+            # fora do pipeline); silver/gold são reconstruídas do zero a cada PR. O macro
+            # é gerado só dentro do container do pipeline (nunca commitado no projeto dbt).
+            - |
+              if [ "$BITBUCKET_PR_DESTINATION_BRANCH" != "develop" ]; then
+                exit 0
+              fi
+              pip install dbt-databricks==1.12.1
+              cd dbt_lh_nautical
+              export DBT_PROFILES_DIR=./ci
+              mkdir -p macros/_ci_tmp
+              cat > macros/_ci_tmp/drop_ci_transformed_schemas.sql << 'EOF'
+              {% macro drop_ci_transformed_schemas() %}
+                  {% if target.name != 'ci' %}
+                      {{ exceptions.raise_compiler_error("refusing to run against target: " ~ target.name) }}
+                  {% endif %}
+                  {% set drops = [
+                      "drop schema if exists " ~ target.database ~ ".silver cascade",
+                      "drop schema if exists " ~ target.database ~ ".gold cascade"
+                  ] %}
+                  {% for stmt in drops %}
+                      {% do run_query(stmt) %}
+                      {{ log("Executed: " ~ stmt, info=true) }}
+                  {% endfor %}
+              {% endmacro %}
+              EOF
+              dbt run-operation drop_ci_transformed_schemas || true
+
+    # Cenário B: alguém abriu um Pull Request de 'develop' -> 'main'. Aqui a origem do PR realmente
+    # é 'develop', então a chave já casa direto com o cenário pretendido, sem precisar de checagem em runtime.
+    develop:
       - step:
           name: "Validação Estrutural do Bundle (Pré-Merge)"
           script:
             - echo "Iniciando checagem de sintaxe para o ambiente de produção..."
             - databricks bundle validate -t prod
 
-  # Cenário B: O PR foi aprovado e o código foi mergeado na 'main'
+  # Cenário C: O PR foi aprovado e o código foi mergeado na 'main'
   branches:
     main:
       - step:

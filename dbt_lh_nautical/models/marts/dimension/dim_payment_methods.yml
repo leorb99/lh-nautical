@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: dim_payment_methods
+    description: "Payment method dimension model built from staged payment records."
+    columns:
+      - name: payment_method_sk
+        description: "Surrogate key for the payment method."
+        tests:
+          - unique
+          - not_null
+      
+      - name: payment_method_name
+        description: "Name of the payment method used in the source payments data."
+        tests:
+          - not_null

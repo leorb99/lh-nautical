@@ -1,10 +1,10 @@
 resources:
   jobs:
     job_ingestao_completa:
-      name: "Ingestão Completa (JDBC + Autoloader)" 
+      name: "Ingestion and Transformation" 
       # Executar o Job todos os dias a 1h da manhã
       schedule:
-        quartz_cron_expression: "0 0 1 * * ?"
+        quartz_cron_expression: "0 30 4 * * ?"
         timezone_id: "America/Sao_Paulo"
         pause_status: "UNPAUSED"
 
@@ -25,6 +25,10 @@ resources:
               catalog_name: ${var.catalog_name}
               schema: bronze
               numPartitions: "4"
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
 
         - task_key: "autoloader_ingestao"
           depends_on:
@@ -34,20 +38,66 @@ resources:
             base_parameters:
               catalog_name: ${var.catalog_name} 
               schema: bronze
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
+
+        - task_key: "ingestion_currency"
+          depends_on:
+            - task_key: "autoloader_ingestao"
+          notebook_task:
+            notebook_path: ../src/bronze/currency_ingestion.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name} 
+              schema: bronze
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
 
         - task_key: "testes_ingestao"
           depends_on:
-            - task_key: "autoloader_ingestao"
+            - task_key: "ingestion_currency"
           environment_key: default
           spark_python_task:
             python_file: ../tests/run_tests.py
             parameters:
               - "--catalog"
               - ${var.catalog_name}
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
+          
 
+        - task_key: "dbt_transformacao"
+          depends_on:
+           - task_key: "testes_ingestao"
+          dbt_task:
+            project_directory: ../dbt_lh_nautical
+            warehouse_id: e792e2cd0d725b8c
+            catalog: ${var.catalog_name}    
+            schema: bronze                 
+            commands:
+              - "dbt deps"
+              - "dbt seed --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
+              - "dbt build --select staging+ --vars '{\"catalog_name\": \"${var.catalog_name}\"}'"
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 120000
+          retry_on_timeout: true
+          environment_key: dbt_env
+          
       environments:
         - environment_key: default
           spec:
             environment_version: "3"
             dependencies:
               - pytest
+
+        - environment_key: dbt_env
+          spec:
+            environment_version: "3"
+            dependencies:
+              - dbt-databricks 

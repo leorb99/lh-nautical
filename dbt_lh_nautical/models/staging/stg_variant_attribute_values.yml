@@ -6,9 +6,10 @@ models:
 
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - product_variant_id
-            - attribute_id
+          arguments:
+            combination_of_columns:
+              - product_variant_id
+              - attribute_id
 
     columns:
       - name: product_variant_id
@@ -16,18 +17,33 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_product_variants')
-              field: product_variant_id
+              arguments:
+                to: ref('stg_product_variants')
+                field: product_variant_id
 
       - name: attribute_id
         description: "Foreign key identifying the attribute represented by the value."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_attributes')
-              field: attribute_id
+              arguments:
+                to: ref('stg_attributes')
+                field: attribute_id
 
       - name: attribute_value
         description: "Text value assigned to the attribute for the product variant."
         tests:
           - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."

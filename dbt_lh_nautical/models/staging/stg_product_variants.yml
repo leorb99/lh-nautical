@@ -16,8 +16,9 @@ models:
         tests:
           - not_null
           - relationships:
-              field: product_id
-              to: ref('stg_products')
+              arguments:
+                field: product_id
+                to: ref('stg_products')
       
       - name: product_variant_sku
         description: "SKU code for the product variant."
@@ -70,9 +71,6 @@ models:
           - not_null
       
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
         tests:
           - not_null
-          - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true

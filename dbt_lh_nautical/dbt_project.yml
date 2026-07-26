@@ -35,16 +35,25 @@ models:
     staging:
       +materialized: view
       +schema: silver
+      +tags: staging
     intermediate:
       +materialized: view
       +schema: silver
+      +tags: intermediate
     marts:
+      +tags: marts
       dimension:
         +materialized: table
         +schema: gold
       fact:
         +materialized: table
         +schema: gold
-      aggregation:
+
+      bridge:
         +materialized: table
         +schema: gold
+
+#seeds:
+#  dbt_lh_nautical:
+#    +catalog: "{{ var('catalog_name') }}"
+#    +schema: "{{ var('schema_name') }}"

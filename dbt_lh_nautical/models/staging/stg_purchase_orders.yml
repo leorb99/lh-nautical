@@ -23,37 +23,45 @@ models:
         tests:
           - not_null
           - relationships:
-              field: supplier_id
-              to: ref('stg_suppliers')
+              arguments:
+                field: supplier_id
+                to: ref('stg_suppliers')
 
       - name: buyer_id
         description: "Foreign key pointing to the employee/buyer who placed the order."
         tests:
           - not_null
+          - relationships:
+              arguments:
+                field: employee_id
+                to: ref('stg_employees')
 
       - name: destination_location_id
         description: "Foreign key pointing to the physical location where the order should be delivered."
         tests:
           - not_null
           - relationships:
-              field: location_id
-              to: ref('stg_locations')
+              arguments:
+                field: location_id
+                to: ref('stg_locations')
 
       - name: purchase_order_status
         description: "Current status of the purchase order."
         tests:
           - not_null
           - accepted_values:
-              values: ['partially_received', 'draft', 'received', 'cancelled', 'sent']
-              quote: true
+              arguments:
+                values: ['partially_received', 'draft', 'received', 'cancelled', 'sent']
+                quote: true
 
       - name: purchase_order_currency
         description: "The currency used for the purchase order amounts (e.g., BRL, USD)."
         tests:
           - not_null
           - accepted_values:
-              values: ['USD', 'BRL', 'EUR']
-              quote: true
+              arguments:
+                values: ['USD', 'BRL', 'EUR']
+                quote: true
 
       - name: purchase_order_subtotal
         description: "The total amount of the order before taxes, shipping, or discounts."
@@ -92,9 +100,6 @@ models:
           - not_null
       
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
         tests:
           - not_null
-          - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true

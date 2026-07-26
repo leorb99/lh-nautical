@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: fct_goods_receipts
+    description: >
+      Goods receipts fact, one row per purchase order item received, with receipt attributes denormalized. 
+      Also borrows descriptive attributes (product, supplier, destination, order number/status, and dates) from purchase_order_items/purchase_orders, 
+      since int_goods_receipt_items alone only has IDs, nothing to analyze by.
+    columns:
+      - name: goods_receipt_item_id
+        description: "Primary key for the goods receipt item"
+        tests:
+          - unique
+          - not_null
+
+      - name: goods_receipt_id
+        description: "Foreign key pointing to the parent goods receipt event"
+
+      - name: purchase_order_id
+        description: "Foreign key pointing to the purchase order these goods were received against"
+
+      - name: purchase_order_item_id
+        description: "Foreign key pointing to the purchase order item being received"
+
+      - name: product_variant_id
+        description: "Foreign key pointing to the received product variant"
+
+      - name: supplier_id
+        description: "Foreign key pointing to the supplier associated with this purchase order"
+
+      - name: received_by_employee_id
+        description: "Foreign key pointing to the employee who received and processed the goods"
+
+      - name: destination_location_id
+        description: "Foreign key pointing to the location where the goods were delivered"
+
+      - name: purchase_order_number
+        description: "The natural key / human-readable purchase order number"
+
+      - name: purchase_order_status
+        description: "The current lifecycle status of the purchase order"
+
+      - name: placed_at
+        description: "Timestamp when the purchase order was placed"
+
+      - name: purchase_order_expected_delivery_at
+        description: "The expected delivery date for the purchase order, useful to compare against received_at"
+
+      - name: received_at
+        description: "Timestamp when the goods were physically received"
+
+      - name: goods_receipt_notes
+        description: "Free-text notes recorded at receiving time"
+
+      - name: goods_receipt_item_quantity_received
+        description: "Quantity received for this purchase order line item in this receiving event"

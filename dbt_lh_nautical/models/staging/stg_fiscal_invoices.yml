@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: stg_fiscal_invoices
+    description: "Staging table containing cleaned and standardized electronic fiscal invoices table NF-e."
+    columns:
+      - name: fiscal_invoice_id
+        description: "Primary key of the fiscal invoices table."
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: "Foreign key mapping to the orders table."
+        tests:
+          - not_null
+          # Relationship test example (if you have stg_orders)
+          # - relationships:
+          #     to: ref('stg_orders')
+          #     field: order_id
+
+      - name: fiscal_invoice_nfe_access_key
+        description: "The unique 44-digit access key of the electronic fiscal invoice."
+        tests:
+          - unique
+          - not_null
+
+      - name: fiscal_invoice_status
+        description: "The current status of the fiscal invoice."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['authorized', 'rejected', 'cancelled']
+              
+      - name: fiscal_invoice_total_amount
+        description: "The total monetary value of the fiscal invoice."
+        tests:
+          - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."

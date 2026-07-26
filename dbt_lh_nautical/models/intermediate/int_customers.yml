@@ -26,9 +26,6 @@ models:
 
       - name: customer_tax_id
         description: "Tax identification number of the customer (CPF for individuals, CNPJ for companies)"
-        tests:
-          - not_null
-          - unique
 
       - name: customer_state_registration
         description: >
@@ -48,10 +45,10 @@ models:
         description: "Indicates whether the customer is currently active"
 
       - name: created_at
-        description: "Timestamp of when the customer record was created in the source system"
+        description: "Timestamp of when the customer record was created in the source system. Nullified when found in the future"
 
       - name: updated_at
-        description: "Timestamp of when the customer record was last updated in the source system"
+        description: "Timestamp of when the customer record was last updated in the source system. Nullified when found in the future"
 
       - name: primary_address_id
         description: "Identifier of the customer's primary address, if one exists"

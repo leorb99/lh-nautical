@@ -23,9 +23,23 @@ targets:
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
     variables:
-      catalog_name: dev_gabriel_freitas_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
+      catalog_name: dev_${workspace.current_user.short_name}_lh_nautical #ajuste para o seu catálogo dev pessoal (ex: dev_nome_sobrenome_lh_nautical)
     presets:
       artifacts_dynamic_version: true
+
+  ci:
+    # Used to populate the dedicated catalog for CI pipeline runs (dbt build on PRs) and for the
+    # service principal used by Bitbucket Pipelines.
+    mode: development
+    workspace:
+      host: https://dbc-29497e38-da7d.cloud.databricks.com
+    variables:
+      catalog_name: ci_lh_nautical
+    permissions:
+      - service_principal_name: d45477c2-9a5a-45e8-aa63-ac026acbeac3 #name: sp-cicd-bitbucket-lh-nautical
+        level: CAN_MANAGE
+      - user_name: gabriel.freitas@indicium.ai
+        level: CAN_MANAGE
 
   prod:
     mode: production

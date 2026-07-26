@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: fct_payments
+    description: "Fact table containing payment records joined to the payment method dimension." 
+    columns:
+      - name: payment_sk
+        description: "Surrogate key generated from the payment_id."
+        tests:
+          - unique
+          - not_null
+
+      - name: payment_id
+        description: "Original payment transaction identifier."
+        tests:
+          - not_null
+
+      - name: order_id
+        description: "Order identifier associated with the payment."
+        tests:
+          - not_null
+
+      - name: payment_method_sk
+        description: "Foreign key to the payment method dimension."
+
+      - name: payment_installments
+        description: "Number of installments for the payment."
+
+      - name: payment_amount
+        description: "Amount paid in the transaction."
+        tests:
+          - not_null
+
+      - name: payment_status
+        description: "Status of the payment."
+
+      - name: payment_paid_at
+        description: "Timestamp when the payment was made. If the timestamp is in the future, it will be set to null to avoid future-dated records."
+
+      - name: is_effective_paid
+        description: "Indicates whether the payment was effectively made. If the timestamp is in the future, it will be set to null to avoid future-dated records."

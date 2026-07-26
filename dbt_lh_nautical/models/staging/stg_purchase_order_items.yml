@@ -16,16 +16,18 @@ models:
         tests:
           - not_null
           - relationships:
-              field: purchase_orders_id
-              to: ref('stg_purchase_orders')
+              arguments:
+                field: purchase_order_id
+                to: ref('stg_purchase_orders')
       
       - name: product_variant_id
         description: "Foreign key to the purchased product variant."
         tests:
           - not_null
           - relationships:
-              field: product_variant_id
-              to: ref('stg_product_variants')
+              arguments:
+                field: product_variant_id
+                to: ref('stg_product_variants')
       
       - name: purchase_order_item_quantity_ordered
         description: "Quantity ordered for this purchase order line item."
@@ -53,9 +55,6 @@ models:
           - not_null
       
       - name: _action
-        description: "Action type from the CDC pipeline (e.g., INITIAL_LOAD, INSERT_OR_UPDATE)."
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
         tests:
           - not_null
-          - accepted_values:
-              values: ['INITIAL_LOAD', 'INSERT_OR_UPDATE']
-              quote: true

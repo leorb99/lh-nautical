@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: stg_order_items
+    description: "Staging table containing cleaned and standardized line items for sales/purchase orders."
+    columns:
+      - name: order_item_id
+        description: "Primary key of the order items table."
+        data_tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: "Foreign key linking to the parent order header."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+
+      - name: product_variant_id
+        description: "Foreign key linking to the specific product variant item."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_product_variants')
+                field: product_variant_id
+
+      - name: order_item_quantity
+        description: "The number of units ordered for this specific item line."
+        data_tests:
+          - not_null
+
+      - name: order_item_unit_price
+        description: "The price per single unit of the product variant."
+        data_tests:
+          - not_null
+
+      - name: order_item_icms_rate
+        description: "ICMS tax rate percentage applied to the order line item."
+
+      - name: order_item_ipi_rate
+        description: "IPI tax rate percentage applied to the order line item."
+
+      - name: order_item_line_total
+        description: "The calculated total amount for this line item (usually quantity * unit_price + taxes)."
+        data_tests:
+          - not_null
+
+      - name: _hash
+        description: "Hash generated for record deduplication and change detection."
+        data_tests:
+          - not_null
+
+      - name: _ingested_at
+        description: "Timestamp when the row was ingested into the data lake / bronze layer."
+        data_tests:
+          - not_null
+
+      - name: _action
+        description: "Ingestion action associated with the record (e.g. INITIAL_LOAD, INSERT_OR_UPDATE)."
