@@ -297,6 +297,36 @@ Os testes singulares cobrem, entre outros:
 - seleção e confiança do lead time;
 - reconciliação das métricas financeiras.
 
+## Governança de Dados (PII e Mascaramento)
+
+### Classificação de colunas
+
+Colunas com dado de pessoa física (nome, CPF, e-mail, telefone, endereço)
+recebem a tag `databricks_tags: data_classification: "pii"` diretamente no
+`.yml` do model. Identificadores de empresa (CNPJ, razão social) recebem
+`data_classification: "sensitive"` — uma distinção intencional, já que PII se
+refere especificamente a dado de pessoa física, não de pessoa jurídica.
+
+Essa tag só é suportada em modelos materializados como `table`; staging e
+intermediate são views e não a recebem. Hoje ela está aplicada em
+`dim_customers`, `dim_employees` e `dim_suppliers`.
+
+### Mascaramento (ABAC)
+
+A tag sozinha só classifica a coluna — quem de fato mascara o dado é uma
+**policy de ABAC** (Attribute-Based Access Control) do Unity Catalog,
+configurada uma única vez por catálogo em
+[`dbt_lh_nautical/setup/pii_masking_policy.sql`](dbt_lh_nautical/setup/pii_masking_policy.sql):
+
+1. Uma **governed tag** (`data_classification`) é registrada no nível da conta.
+2. Uma função (`mask_pii`) retorna um valor fixo (`***MASKED***`) para qualquer
+   coluna à qual for aplicada.
+3. Uma **policy** aplica essa função automaticamente a toda coluna com a tag
+   `pii` ou `sensitive`, para qualquer usuário, sem exceção.
+
+O script usa widgets do SQL editor (`:catalog_name`) e deve ser executado uma
+vez por catálogo (cada dev pessoal, e produção).
+
 ## Documentação
 
 As descrições completas de modelos e colunas, os testes aplicados, a

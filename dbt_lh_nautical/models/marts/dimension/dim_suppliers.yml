@@ -24,6 +24,8 @@ models:
         description: "Registered legal name of the supplier."
         tests:
           - not_null
+        databricks_tags:
+          data_classification: "sensitive"
 
       - name: supplier_trade_name
         description: "Commercial or trade name of the supplier."
@@ -45,6 +47,8 @@ models:
         tests:
           - unique
           - not_null
+        databricks_tags:
+          data_classification: "sensitive"
 
       - name: supplier_tax_id_type
         description: "Type of supplier tax identifier."
@@ -61,12 +65,18 @@ models:
         tests:
           - unique
           - not_null
+        databricks_tags:
+          data_classification: "pii"
 
       - name: supplier_phone
         description: "Primary supplier contact phone number."
+        databricks_tags:
+          data_classification: "pii"
 
       - name: supplier_contact_name
         description: "Main contact person at the supplier."
+        databricks_tags:
+          data_classification: "pii"
 
       - name: is_active
         description: "Indicates whether the supplier is active."
