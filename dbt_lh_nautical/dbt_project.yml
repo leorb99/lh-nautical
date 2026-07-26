@@ -52,3 +52,8 @@ models:
       bridge:
         +materialized: table
         +schema: gold
+
+#seeds:
+#  dbt_lh_nautical:
+#    +catalog: "{{ var('catalog_name') }}"
+#    +schema: "{{ var('schema_name') }}"

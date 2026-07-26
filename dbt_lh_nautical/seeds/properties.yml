@@ -7,3 +7,9 @@ seeds:
       column_types:
         holiday_date: date
         holiday: string
+
+  - name: valid_colors
+    description: List of colors
+    config:
+      column_types:
+        valid_colors: string
