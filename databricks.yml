@@ -23,7 +23,7 @@ targets:
     #   override below re-pauses it specifically for personal dev deployments, so
     #   `databricks bundle deploy` never leaves a full pipeline rebuild running
     #   nightly against a personal catalog (this silently ate into the shared
-    #   metastore's 500-table quota until caught).
+    #   metastore's 500-table quota until we caught it).
     # See also https://docs.databricks.com/dev-tools/bundles/deployment-modes.html.
     mode: development
     default: true
@@ -44,9 +44,6 @@ targets:
   ci:
     # Used to populate the dedicated catalog for CI pipeline runs (dbt build on PRs) and for the
     # service principal used by Bitbucket Pipelines.
-    # No job override needed here: the pipeline only ever runs `dbt build` directly
-    # against this catalog (see bitbucket-pipelines.yml), never `bundle deploy -t ci`,
-    # so job_ingestao_completa is never actually deployed under this target.
     mode: development
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
