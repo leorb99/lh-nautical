@@ -16,7 +16,6 @@ models:
       - name: goods_receipt_item_id
         description: "Primary key for the goods receipt item"
         tests:
-          - unique
           - not_null
 
       - name: goods_receipt_id

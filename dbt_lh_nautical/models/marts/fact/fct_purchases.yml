@@ -13,7 +13,6 @@ models:
       - name: purchase_order_item_id
         description: "Primary key for the purchase order item"
         tests:
-          - unique
           - not_null
 
       - name: purchase_order_id

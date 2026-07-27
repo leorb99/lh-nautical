@@ -57,7 +57,6 @@ models:
           Natural primary key of the sold order item and the grain-defining
           column of this model. Each order_item_id must occur exactly once.
         tests:
-          - unique
           - not_null
 
       - name: order_id

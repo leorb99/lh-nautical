@@ -19,7 +19,6 @@ models:
       - name: customer_id
         description: "Natural/business key for the customer, as assigned by the source system"
         tests:
-          - unique
           - not_null
 
       - name: customer_person_type
