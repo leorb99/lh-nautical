@@ -43,6 +43,15 @@ models:
       to one row per order_id.
 
     columns:
+      - name: order_item_sk
+        description: >
+          Surrogate key for the order item, generated from order_item_id.
+          Decoupled from the source system's ID; other models should join on
+          this key.
+        tests:
+          - unique
+          - not_null
+
       - name: order_item_id
         description: >
           Natural primary key of the sold order item and the grain-defining

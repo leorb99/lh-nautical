@@ -123,7 +123,8 @@ with
     , final as (
         select
             -- Keys
-            order_item_id
+            {{ dbt_utils.generate_surrogate_key(['order_item_id']) }} as order_item_sk
+            , order_item_id
             , order_id
             , product_variant_id
             , customer_id
