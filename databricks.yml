@@ -44,8 +44,9 @@ targets:
   ci:
     # Used to populate the dedicated catalog for CI pipeline runs (dbt build on PRs) and for the
     # service principal used by Bitbucket Pipelines.
-    # Same pause_status override as dev, and for the same reason: nothing here should
-    # run on a schedule, the CI catalog is only meant to be touched by the pipeline steps.
+    # No job override needed here: the pipeline only ever runs `dbt build` directly
+    # against this catalog (see bitbucket-pipelines.yml), never `bundle deploy -t ci`,
+    # so job_ingestao_completa is never actually deployed under this target.
     mode: development
     workspace:
       host: https://dbc-29497e38-da7d.cloud.databricks.com
@@ -56,13 +57,6 @@ targets:
         level: CAN_MANAGE
       - user_name: gabriel.freitas@indicium.ai
         level: CAN_MANAGE
-    resources:
-      jobs:
-        job_ingestao_completa:
-          schedule:
-            quartz_cron_expression: "0 30 4 * * ?"
-            timezone_id: "America/Sao_Paulo"
-            pause_status: PAUSED
 
   prod:
     mode: production
