@@ -14,6 +14,10 @@ models:
         description: "Identifier of the customer who owns the address"
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
 
       - name: address_type
         description: "Type of address (e.g. billing, secondary)"
