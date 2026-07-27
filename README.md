@@ -208,6 +208,29 @@ O lead time segue a cascata:
 3. histórico global;
 4. padrão de sete dias.
 
+### Segmentação RFM de clientes
+
+`agg_customer_rfm` possui uma linha por cliente com ao menos uma venda
+efetiva, segmentado pela metodologia RFM (Recency, Frequency, Monetary):
+
+- **Recência**: dias desde a última venda efetiva do cliente até a data
+  mais recente da base (evita distorção caso a ingestão mais recente não
+  seja de hoje).
+- **Frequência**: número de pedidos distintos com venda efetiva.
+- **Monetário**: soma do valor total dos pedidos com venda efetiva,
+  deduplicado a nível de pedido antes de somar.
+
+Cada métrica é dividida em quintis (1 a 5, sendo 5 sempre o melhor) e o
+cliente é classificado em um segmento pela primeira regra que bater, em
+ordem de prioridade:
+
+1. `champions`: topo nas três métricas;
+2. `at_risk`: alto em frequência e monetário, mas recência baixa;
+3. `loyal`: bom em frequência e monetário, independente da recência;
+4. `new`: recência alta, mas ainda pouco frequente;
+5. `hibernating`: baixo nas três métricas;
+6. `needs_attention`: demais casos.
+
 ## KPIs Principais
 
 | KPI | Definição | Modelo | Campo |
@@ -246,6 +269,9 @@ financeiras e operacionais.
 | Quanto deve ser reposto por variante e local? | `fct_inventory_replenishment` | `suggested_reorder_quantity` |
 | Qual lead time é utilizado na reposição? | `fct_inventory_replenishment` | `selected_lead_time_days` |
 | Quais fornecedores atendem cada produto? | `bridge_product_suppliers` | `supplier_id`, `last_quoted_cost`, `lead_time_days` |
+| Quais são os clientes mais valiosos? | `agg_customer_rfm` | `customer_segment` (`champions`) |
+| Quais clientes estão em risco de perda? | `agg_customer_rfm` | `customer_segment` (`at_risk`) |
+| Quais clientes são novos e ainda não fidelizados? | `agg_customer_rfm` | `customer_segment` (`new`) |
 
 ## Qualidade e Reutilização
 

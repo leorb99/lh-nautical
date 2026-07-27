@@ -1,0 +1,89 @@
+version: 2
+
+models:
+  - name: agg_customer_rfm
+    description: >
+      Customer RFM (Recency, Frequency, Monetary) segmentation, one row per customer with at least one effective sale.
+
+      Grain: One row per customer_id.
+
+      Effective-sale rule:
+      Only orders classified upstream as effective sales (paid, authorized
+      fiscal invoice, valid non-future placed_at) are considered.
+
+      Reference date:
+      Recency is measured against the latest placed_at among effective sales, not the current date, so it stays stable
+      regardless of when the model is run relative to the most recently ingested data.
+
+      Scoring:
+      Each metric is scored 1-5 by quintile across the customer base
+      (5 is always the best score: most recent, most frequent, or highest spend).
+
+      Segments:
+      Evaluated in priority order, first match wins!
+      1. champions (top on all three -> e.g. 5-5-5 or, precisely, (>=4)-(>=4)-(>=4))
+      2. at_risk (were top on frequency/monetary. haven't bought recently -> (<=2)-(>=4)-(>=4))
+      3. loyal (solid frequency/monetary regardless of recency -> X-(>=3)-(>=3))
+      4. new (recent but not yet frequent -> (>=4)-(<=2)-X)
+      5. hibernating (low on all three -> (<=2)-(<=2)-(<=2))
+      6. needs_attention (as the catch-all for everyone in between)
+
+    columns:
+      - name: customer_id
+        description: "Foreign key identifying the customer. Grain-defining column of this model."
+        tests:
+          - unique
+          - not_null
+
+      - name: last_order_at
+        description: "Timestamp of the customer's most recent effective sale."
+        tests:
+          - not_null
+
+      - name: recency_days
+        description: "Days between the reference date and the customer's last effective sale."
+        tests:
+          - not_null
+
+      - name: frequency_orders
+        description: "Number of distinct orders from effective sales for the customer."
+        tests:
+          - not_null
+
+      - name: monetary_amount
+        description: "Total order_total_amount from the customer's effective sales."
+        tests:
+          - not_null
+
+      - name: recency_score
+        description: "Quintile score (1-5) for recency. 5 is most recent."
+
+      - name: frequency_score
+        description: "Quintile score (1-5) for frequency. 5 is most frequent."
+
+      - name: monetary_score
+        description: "Quintile score (1-5) for monetary value. 5 is highest spend."
+
+      - name: customer_segment
+        description: "RFM segment derived from the three scores. See model description for the rule priority."
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - champions
+                  - loyal
+                  - at_risk
+                  - new
+                  - hibernating
+                  - needs_attention
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "recency_days >= 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "frequency_orders > 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "monetary_amount > 0"
