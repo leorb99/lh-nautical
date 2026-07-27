@@ -22,7 +22,8 @@ with
     , joined as (
         select
             -- keys
-            goods_receipt_items.goods_receipt_item_id
+            {{ dbt_utils.generate_surrogate_key(['goods_receipt_items.goods_receipt_item_id']) }} as goods_receipt_item_sk
+            , goods_receipt_items.goods_receipt_item_id
             , goods_receipt_items.goods_receipt_id
             , goods_receipts.purchase_order_id
             , goods_receipt_items.purchase_order_item_id

@@ -12,7 +12,8 @@ with
     , joined as (
         select
             -- keys
-            purchase_order_items.purchase_order_item_id
+            {{ dbt_utils.generate_surrogate_key(['purchase_order_items.purchase_order_item_id']) }} as purchase_order_item_sk
+            , purchase_order_items.purchase_order_item_id
             , purchase_order_items.purchase_order_id
             , purchase_order_items.product_variant_id
             , purchase_orders.supplier_id

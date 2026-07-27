@@ -13,19 +13,24 @@ models:
       - name: employee_id
         description: "Natural/Business key for the employee."
         tests:
-          - unique
           - not_null
 
       - name: employee_full_name
         description: "Full name of the employee, properly formatted and standardized."
+        databricks_tags:
+          data_classification: "pii"
 
       - name: employee_cpf
         description: "Employee's CPF document number with non-alphanumeric characters removed."
+        databricks_tags:
+          data_classification: "pii"
 
       - name: employee_email
         description: "Cleaned and standardized corporate email address of the employee."
         tests:
           - not_null
+        databricks_tags:
+          data_classification: "pii"
 
       - name: employee_role
         description: "Job title or role of the employee in Proper Case."

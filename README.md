@@ -208,6 +208,29 @@ O lead time segue a cascata:
 3. histórico global;
 4. padrão de sete dias.
 
+### Segmentação RFM de clientes
+
+`agg_customer_rfm` possui uma linha por cliente com ao menos uma venda
+efetiva, segmentado pela metodologia RFM (Recency, Frequency, Monetary):
+
+- **Recência**: dias desde a última venda efetiva do cliente até a data
+  mais recente da base (evita distorção caso a ingestão mais recente não
+  seja de hoje).
+- **Frequência**: número de pedidos distintos com venda efetiva.
+- **Monetário**: soma do valor total dos pedidos com venda efetiva,
+  deduplicado a nível de pedido antes de somar.
+
+Cada métrica é dividida em quintis (1 a 5, sendo 5 sempre o melhor) e o
+cliente é classificado em um segmento pela primeira regra que bater, em
+ordem de prioridade:
+
+1. `champions`: topo nas três métricas;
+2. `at_risk`: alto em frequência e monetário, mas recência baixa;
+3. `loyal`: bom em frequência e monetário, independente da recência;
+4. `new`: recência alta, mas ainda pouco frequente;
+5. `hibernating`: baixo nas três métricas;
+6. `needs_attention`: demais casos.
+
 ## KPIs Principais
 
 | KPI | Definição | Modelo | Campo |
@@ -246,6 +269,9 @@ financeiras e operacionais.
 | Quanto deve ser reposto por variante e local? | `fct_inventory_replenishment` | `suggested_reorder_quantity` |
 | Qual lead time é utilizado na reposição? | `fct_inventory_replenishment` | `selected_lead_time_days` |
 | Quais fornecedores atendem cada produto? | `bridge_product_suppliers` | `supplier_id`, `last_quoted_cost`, `lead_time_days` |
+| Quais são os clientes mais valiosos? | `agg_customer_rfm` | `customer_segment` (`champions`) |
+| Quais clientes estão em risco de perda? | `agg_customer_rfm` | `customer_segment` (`at_risk`) |
+| Quais clientes são novos e ainda não fidelizados? | `agg_customer_rfm` | `customer_segment` (`new`) |
 
 ## Qualidade e Reutilização
 
@@ -296,6 +322,40 @@ Os testes singulares cobrem, entre outros:
 - consistência de estoque e reposição;
 - seleção e confiança do lead time;
 - reconciliação das métricas financeiras.
+
+## Governança de Dados (PII e Mascaramento)
+
+### Classificação de colunas
+
+Colunas com dado de pessoa física (nome, CPF, e-mail, telefone, endereço)
+recebem a tag `databricks_tags: data_classification: "pii"` diretamente no
+`.yml` do model. Identificadores de empresa (CNPJ, razão social) recebem
+`data_classification: "sensitive"` — uma distinção intencional, já que PII se
+refere especificamente a dado de pessoa física, não de pessoa jurídica.
+
+Essa tag só é suportada em modelos materializados como `table`; staging e
+intermediate são views e não a recebem. Hoje ela está aplicada em
+`dim_customers`, `dim_employees` e `dim_suppliers`.
+
+### Mascaramento (ABAC)
+
+A tag sozinha só classifica a coluna — quem de fato mascara o dado é uma
+**policy de ABAC** (Attribute-Based Access Control) do Unity Catalog,
+configurada uma única vez por catálogo em
+[`dbt_lh_nautical/setup/pii_masking_policy.sql`](dbt_lh_nautical/setup/pii_masking_policy.sql):
+
+1. Uma **governed tag** (`data_classification`) é registrada no nível da conta.
+2. Uma função (`mask_pii`) retorna um valor fixo (`***MASKED***`) para qualquer
+   coluna à qual for aplicada.
+3. Uma **policy** aplica essa função automaticamente a toda coluna com a tag
+   `pii` ou `sensitive`, para qualquer usuário, com uma exceção: a identidade
+   que roda o dbt/os testes naquele catálogo (`:pipeline_identity`) enxerga o
+   valor real. Sem essa exceção, os próprios testes de qualidade (ex.:
+   `unique` numa coluna mascarada) veem o mesmo valor mascarado em todas as
+   linhas e falham com falso positivo de duplicidade.
+
+O script usa widgets do SQL editor (`:catalog_name`, `:pipeline_identity`) e
+deve ser executado uma vez por catálogo (cada dev pessoal, e produção).
 
 ## Documentação
 
