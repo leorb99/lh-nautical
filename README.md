@@ -322,10 +322,14 @@ configurada uma única vez por catálogo em
 2. Uma função (`mask_pii`) retorna um valor fixo (`***MASKED***`) para qualquer
    coluna à qual for aplicada.
 3. Uma **policy** aplica essa função automaticamente a toda coluna com a tag
-   `pii` ou `sensitive`, para qualquer usuário, sem exceção.
+   `pii` ou `sensitive`, para qualquer usuário, com uma exceção: a identidade
+   que roda o dbt/os testes naquele catálogo (`:pipeline_identity`) enxerga o
+   valor real. Sem essa exceção, os próprios testes de qualidade (ex.:
+   `unique` numa coluna mascarada) veem o mesmo valor mascarado em todas as
+   linhas e falham com falso positivo de duplicidade.
 
-O script usa widgets do SQL editor (`:catalog_name`) e deve ser executado uma
-vez por catálogo (cada dev pessoal, e produção).
+O script usa widgets do SQL editor (`:catalog_name`, `:pipeline_identity`) e
+deve ser executado uma vez por catálogo (cada dev pessoal, e produção).
 
 ## Documentação
 

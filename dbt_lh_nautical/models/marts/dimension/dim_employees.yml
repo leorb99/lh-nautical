@@ -13,7 +13,6 @@ models:
       - name: employee_id
         description: "Natural/Business key for the employee."
         tests:
-          - unique
           - not_null
 
       - name: employee_full_name

@@ -14,10 +14,10 @@ models:
         description: "Foreign key mapping to the orders table."
         tests:
           - not_null
-          # Relationship test example (if you have stg_orders)
-          # - relationships:
-          #     to: ref('stg_orders')
-          #     field: order_id
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
 
       - name: fiscal_invoice_nfe_access_key
         description: "The unique 44-digit access key of the electronic fiscal invoice."

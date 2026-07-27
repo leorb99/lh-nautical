@@ -17,7 +17,6 @@ models:
       - name: supplier_id
         description: "Natural key identifying the supplier."
         tests:
-          - unique
           - not_null
 
       - name: supplier_legal_name

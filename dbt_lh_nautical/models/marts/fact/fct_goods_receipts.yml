@@ -7,10 +7,15 @@ models:
       Also borrows descriptive attributes (product, supplier, destination, order number/status, and dates) from purchase_order_items/purchase_orders, 
       since int_goods_receipt_items alone only has IDs, nothing to analyze by.
     columns:
+      - name: goods_receipt_item_sk
+        description: "Surrogate key generated from goods_receipt_item_id"
+        tests:
+          - unique
+          - not_null
+
       - name: goods_receipt_item_id
         description: "Primary key for the goods receipt item"
         tests:
-          - unique
           - not_null
 
       - name: goods_receipt_id

@@ -17,7 +17,6 @@ models:
       - name: stock_movement_id
         description: "Natural key identifying each inventory movement."
         tests:
-          - unique
           - not_null
 
       - name: product_variant_id

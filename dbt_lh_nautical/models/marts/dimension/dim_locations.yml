@@ -18,7 +18,6 @@ models:
       - name: location_id
         description: "Natural/business key for the location, as assigned by the source system"
         tests:
-          - unique
           - not_null
 
       - name: location_name

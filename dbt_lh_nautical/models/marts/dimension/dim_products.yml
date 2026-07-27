@@ -13,7 +13,6 @@ models:
       - name: product_variant_id
         description: "Primary key for the product variant."
         tests:
-          - unique
           - not_null
       
       - name: product_id

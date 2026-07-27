@@ -4,10 +4,15 @@ models:
   - name: fct_purchases
     description: "Purchases fact, one row per purchase order item, with purchase order attributes denormalized"
     columns:
+      - name: purchase_order_item_sk
+        description: "Surrogate key generated from purchase_order_item_id"
+        tests:
+          - unique
+          - not_null
+
       - name: purchase_order_item_id
         description: "Primary key for the purchase order item"
         tests:
-          - unique
           - not_null
 
       - name: purchase_order_id

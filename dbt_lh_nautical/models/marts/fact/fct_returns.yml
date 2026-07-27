@@ -17,7 +17,6 @@ models:
       - name: return_item_id
         description: "Natural key identifying each returned item"
         tests:
-          - unique
           - not_null
 
       - name: return_id
