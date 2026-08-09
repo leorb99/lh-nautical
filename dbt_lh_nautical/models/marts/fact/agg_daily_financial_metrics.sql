@@ -38,6 +38,10 @@ with
             , sum(order_item_quantity) as sold_item_quantity
             , sum(completed_returned_quantity) as returned_item_quantity
             , sum(completed_refund_amount) as completed_refund_amount
+
+            -- Cast to decimal(14,2): same unbounded-precision issue as
+            -- average_ticket_amount/return_quantity_rate below, caught via
+            -- information_schema rather than by a test.
             , cast(
                 sum(order_item_net_revenue_after_returns)
                 as decimal(14, 2)
@@ -179,6 +183,11 @@ with
             , pending_invoice_order_count
             , pending_invoice_revenue_amount
 
+            -- Cast to a fixed scale: division between DECIMAL columns widens
+            -- precision automatically. Target scale matches the tolerance of
+            -- assert_daily_average_ticket_reconciles (0.01) and
+            -- assert_daily_return_rate_reconciles (0.000001) below.
+            --
             -- Average official order value for effective sales.
             , cast(
                 case

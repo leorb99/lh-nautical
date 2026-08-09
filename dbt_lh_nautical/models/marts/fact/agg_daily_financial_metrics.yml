@@ -97,6 +97,8 @@ models:
           parent-order discounts and deducting completed monetary refunds.
 
           This measure answers the business question: What is the net revenue?
+
+          Stored as decimal(14,2).
         tests:
           - not_null
 
@@ -155,6 +157,8 @@ models:
 
           This measure answers the business question: What is the average ticket?
 
+          Stored as decimal(14,2).
+
       - name: return_quantity_rate
         description: >
           Quantity-based return rate for effective sales.
@@ -173,3 +177,5 @@ models:
           average the daily rates.
 
           This measure answers the business question: What is the return rate?
+
+          Stored as decimal(14,6).
