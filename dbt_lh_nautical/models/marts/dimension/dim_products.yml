@@ -11,8 +11,18 @@ models:
           - not_null
       
       - name: product_variant_id
-        description: "Primary key for the product variant."
+        description: >
+          Primary key for the product variant.
+
+          Uniqueness here is a direct guarantee, not just an inherited one:
+          stg_product_variants.product_variant_id is unique, and both models
+          left-joined in (int_products_enriched by product_id,
+          int_variant_attributes by product_variant_id) are themselves
+          unique on their join key, so neither join can fan out a row. This
+          test makes that guarantee explicit at the mart itself instead of
+          requiring a reader to trace three upstream models to confirm it.
         tests:
+          - unique
           - not_null
       
       - name: product_id
