@@ -38,8 +38,9 @@ with
             , sum(order_item_quantity) as sold_item_quantity
             , sum(completed_returned_quantity) as returned_item_quantity
             , sum(completed_refund_amount) as completed_refund_amount
-            , sum(
-                order_item_net_revenue_after_returns
+            , cast(
+                sum(order_item_net_revenue_after_returns)
+                as decimal(14, 2)
             ) as net_revenue_amount
         from effective_sales
         group by cast(placed_at as date)
