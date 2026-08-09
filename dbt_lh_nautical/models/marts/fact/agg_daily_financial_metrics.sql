@@ -179,24 +179,30 @@ with
             , pending_invoice_revenue_amount
 
             -- Average official order value for effective sales.
-            , case
-                when effective_order_count > 0
-                    then (
-                        effective_order_revenue_amount
-                        / effective_order_count
-                    )
-                else 0
-            end as average_ticket_amount
+            , cast(
+                case
+                    when effective_order_count > 0
+                        then (
+                            effective_order_revenue_amount
+                            / effective_order_count
+                        )
+                    else 0
+                end
+                as decimal(14, 2)
+            ) as average_ticket_amount
 
             -- Quantity-based return rate for effective sales.
-            , case
-                when sold_item_quantity > 0
-                    then (
-                        returned_item_quantity
-                        / sold_item_quantity
-                    )
-                else 0
-            end as return_quantity_rate
+            , cast(
+                case
+                    when sold_item_quantity > 0
+                        then (
+                            returned_item_quantity
+                            / sold_item_quantity
+                        )
+                    else 0
+                end
+                as decimal(14, 6)
+            ) as return_quantity_rate
 
         from combined_metrics
     )
