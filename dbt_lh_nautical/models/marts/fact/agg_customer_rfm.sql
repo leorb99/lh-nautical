@@ -32,6 +32,12 @@ with
     , customer_metrics as (
         select
             customer_orders.customer_id
+
+            -- Customer acquisition date: the first effective sale, not to be
+            -- confused with dim_customers.created_at (account registration,
+            -- which may predate or postdate the first actual purchase).
+            , min(customer_orders.placed_at) as first_order_at
+
             , max(customer_orders.placed_at) as last_order_at
             , datediff(
                 any_value(reference_date.analysis_date)
@@ -48,6 +54,7 @@ with
     , scored as (
         select
             customer_id
+            , first_order_at
             , last_order_at
             , recency_days
             , frequency_orders
@@ -62,6 +69,7 @@ with
     , final as (
         select
             customer_id
+            , first_order_at
             , last_order_at
             , recency_days
             , frequency_orders
