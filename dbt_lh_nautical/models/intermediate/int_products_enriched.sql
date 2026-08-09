@@ -75,7 +75,15 @@ with
             , cleaned_products.product_created_at
             , cleaned_products.product_updated_at
             , brands.brand_id
+
+            -- Trim + whitespace collapse only, same reasoning as category_name
+            -- above: initcap()-based capitalization was tried and rejected,
+            -- it would turn "BR Náutica" into "Br Náutica" and "MaxSea" into
+            -- "Maxsea", destroying intentional capitalization in real brand
+            -- names. No known bad value here to correct explicitly, unlike
+            -- category's 'SEGURANÇA'.
             , {{ trim_collapse_whitespace('brands.brand_name') }} as brand_name
+
             , brands.brand_country
             , brands.is_active as is_brand_active
             , case when brands.created_at > current_timestamp() then null else brands.created_at end as brand_created_at

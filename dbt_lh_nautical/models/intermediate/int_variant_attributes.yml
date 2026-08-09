@@ -14,7 +14,17 @@ models:
           - not_null
 
       - name: attr_color
-        description: "Normalized color attribute for the product variant."
+        description: >
+          Color attribute for the product variant, fuzzy-corrected against
+          the valid_colors seed.
+
+          The raw value is trimmed, lowercased, and compared to every entry
+          in valid_colors using Levenshtein edit distance. The closest match
+          is accepted only when its distance is 2 or less; otherwise the
+          attribute is null rather than a guessed, possibly wrong, color.
+          This exists to absorb typos in the source system (e.g. a raw value
+          one character off from a valid color) without silently accepting
+          arbitrary free text as a color.
 
       - name: attr_size
         description: "Normalized size attribute for the product variant."
@@ -35,4 +45,15 @@ models:
         description: "Boolean flag indicating whether the product variant is waterproof."
 
       - name: attr_material
-        description: "Material attribute for the product variant."
+        description: >
+          Material attribute for the product variant, fuzzy-corrected
+          against the valid_materials seed, using the exact same mechanism
+          as attr_color (trim, lowercase, Levenshtein distance against the
+          seed, accepted only within a distance of 2).
+
+          Added after confirming two real, low-frequency typos in this
+          column against the full distinct value list: "alumíni" (1
+          occurrence) beside "alumínio" (43 combined after the fix), and
+          "inoox" (1 occurrence) beside "inox" (43 combined). Before this
+          fix, both typos passed through as if they were distinct,
+          legitimate materials.
