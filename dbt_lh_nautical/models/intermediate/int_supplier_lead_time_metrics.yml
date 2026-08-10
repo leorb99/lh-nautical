@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: int_supplier_lead_time_metrics
+    description: >
+      Supplier-grain lead-time metrics combining two sources: the lead
+      time actually observed in receiving history (from
+      int_purchase_order_receipts, aggregated across every product bought
+      from the supplier) and the lead time declared in the product-supplier
+      catalog (from bridge_product_suppliers, averaged across every product
+      the supplier provides).
+
+      Validated on real data before this model was built: every one of the
+      25 suppliers already has abundant receiving history (minimum 105
+      observations), so a multi-level confidence cascade like the one used
+      for inventory replenishment (product-location, product, global,
+      fixed default) would add complexity with no real fallback ever
+      firing. The declared value is also 100% populated (zero nulls across
+      1520 rows), so a single coalesce (observed, else declared) is enough
+      to cover a future supplier with no receiving history yet.
+
+      Observed and declared are also exposed side by side because they
+      disagree in a consistent, non-random way: for all 25 suppliers today,
+      the observed median lead time is lower than the declared average,
+      by 5 to 14 days depending on the supplier. That gap is itself useful
+      for procurement review, not just an intermediate step toward a single
+      combined number.
+
+    columns:
+      - name: supplier_id
+        description: Supplier represented by the lead-time metrics.
+        tests:
+          - not_null
+          - unique
+
+      - name: observed_median_lead_time_days
+        description: >
+          Median lead time in days between purchase order placement and
+          first goods receipt, across all completed receipts for this
+          supplier. Null when the supplier has no valid receiving history
+          yet.
+
+      - name: observed_average_lead_time_days
+        description: >
+          Average lead time in days across all completed receipts for
+          this supplier. Null when the supplier has no valid receiving
+          history yet.
+
+      - name: observed_lead_time_observation_count
+        description: >
+          Number of valid receipt observations backing the observed
+          metrics above. Null when the supplier has no valid receiving
+          history yet.
+
+      - name: declared_average_lead_time_days
+        description: >
+          Average of the lead_time_days quoted in the product-supplier
+          catalog (bridge_product_suppliers) across every product this
+          supplier provides. Null only if the supplier has no
+          product-supplier catalog rows at all.
+
+      - name: selected_lead_time_days
+        description: >
+          The lead time used downstream for ranking and reporting.
+          Observed history is preferred whenever it exists; falls back to
+          the declared average only when the supplier has no receiving
+          history yet.
+        tests:
+          - not_null
+
+      - name: lead_time_source
+        description: >
+          Which value selected_lead_time_days came from: observed_history
+          when receiving history exists, declared_only otherwise.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - observed_history
+                  - declared_only
