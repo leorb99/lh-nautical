@@ -20,19 +20,34 @@ models:
           - not_null
 
       - name: supplier_legal_name
-        description: "Registered legal name of the supplier."
+        description: >
+          Registered legal name of the supplier, trimmed with internal
+          whitespace collapsed to a single space (via int_suppliers). Not
+          capitalization-normalized, same reasoning as brand_name/
+          category_name elsewhere in the project: a general casing rule
+          would risk corrupting real values like "S.A." abbreviations.
         tests:
           - not_null
         databricks_tags:
           data_classification: "sensitive"
 
       - name: supplier_trade_name
-        description: "Commercial or trade name of the supplier."
+        description: >
+          Commercial or trade name of the supplier, same whitespace
+          cleaning as supplier_legal_name above. One confirmed bad source
+          value ("das", a standalone Portuguese preposition with no
+          business meaning as a trade name) is nulled explicitly in
+          int_suppliers, so it falls back to the legal name in
+          supplier_display_name below instead of displaying as "das".
 
       - name: supplier_display_name
         description: >
           Preferred supplier name for reporting, using the trade name when
-          available and the legal name otherwise.
+          available and the legal name otherwise. Reflects the cleaning
+          applied to both source columns: no longer shows a bare "das" for
+          the supplier whose trade name was that single confirmed bad
+          value, or a stray leading space for any supplier whose trade
+          name had one.
         tests:
           - not_null
 
@@ -73,7 +88,9 @@ models:
           data_classification: "pii"
 
       - name: supplier_contact_name
-        description: "Main contact person at the supplier."
+        description: >
+          Main contact person at the supplier, same whitespace cleaning as
+          supplier_legal_name above.
         databricks_tags:
           data_classification: "pii"
 

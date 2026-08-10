@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: int_suppliers
+    description: >
+      Intermediate model that cleans supplier name fields. Fills a layering
+      gap this domain had relative to customers, products, and locations,
+      all of which already clean entity names at the intermediate layer
+      before their dimension. dim_suppliers previously read stg_suppliers
+      directly, with no cleaning applied at all.
+
+    tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_suppliers')
+
+    columns:
+      - name: supplier_id
+        description: "Primary key of the supplier."
+        tests:
+          - unique
+          - not_null
+
+      - name: supplier_legal_name
+        description: >
+          Registered legal name of the supplier, trimmed with internal
+          whitespace collapsed to a single space. No capitalization is
+          applied: entity-name capitalization macros were tried on similar
+          fields elsewhere in the project (brand_name, category_name) and
+          rejected, since they corrupt real values (abbreviations like
+          "S.A.", hyphenated names).
+
+      - name: supplier_trade_name
+        description: >
+          Commercial or trade name of the supplier, same whitespace
+          cleaning as supplier_legal_name above. One confirmed bad source
+          value was found and nulled explicitly: a trade name of exactly
+          "das" (a standalone Portuguese preposition, not a real trade
+          name) for the supplier whose legal name is "das Neves - ME".
+          When null, dim_suppliers.supplier_display_name falls back to the
+          legal name via coalesce.
+
+      - name: supplier_country
+        description: "Country where the supplier is registered."
+
+      - name: supplier_tax_id
+        description: "Supplier tax identification number."
+
+      - name: supplier_tax_id_type
+        description: "Type of supplier tax identifier."
+
+      - name: supplier_email
+        description: "Primary supplier contact email."
+
+      - name: supplier_phone
+        description: "Primary supplier contact phone number."
+
+      - name: supplier_contact_name
+        description: >
+          Main contact person at the supplier, same whitespace cleaning as
+          supplier_legal_name above.
+
+      - name: is_active
+        description: "Indicates whether the supplier is active."
+
+      - name: created_at
+        description: "Timestamp when the supplier record was created."
+
+      - name: updated_at
+        description: "Timestamp when the supplier record was last updated."

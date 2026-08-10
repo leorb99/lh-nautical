@@ -1,7 +1,7 @@
 with
     suppliers as (
         select *
-        from {{ ref('stg_suppliers') }}
+        from {{ ref('int_suppliers') }}
     )
 
     , selected_suppliers as (
