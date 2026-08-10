@@ -15,6 +15,8 @@ models:
 
       - name: supplier_id
         description: "Foreign key pointing to the supplier associated with this purchase order"
+        tests:
+          - not_null
 
       - name: buyer_id
         description: "Foreign key pointing to the employee who placed the purchase order (employees with the 'buyer' role)"
@@ -23,16 +25,39 @@ models:
         description: "Foreign key pointing to the physical location where the order should be delivered"
 
       - name: purchase_order_status
-        description: "Current status of the purchase order"
+        description: >
+          Current status of the purchase order. "Open" for dashboard
+          purposes means sent or partially_received; see
+          fct_purchases.purchase_order_status for the full definition.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - draft
+                  - sent
+                  - partially_received
+                  - received
+                  - cancelled
 
       - name: purchase_order_currency
         description: "The currency used for the purchase order amounts (e.g., BRL, USD)"
+        tests:
+          - not_null
 
       - name: purchase_order_subtotal
-        description: "The total amount of the order before taxes, shipping, or discounts"
+        description: >
+          The total amount of the order before taxes, shipping, or
+          discounts. Always equal to purchase_order_total in this
+          business: purchase orders carry no discount, unlike sales
+          orders, confirmed by the model-level test below (0 rows differ).
+        tests:
+          - not_null
 
       - name: purchase_order_total
         description: "The final total amount of the purchase order"
+        tests:
+          - not_null
 
       - name: placed_at
         description: "Timestamp when the purchase order was officially placed/submitted. Nullified when found in the future"

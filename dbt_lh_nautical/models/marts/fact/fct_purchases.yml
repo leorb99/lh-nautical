@@ -20,36 +20,71 @@ models:
 
       - name: product_variant_id
         description: "Foreign key pointing to the purchased product variant"
+        tests:
+          - not_null
 
       - name: supplier_id
         description: "Foreign key pointing to the supplier associated with this purchase order"
+        tests:
+          - not_null
 
       - name: buyer_id
         description: "Foreign key pointing to the employee who placed the purchase order"
+        tests:
+          - not_null
 
       - name: destination_location_id
         description: "Foreign key pointing to the location where the order should be delivered"
+        tests:
+          - not_null
 
       - name: purchase_order_number
         description: "The natural key / human-readable purchase order number"
 
       - name: purchase_order_status
-        description: "The current lifecycle status of the purchase order"
+        description: >
+          The current lifecycle status of the purchase order. Feeds the
+          "open purchase orders" card on the executive dashboard: open is
+          defined as sent or partially_received, excluding draft (not yet
+          a real commitment with the supplier), received and cancelled
+          (both final states).
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - draft
+                  - sent
+                  - partially_received
+                  - received
+                  - cancelled
 
       - name: purchase_order_currency
         description: "The currency used for the purchase order amounts"
+        tests:
+          - not_null
 
       - name: placed_at
-        description: "Timestamp when the purchase order was placed"
+        description: >
+          Timestamp when the purchase order was placed. Nullified upstream
+          when the source timestamp was in the future (~14% of rows,
+          confirmed via discovery in int_purchase_orders); intentionally
+          left without a not_null test.
 
       - name: purchase_order_expected_delivery_at
         description: "The expected delivery date for the purchase order"
 
       - name: purchase_order_item_quantity_ordered
         description: "Quantity ordered for this purchase order line item"
+        tests:
+          - not_null
 
       - name: purchase_order_item_unit_cost
         description: "Unit cost for this purchase order line item"
+        tests:
+          - not_null
 
       - name: purchase_order_item_line_total
         description: "Total amount for this purchase order line item"
+        tests:
+          - not_null
