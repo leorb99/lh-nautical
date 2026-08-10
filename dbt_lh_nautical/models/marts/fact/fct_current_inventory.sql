@@ -97,31 +97,10 @@ with
                     )
             end as inventory_coverage_days_90d
 
-            , case
-                when current_stock.quantity_on_hand = 0
-                    then 'out_of_stock'
-
-                when
-                    coalesce(
-                        inventory_demand.average_daily_sales_90d
-                        , 0
-                    ) = 0
-                    then 'no_recent_sales'
-
-                when (
-                    current_stock.quantity_on_hand
-                    / inventory_demand.average_daily_sales_90d
-                ) <= 7
-                    then 'critical'
-
-                when (
-                    current_stock.quantity_on_hand
-                    / inventory_demand.average_daily_sales_90d
-                ) <= 15
-                    then 'attention'
-
-                else 'healthy'
-            end as inventory_health_status
+            , {{ classify_inventory_health(
+                'current_stock.quantity_on_hand',
+                'inventory_demand.average_daily_sales_90d'
+            ) }} as inventory_health_status
 
             , case
                 when current_stock.quantity_on_hand = 0

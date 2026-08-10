@@ -116,11 +116,15 @@ models:
 
       - name: inventory_health_status
         description: >
-          Inventory health classification based on the 90-day average demand.
-          Values are out_of_stock for zero inventory, critical for coverage of
-          up to 7 days, attention for coverage above 7 and up to 15 days,
-          healthy for coverage above 15 days, and no_recent_sales when no
-          demand exists in the 90-day analysis window.
+          Inventory health classification based on the 90-day average demand,
+          computed by the classify_inventory_health macro (shared with
+          fct_inventory_replenishment.inventory_health_status, which
+          reproduces the same classification independently rather than via a
+          join between the two facts). Values are out_of_stock for zero
+          inventory, critical for coverage of up to 7 days, attention for
+          coverage above 7 and up to 15 days, healthy for coverage above 15
+          days, and no_recent_sales when no demand exists in the 90-day
+          analysis window.
         tests:
           - accepted_values:
               arguments:

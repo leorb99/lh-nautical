@@ -186,3 +186,29 @@ models:
           the recommended stock target.
         tests:
           - not_null
+
+      - name: inventory_health_status
+        description: >
+          Inventory health classification, identical in meaning to
+          fct_current_inventory.inventory_health_status and computed by the
+          same shared macro (classify_inventory_health) rather than a join
+          between the two facts: both share quantity_on_hand and
+          average_daily_sales_90d at the product_variant_id + location_id
+          grain, sourced from the same two intermediate models, so the two
+          facts agree by construction. Values are out_of_stock for zero
+          inventory, critical for coverage of up to 7 days, attention for
+          coverage above 7 and up to 15 days, healthy for coverage above 15
+          days, and no_recent_sales when no demand exists in the 90-day
+          analysis window. Use this field, joined to dim_locations by
+          location_id, for the "locations with the most critical items"
+          matrix.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - out_of_stock
+                  - critical
+                  - attention
+                  - healthy
+                  - no_recent_sales
