@@ -94,6 +94,13 @@ models:
           Analytical return timestamp derived from the source created_at field.
           Future-dated values remain null until the registered date is reached.
 
+      - name: return_date
+        description: >
+          Date-only grain of returned_at, derived with the same future-date
+          check so it's always consistent with it. Use this column (not
+          returned_at) to relate fct_returns to dim_dates and for period-based
+          DAX.
+
       - name: is_future_return_date
         description: >
           Indicates whether the source return timestamp is later than the
