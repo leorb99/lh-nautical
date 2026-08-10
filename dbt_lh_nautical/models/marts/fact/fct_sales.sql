@@ -46,6 +46,7 @@ with
             , orders.order_status
             , orders.fiscal_invoice_status
             , orders.placed_at
+            , orders.order_date
 
             -- Centralized business classifications defined in int_orders
             , orders.is_effective_sale
@@ -138,6 +139,7 @@ with
             , order_status
             , fiscal_invoice_status
             , placed_at
+            , order_date
             , is_effective_sale
             , is_paid_sale_pending_invoice_fix
 
