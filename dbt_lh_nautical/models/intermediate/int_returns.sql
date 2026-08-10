@@ -47,6 +47,14 @@ with
                 else returns.created_at
             end as returned_at
 
+            -- Date-only grain of returned_at, mirroring the same future-date check so
+            -- it never disagrees with the timestamp. Needed to relate returns to
+            -- dim_dates (a timestamp can't join a date-typed key).
+            , case
+                when returns.created_at > current_timestamp() then null
+                else cast(returns.created_at as date)
+            end as return_date
+
             , returns.updated_at
 
             -- Distinguishes a future date invalidated by the quality rule

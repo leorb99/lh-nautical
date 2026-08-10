@@ -114,6 +114,12 @@ models:
           are nullified upstream and are not considered valid for effective
           sales.
 
+      - name: order_date
+        description: >
+          Date-only grain of placed_at, cast after the future-timestamp check so
+          it's always consistent with it. Use this column (not placed_at) to
+          relate fct_sales to dim_dates and for period-based DAX.
+
       - name: is_effective_sale
         description: >
           Business classification indicating whether the parent order qualifies

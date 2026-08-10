@@ -93,6 +93,10 @@ with
             , cleaned_orders.order_discount_amount
             , cleaned_orders.order_total_amount
             , cleaned_orders.placed_at
+            -- Date-only grain of placed_at, derived after nullify_future_date so it
+            -- never disagrees with the timestamp it's truncated from. Needed to relate
+            -- orders to dim_dates (a timestamp can't join a date-typed key).
+            , cast(cleaned_orders.placed_at as date) as order_date
             , cleaned_orders.created_at
             , cleaned_orders.updated_at
 

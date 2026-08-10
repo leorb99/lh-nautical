@@ -24,6 +24,7 @@ with
             , return_item_total_refund_amount
             , return_total_refund_amount
             , returned_at
+            , return_date
             , is_future_return_date
             , is_effective_return
             , is_exchange
