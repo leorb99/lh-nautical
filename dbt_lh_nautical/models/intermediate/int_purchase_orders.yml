@@ -41,7 +41,11 @@ models:
                   - cancelled
 
       - name: purchase_order_currency
-        description: "The currency used for the purchase order amounts (e.g., BRL, USD)"
+        description: >
+          The currency used for the purchase order amounts (BRL, USD or
+          EUR). No exchange-rate conversion is applied; see
+          fct_purchases.purchase_order_currency for the known limitation
+          this creates for any future cross-currency KPI.
         tests:
           - not_null
 

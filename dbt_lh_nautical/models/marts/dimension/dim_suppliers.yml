@@ -162,6 +162,16 @@ models:
                   - observed_history
                   - declared_only
 
+      - name: lead_time_variance_days
+        description: >
+          observed_median_lead_time_days minus declared_average_lead_time_days.
+          Negative means the supplier delivers faster than it promises,
+          positive means it delivers slower. This is the field that
+          answers "which suppliers overpromise on lead time", something
+          neither raw column shows on its own. Null whenever either side
+          is missing, which today only happens for a declared_only
+          supplier (no observed value to compare against yet).
+
       - name: created_at
         description: "Timestamp when the supplier record was created."
 

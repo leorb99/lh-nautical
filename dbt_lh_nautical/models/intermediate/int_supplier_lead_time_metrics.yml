@@ -79,3 +79,11 @@ models:
                 values:
                   - observed_history
                   - declared_only
+
+      - name: lead_time_variance_days
+        description: >
+          observed_median_lead_time_days minus declared_average_lead_time_days.
+          Negative means the supplier delivers faster than it promises,
+          positive means it delivers slower. Null whenever either side is
+          missing, which today only happens for a declared_only supplier
+          (no observed value to compare against yet).

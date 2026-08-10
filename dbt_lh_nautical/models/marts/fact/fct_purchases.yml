@@ -60,7 +60,14 @@ models:
                   - cancelled
 
       - name: purchase_order_currency
-        description: "The currency used for the purchase order amounts"
+        description: >
+          The currency used for the purchase order amounts (BRL, USD or
+          EUR). No exchange-rate conversion is applied anywhere in this
+          model. Does not affect the two current Block 6 KPIs (supplier
+          ranking, open purchase order count), neither sums cost across
+          orders, but is a known limitation for any future KPI that would
+          sum purchase_order_item_unit_cost or purchase_order_item_line_total
+          across orders placed in different currencies.
         tests:
           - not_null
 

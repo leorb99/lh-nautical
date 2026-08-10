@@ -84,6 +84,15 @@ with
                 else 'declared_only'
             end as lead_time_source
 
+            -- Signals suppliers who promise one lead time and deliver in
+            -- another: negative means the supplier delivers faster than
+            -- promised, positive means it delivers slower. Null whenever
+            -- either side is missing (e.g. declared_only suppliers, since
+            -- there is no observed value to compare against yet).
+            , observed_lead_time.observed_median_lead_time_days
+            - declared_lead_time.declared_average_lead_time_days
+                as lead_time_variance_days
+
         from observed_lead_time
 
         full outer join declared_lead_time

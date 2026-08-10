@@ -46,6 +46,7 @@ with
             , lead_time_metrics.declared_average_lead_time_days
             , lead_time_metrics.selected_lead_time_days
             , lead_time_metrics.lead_time_source
+            , lead_time_metrics.lead_time_variance_days
 
             , suppliers.created_at
             , suppliers.updated_at
