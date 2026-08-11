@@ -13,12 +13,30 @@ with
     , categories as (
         select
             child.category_id
-            , child.category_name
+
+            -- Trims and collapses internal whitespace only: initcap()-based
+            -- capitalization macros were tried and rejected here, they strip
+            -- hyphens (breaks "Salva-Vidas") and mangle words after them.
+            -- The one known bad value ('SEGURANÇA', all caps, unlike every
+            -- other category) is corrected explicitly instead, since no
+            -- general-purpose casing fix proved safe against real data.
+            , case
+                when {{ trim_collapse_whitespace('child.category_name') }} = 'SEGURANÇA'
+                    then 'Segurança'
+                else {{ trim_collapse_whitespace('child.category_name') }}
+            end as category_name
+
             , child.category_url_slug
             , case when child.created_at > current_timestamp() then null else child.created_at end as category_created_at
             , case when child.updated_at > current_timestamp() then null else child.updated_at end as category_updated_at
             , parent.category_id as parent_category_id
-            , parent.category_name as parent_category_name
+
+            , case
+                when {{ trim_collapse_whitespace('parent.category_name') }} = 'SEGURANÇA'
+                    then 'Segurança'
+                else {{ trim_collapse_whitespace('parent.category_name') }}
+            end as parent_category_name
+
             , child.is_active as is_category_active
         from {{ ref('stg_categories') }} as child
         left join {{ ref('stg_categories') }} as parent
@@ -57,7 +75,15 @@ with
             , cleaned_products.product_created_at
             , cleaned_products.product_updated_at
             , brands.brand_id
-            , brands.brand_name
+
+            -- Trim + whitespace collapse only, same reasoning as category_name
+            -- above: initcap()-based capitalization was tried and rejected,
+            -- it would turn "BR Náutica" into "Br Náutica" and "MaxSea" into
+            -- "Maxsea", destroying intentional capitalization in real brand
+            -- names. No known bad value here to correct explicitly, unlike
+            -- category's 'SEGURANÇA'.
+            , {{ trim_collapse_whitespace('brands.brand_name') }} as brand_name
+
             , brands.brand_country
             , brands.is_active as is_brand_active
             , case when brands.created_at > current_timestamp() then null else brands.created_at end as brand_created_at

@@ -13,3 +13,12 @@ seeds:
     config:
       column_types:
         valid_colors: string
+
+  - name: valid_materials
+    description: >
+      List of valid product materials, used to fuzzy-correct typos in
+      attr_material via Levenshtein distance, the same approach already
+      used for attr_color against valid_colors.
+    config:
+      column_types:
+        valid_materials: string

@@ -14,6 +14,11 @@ with
         from {{ ref('valid_colors') }}
     )
 
+    , valid_materials as (
+        select *
+        from {{ ref('valid_materials') }}
+    )
+
     , cleaned_raw_values as (
         select
             product_variant_id
@@ -64,12 +69,51 @@ with
             , attribute_name
             , raw_value
             , min_by(valid_colors, distance) as best_match_color
-            , min(distance) as distance
+            , min(distance) as color_distance
         from color_distances
         group by 1, 2, 3
     )
 
-    -- Combines the original data with the match fuzzy
+    -- Prepares the material strings before cross join, same approach as colors above
+    , normalized_materials as (
+        select
+            product_variant_id
+            , attribute_name
+            , raw_value
+            , trim(lower(raw_value)) as normalized_raw_value
+        from joined_attributes
+        where
+            attribute_name = 'material'
+            and raw_value is not null
+    )
+
+    -- Cross join to calculate Levenshtein distance between normalized raw values and valid materials
+    , material_distances as (
+        select
+            normalized_materials.product_variant_id
+            , normalized_materials.attribute_name
+            , normalized_materials.raw_value
+            , valid_materials.valid_materials
+            , levenshtein(normalized_materials.normalized_raw_value, valid_materials.valid_materials) as distance
+        from normalized_materials
+        cross join valid_materials
+    )
+
+    -- Agregation to find the best match for each product_variant_id and attribute_name
+    , fuzzy_matched_materials as (
+        select
+            product_variant_id
+            , attribute_name
+            , raw_value
+            , min_by(valid_materials, distance) as best_match_material
+            , min(distance) as material_distance
+        from material_distances
+        group by 1, 2, 3
+    )
+
+    -- Combines the original data with both fuzzy matches. attribute_name
+    -- partitions color/material/etc, so only one of the two joins ever
+    -- contributes a non-null match per row.
     , combined_with_fuzzy as (
         select
             joined_attributes.product_variant_id
@@ -77,12 +121,18 @@ with
             , joined_attributes.attribute_data_type
             , joined_attributes.raw_value
             , fuzzy_matched_colors.best_match_color
-            , fuzzy_matched_colors.distance
+            , fuzzy_matched_colors.color_distance
+            , fuzzy_matched_materials.best_match_material
+            , fuzzy_matched_materials.material_distance
         from joined_attributes
         left join fuzzy_matched_colors
             on
                 joined_attributes.product_variant_id = fuzzy_matched_colors.product_variant_id
                 and joined_attributes.attribute_name = fuzzy_matched_colors.attribute_name
+        left join fuzzy_matched_materials
+            on
+                joined_attributes.product_variant_id = fuzzy_matched_materials.product_variant_id
+                and joined_attributes.attribute_name = fuzzy_matched_materials.attribute_name
     )
 
     , cleaned_values as (
@@ -99,7 +149,16 @@ with
                                     -- If the difference is up to 2 characters, accept the correctionormalized_colors.
                                     -- If it is greater, set it to NULL.
                                     case
-                                        when distance <= 2 then best_match_color
+                                        when color_distance <= 2 then best_match_color
+                                    end
+
+                            when attribute_name = 'material'
+                                then
+                                    -- Same approach as color: accept the fuzzy correction only
+                                    -- up to a distance of 2, otherwise NULL rather than a
+                                    -- guessed, possibly wrong, material.
+                                    case
+                                        when material_distance <= 2 then best_match_material
                                     end
 
                             when attribute_name = 'size'

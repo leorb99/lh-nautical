@@ -14,12 +14,26 @@ models:
           - not_null
 
       - name: product_name
-        description: "Normalized product name, using description fallback when necessary."
+        description: >
+          Product name. Falls back to the first 40 characters of
+          product_description when the name itself is missing or garbage,
+          and to a traceable "Produto Não Identificado (ID: ...)" placeholder
+          when both are missing.
+
+          Casing is preserved as-is from the source (only trimmed): this
+          field no longer forces lowercase. It previously did, as a side
+          effect of the garbage-value detection macro (nullify_garbage)
+          lowercasing its entire return value, not just the comparison used
+          to detect placeholder text.
         tests:
           - not_null
 
       - name: product_description
-        description: "Cleaned product description with placeholder values removed."
+        description: >
+          Product description with known placeholder/garbage values (e.g.
+          "n/a", "todo", "TODO: add description", "asdf") nulled out via
+          nullify_garbage. Casing is preserved as-is from the source (only
+          trimmed), same correction as product_name above.
       
       - name: product_ncm_code
         description: "NCM classification code for the product."
@@ -42,7 +56,12 @@ models:
           - not_null
             
       - name: brand_name
-        description: "Name of the product brand."
+        description: >
+          Name of the product brand, trimmed with internal whitespace
+          collapsed to a single space. No capitalization is applied: an
+          initcap()-based fix was tried and rejected, since it corrupts real
+          brand names in this catalog (e.g. "BR Náutica" becomes
+          "Br Náutica", "MaxSea" becomes "Maxsea").
       
       - name: brand_country
         description: "Country of origin for the brand."
@@ -62,7 +81,18 @@ models:
           - not_null
       
       - name: category_name
-        description: "Name of the product category."
+        description: >
+          Name of the product category, trimmed with internal whitespace
+          collapsed to a single space. No general-purpose capitalization is
+          applied: it would corrupt real values, e.g. turning
+          "Coletes Salva-Vidas" into "Coletes Salva-vidas" (initcap alone) or
+          "Coletes SalvaVidas" (initcap() combined with a title-removal regex
+          that also strips hyphens).
+
+          The one confirmed bad value, 'SEGURANÇA' (all caps, unlike every
+          other category in this table), is corrected explicitly to
+          'Segurança' instead, since no general casing rule proved safe
+          against the rest of the real category list.
       
       - name: category_url_slug
         description: "URL slug for the product category."
@@ -71,7 +101,13 @@ models:
         description: "Foreign key to the parent category."
       
       - name: parent_category_name
-        description: "Name of the parent category."
+        description: >
+          Name of the parent category. Same cleaning as category_name above
+          (trim, whitespace collapse, no capitalization, explicit
+          'SEGURANÇA' correction): both columns are sourced from the same
+          stg_categories.category_name, one via the child alias and one via
+          the parent alias of the self-join, so the same category can appear
+          through either column.
       
       - name: is_category_active
         description: "Indicates whether the related category is active."
