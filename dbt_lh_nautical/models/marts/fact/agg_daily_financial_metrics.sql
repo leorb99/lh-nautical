@@ -38,8 +38,13 @@ with
             , sum(order_item_quantity) as sold_item_quantity
             , sum(completed_returned_quantity) as returned_item_quantity
             , sum(completed_refund_amount) as completed_refund_amount
-            , sum(
-                order_item_net_revenue_after_returns
+
+            -- Cast to decimal(14,2): same unbounded-precision issue as
+            -- average_ticket_amount/return_quantity_rate below, caught via
+            -- information_schema rather than by a test.
+            , cast(
+                sum(order_item_net_revenue_after_returns)
+                as decimal(14, 2)
             ) as net_revenue_amount
         from effective_sales
         group by cast(placed_at as date)
@@ -178,25 +183,36 @@ with
             , pending_invoice_order_count
             , pending_invoice_revenue_amount
 
+            -- Cast to a fixed scale: division between DECIMAL columns widens
+            -- precision automatically. Target scale matches the tolerance of
+            -- assert_daily_average_ticket_reconciles (0.01) and
+            -- assert_daily_return_rate_reconciles (0.000001) below.
+            --
             -- Average official order value for effective sales.
-            , case
-                when effective_order_count > 0
-                    then (
-                        effective_order_revenue_amount
-                        / effective_order_count
-                    )
-                else 0
-            end as average_ticket_amount
+            , cast(
+                case
+                    when effective_order_count > 0
+                        then (
+                            effective_order_revenue_amount
+                            / effective_order_count
+                        )
+                    else 0
+                end
+                as decimal(14, 2)
+            ) as average_ticket_amount
 
             -- Quantity-based return rate for effective sales.
-            , case
-                when sold_item_quantity > 0
-                    then (
-                        returned_item_quantity
-                        / sold_item_quantity
-                    )
-                else 0
-            end as return_quantity_rate
+            , cast(
+                case
+                    when sold_item_quantity > 0
+                        then (
+                            returned_item_quantity
+                            / sold_item_quantity
+                        )
+                    else 0
+                end
+                as decimal(14, 6)
+            ) as return_quantity_rate
 
         from combined_metrics
     )

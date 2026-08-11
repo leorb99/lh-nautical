@@ -60,9 +60,13 @@ models:
 
       - name: order_subtotal_amount
         description: "The gross total amount of items before discounts."
+        data_tests:
+          - not_null
 
       - name: order_discount_amount
         description: "The total discount amount applied to the order."
+        data_tests:
+          - not_null
 
       - name: order_total_amount
         description: "The final total amount of the order after discounts."

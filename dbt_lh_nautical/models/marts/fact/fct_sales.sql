@@ -112,6 +112,14 @@ with
             -- nullif prevents division by zero. The upstream data-quality test
             -- on order_subtotal_amount is responsible for surfacing invalid
             -- zero-subtotal orders.
+            --
+            -- Deliberately not cast/rounded here: this value is summed across
+            -- every item of an order in
+            -- assert_order_item_discount_allocation_reconciles, which requires
+            -- full precision per item to reconcile with the order's discount
+            -- amount. Rounding at this row level was tried and broke that
+            -- test. If display precision needs to be controlled, do it in the
+            -- BI tool's number formatting, not here.
             , order_item_net_revenue - (
                 order_discount_amount
                 * order_item_line_total
