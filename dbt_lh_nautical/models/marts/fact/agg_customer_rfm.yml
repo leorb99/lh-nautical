@@ -35,6 +35,20 @@ models:
           - unique
           - not_null
 
+      - name: first_order_at
+        description: >
+          Timestamp of the customer's first effective sale, i.e. the date the
+          customer was acquired. Not to be confused with
+          dim_customers.created_at, which is account registration and may not
+          match the date of the first actual purchase.
+
+          This is the field to use for a cumulative customer-acquisition
+          chart (running distinct count of customers whose first_order_at is
+          on or before the date in context). last_order_at is the wrong field
+          for that chart: it would count reactivations as new acquisitions.
+        tests:
+          - not_null
+
       - name: last_order_at
         description: "Timestamp of the customer's most recent effective sale."
         tests:
@@ -87,3 +101,6 @@ models:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "monetary_amount > 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "first_order_at <= last_order_at"

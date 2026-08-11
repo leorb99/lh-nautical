@@ -122,6 +122,16 @@ with
                 else false
             end as is_replenishment_required
 
+            -- Same classification as fct_current_inventory.inventory_health_status,
+            -- via a shared macro: both models have quantity_on_hand and
+            -- average_daily_sales_90d at the same grain, sourced from the
+            -- same two intermediate models, so the two facts agree by
+            -- construction without a cross-fact join.
+            , {{ classify_inventory_health(
+                'quantity_on_hand',
+                'average_daily_sales_90d'
+            ) }} as inventory_health_status
+
         from replenishment_calculations
     )
 

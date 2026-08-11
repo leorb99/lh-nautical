@@ -95,19 +95,49 @@ models:
         description: Lead time selected through the fallback hierarchy.
 
       - name: lead_time_source
-        description: Source used to determine the selected lead time.
+        description: >
+          Source used to determine the selected lead time, following the
+          fallback hierarchy defined in int_inventory_replenishment_inputs:
+          product_location_history, then product_history, then
+          global_history, then default_7_days as the last resort.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - product_location_history
+                  - product_history
+                  - global_history
+                  - default_7_days
 
       - name: lead_time_observation_count
         description: Number of historical observations supporting the lead time.
 
       - name: lead_time_confidence
-        description: Confidence classification for the selected lead time.
+        description: >
+          Confidence classification for the selected lead time. Only
+          product_location_history can reach high (10+ observations) or
+          medium (3-9); any other source caps at low, and assumed is used
+          when no history exists at any level.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - high
+                  - medium
+                  - low
+                  - assumed
 
       - name: is_lead_time_estimated
         description: Indicates whether a fallback lead time was used.
+        tests:
+          - not_null
 
       - name: is_demand_history_missing
         description: Indicates absence of valid demand history in the 90-day window.
+        tests:
+          - not_null
 
       - name: demand_during_lead_time
         description: >
@@ -145,6 +175,8 @@ models:
           quantity_on_hand is lower than demand_during_lead_time. Open purchase
           orders are not included in this flag because it measures exposure
           before replenishment arrives.
+        tests:
+          - not_null
 
       - name: is_replenishment_required
         description: >
@@ -152,3 +184,31 @@ models:
           is positive and current stock is at or below the source reorder point,
           or when current stock plus open purchase-order quantity remains below
           the recommended stock target.
+        tests:
+          - not_null
+
+      - name: inventory_health_status
+        description: >
+          Inventory health classification, identical in meaning to
+          fct_current_inventory.inventory_health_status and computed by the
+          same shared macro (classify_inventory_health) rather than a join
+          between the two facts: both share quantity_on_hand and
+          average_daily_sales_90d at the product_variant_id + location_id
+          grain, sourced from the same two intermediate models, so the two
+          facts agree by construction. Values are out_of_stock for zero
+          inventory, critical for coverage of up to 7 days, attention for
+          coverage above 7 and up to 15 days, healthy for coverage above 15
+          days, and no_recent_sales when no demand exists in the 90-day
+          analysis window. Use this field, joined to dim_locations by
+          location_id, for the "locations with the most critical items"
+          matrix.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - out_of_stock
+                  - critical
+                  - attention
+                  - healthy
+                  - no_recent_sales

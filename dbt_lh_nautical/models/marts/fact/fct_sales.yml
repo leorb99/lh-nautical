@@ -147,7 +147,11 @@ models:
       - name: order_item_quantity
         description: >
           Quantity of units sold in the order item before completed returns are
-          deducted.
+          deducted. The denominator for any return-rate-by-category or
+          return-rate-by-product measure built from this table
+          (completed_returned_quantity divided by order_item_quantity).
+        tests:
+          - not_null
 
       - name: order_item_unit_price
         description: >
@@ -247,3 +251,6 @@ models:
       - dbt_utils.equal_rowcount:
           arguments:
             compare_model: ref('int_order_items')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_item_quantity > 0"
