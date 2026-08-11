@@ -5,7 +5,9 @@ models:
     description: >
       Supplier dimension with one row per supplier. Contains identification,
       contact, country and activity-status attributes for procurement and
-      inventory analyses.
+      inventory analyses, plus a combined lead-time metric (observed
+      receiving history, falling back to the declared catalog quote) for
+      the supplier ranking dashboard card.
 
     columns:
       - name: supplier_sk
@@ -20,19 +22,34 @@ models:
           - not_null
 
       - name: supplier_legal_name
-        description: "Registered legal name of the supplier."
+        description: >
+          Registered legal name of the supplier, trimmed with internal
+          whitespace collapsed to a single space (via int_suppliers). Not
+          capitalization-normalized, same reasoning as brand_name/
+          category_name elsewhere in the project: a general casing rule
+          would risk corrupting real values like "S.A." abbreviations.
         tests:
           - not_null
         databricks_tags:
           data_classification: "sensitive"
 
       - name: supplier_trade_name
-        description: "Commercial or trade name of the supplier."
+        description: >
+          Commercial or trade name of the supplier, same whitespace
+          cleaning as supplier_legal_name above. One confirmed bad source
+          value ("das", a standalone Portuguese preposition with no
+          business meaning as a trade name) is nulled explicitly in
+          int_suppliers, so it falls back to the legal name in
+          supplier_display_name below instead of displaying as "das".
 
       - name: supplier_display_name
         description: >
           Preferred supplier name for reporting, using the trade name when
-          available and the legal name otherwise.
+          available and the legal name otherwise. Reflects the cleaning
+          applied to both source columns: no longer shows a bare "das" for
+          the supplier whose trade name was that single confirmed bad
+          value, or a stray leading space for any supplier whose trade
+          name had one.
         tests:
           - not_null
 
@@ -73,7 +90,9 @@ models:
           data_classification: "pii"
 
       - name: supplier_contact_name
-        description: "Main contact person at the supplier."
+        description: >
+          Main contact person at the supplier, same whitespace cleaning as
+          supplier_legal_name above.
         databricks_tags:
           data_classification: "pii"
 
@@ -91,6 +110,67 @@ models:
                 values:
                   - active
                   - inactive
+
+      - name: observed_median_lead_time_days
+        description: >
+          Median lead time in days actually observed between purchase
+          order placement and first goods receipt, across every product
+          bought from this supplier (from int_supplier_lead_time_metrics).
+          Null when the supplier has no valid receiving history yet, in
+          which case declared_average_lead_time_days is used instead (see
+          selected_lead_time_days).
+
+      - name: observed_average_lead_time_days
+        description: >
+          Average observed lead time in days, same source and null
+          condition as observed_median_lead_time_days above.
+
+      - name: observed_lead_time_observation_count
+        description: >
+          Number of valid receipt observations backing the two observed
+          metrics above. Every supplier in this business currently has at
+          least 105 observations.
+
+      - name: declared_average_lead_time_days
+        description: >
+          Average of the lead_time_days quoted in the product-supplier
+          catalog (bridge_product_suppliers) across every product this
+          supplier provides. Consistently higher than
+          observed_median_lead_time_days for every supplier today (by 5
+          to 14 days), suppliers appear to quote longer lead times than
+          they actually deliver in.
+
+      - name: selected_lead_time_days
+        description: >
+          Combined lead time used for the "supplier ranking by lead time"
+          dashboard card. Uses observed history whenever it exists
+          (currently every supplier), falls back to the declared catalog
+          average otherwise. See lead_time_source to know which one was
+          used for a given supplier.
+        tests:
+          - not_null
+
+      - name: lead_time_source
+        description: >
+          Which value selected_lead_time_days came from: observed_history
+          when receiving history exists, declared_only otherwise.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - observed_history
+                  - declared_only
+
+      - name: lead_time_variance_days
+        description: >
+          observed_median_lead_time_days minus declared_average_lead_time_days.
+          Negative means the supplier delivers faster than it promises,
+          positive means it delivers slower. This is the field that
+          answers "which suppliers overpromise on lead time", something
+          neither raw column shows on its own. Null whenever either side
+          is missing, which today only happens for a declared_only
+          supplier (no observed value to compare against yet).
 
       - name: created_at
         description: "Timestamp when the supplier record was created."
