@@ -51,7 +51,10 @@ with
             -- Some products lack name information, so we use a limited version of the description to name them.
             -- If the description is also null, we have a traceable placeholder.
             , coalesce(
-                {{ nullify_garbage('products.product_name') }}
+                {{ nullify_garbage("case 
+                        when products.product_name like '%Caboo%' then replace(products.product_name, 'Caboo', 'Cabo')
+                        else products.product_name
+                    end") }}
                 , left({{ nullify_garbage('products.product_description') }}, 40)
                 , 'Produto Não Identificado (ID: ' || cast(products.product_id as string) || ')'
             ) as product_name

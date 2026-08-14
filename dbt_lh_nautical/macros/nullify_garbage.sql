@@ -10,7 +10,7 @@
     case
         when trim(lower({{ column_name }})) in (
             'asdf', '???', '??', '?', 'fixme', 'n/a', 'null', 'test', 'todo', 'xxx', '.', 'tbd', '--', '-', 'todo: add description',
-            'cliente genérico', 'genérico', 'joão da silva', 'nao informado', 'não informado', 'caboo náutico 4942'
+            'cliente genérico', 'genérico', 'joão da silva', 'nao informado', 'não informado'
         ) then null
         else trim({{ column_name }})
     end
