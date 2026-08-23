@@ -129,6 +129,19 @@ with
         from sales_with_returns
     )
 
+    -- Human-readable label for BI/presentation layers, derived once from
+    -- order_channel so the source values stay the single source of truth.
+    , labeled as (
+        select
+            *
+            , case order_channel
+                when 'ecommerce' then 'E-commerce'
+                when 'pos' then 'Loja Física'
+                else initcap(order_channel)
+            end as order_channel_label
+        from calculated_sales
+    )
+
     , final as (
         select
             -- Keys
@@ -144,6 +157,7 @@ with
             -- Order attributes and sales classifications
             , order_number
             , order_channel
+            , order_channel_label
             , order_status
             , fiscal_invoice_status
             , placed_at
@@ -178,7 +192,7 @@ with
                 - completed_refund_amount
             ) as order_item_net_revenue_after_returns
 
-        from calculated_sales
+        from labeled
     )
 
 select *
