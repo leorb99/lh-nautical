@@ -97,6 +97,26 @@ models:
         description: >
           Sales channel through which the order originated, such as ecommerce
           or point of sale.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - ecommerce
+                  - pos
+
+      - name: order_channel_label
+        description: >
+          Human-readable Portuguese label for order_channel, for
+          BI/presentation layers (e.g. "ecommerce" -> "E-commerce", "pos" ->
+          "Loja Física"). Derived once from order_channel, not a separate
+          re-evaluation of channel logic.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - E-commerce
+                  - Loja Física
 
       - name: order_status
         description: >

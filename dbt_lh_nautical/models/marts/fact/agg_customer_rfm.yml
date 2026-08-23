@@ -91,6 +91,36 @@ models:
                   - hibernating
                   - needs_attention
 
+      - name: customer_segment_label
+        description: >
+          Human-readable version of customer_segment for BI/presentation
+          layers (e.g. "at_risk" -> "At Risk"), using the standard RFM
+          methodology terms. Derived once from the already-resolved
+          customer_segment, not a separate re-evaluation of the RFM rule.
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - Champions
+                  - Loyal
+                  - At Risk
+                  - New
+                  - Hibernating
+                  - Needs Attention
+
+      - name: customer_segment_sort_order
+        description: >
+          Display order for customer_segment_label by business value/
+          urgency (1 = Champions ... 6 = Hibernating), not alphabetical.
+          Use as the "sort by column" for customer_segment_label in BI
+          tools so segments render Champions, Loyal, At Risk, New, Needs
+          Attention, Hibernating instead of alphabetical order.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6]
+
     tests:
       - dbt_utils.expression_is_true:
           arguments:
