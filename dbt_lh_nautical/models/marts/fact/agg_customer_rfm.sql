@@ -111,5 +111,35 @@ with
         from scored
     )
 
+    -- Human-readable label for BI/presentation layers, derived once from
+    -- the already-resolved customer_segment so the priority-ordered rule
+    -- above stays the single source of truth (not re-evaluated here).
+    , labeled as (
+        select
+            *
+            , case customer_segment
+                when 'champions' then 'Champions'
+                when 'at_risk' then 'At Risk'
+                when 'loyal' then 'Loyal'
+                when 'new' then 'New'
+                when 'hibernating' then 'Hibernating'
+                when 'needs_attention' then 'Needs Attention'
+                else customer_segment
+            end as customer_segment_label
+            -- Sort key for BI (customer_segment_label is not alphabetically
+            -- meaningful): ranks segments by business value/urgency, not by
+            -- name. Use as the "sort by column" for customer_segment_label.
+            , case customer_segment
+                when 'champions' then 1
+                when 'loyal' then 2
+                when 'at_risk' then 3
+                when 'new' then 4
+                when 'needs_attention' then 5
+                when 'hibernating' then 6
+                else 7
+            end as customer_segment_sort_order
+        from final
+    )
+
 select *
-from final
+from labeled
