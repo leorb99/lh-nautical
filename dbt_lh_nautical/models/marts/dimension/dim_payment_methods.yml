@@ -14,3 +14,12 @@ models:
         description: "Name of the payment method used in the source payments data."
         tests:
           - not_null
+
+      - name: payment_method_label
+        description: >
+          Human-readable Portuguese label for payment_method_name, for
+          BI/presentation layers (e.g. "credit_card" -> "Cartão de Crédito").
+          Any value not explicitly mapped falls back to a capitalized version
+          of payment_method_name.
+        tests:
+          - not_null
