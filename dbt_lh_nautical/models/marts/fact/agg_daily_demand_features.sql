@@ -67,9 +67,10 @@ with
             , coalesce(daily_sales.quantity_sold, 0) as quantity_sold
         from date_spine
         left join daily_sales
-            on date_spine.product_variant_id = daily_sales.product_variant_id
-            and date_spine.location_id = daily_sales.location_id
-            and date_spine.date_day = daily_sales.order_date
+            on
+                date_spine.product_variant_id = daily_sales.product_variant_id
+                and date_spine.location_id = daily_sales.location_id
+                and date_spine.date_day = daily_sales.order_date
     )
 
     -- Lag and rolling-window features are computed on the gap-free grid, so
@@ -84,30 +85,30 @@ with
         select
             filled_grid.*
 
-            , lag(quantity_sold, 1) over (
-                partition by product_variant_id, location_id order by date_day
+            , lag(filled_grid.quantity_sold, 1) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
             ) as lag_1d
 
-            , lag(quantity_sold, 7) over (
-                partition by product_variant_id, location_id order by date_day
+            , lag(filled_grid.quantity_sold, 7) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
             ) as lag_7d
 
-            , lag(quantity_sold, 30) over (
-                partition by product_variant_id, location_id order by date_day
+            , lag(filled_grid.quantity_sold, 30) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
             ) as lag_30d
 
-            , avg(quantity_sold) over (
-                partition by product_variant_id, location_id order by date_day
+            , avg(filled_grid.quantity_sold) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
                 rows between 7 preceding and 1 preceding
             ) as moving_avg_7d
 
-            , avg(quantity_sold) over (
-                partition by product_variant_id, location_id order by date_day
+            , avg(filled_grid.quantity_sold) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
                 rows between 30 preceding and 1 preceding
             ) as moving_avg_30d
 
-            , avg(quantity_sold) over (
-                partition by product_variant_id, location_id order by date_day
+            , avg(filled_grid.quantity_sold) over (
+                partition by filled_grid.product_variant_id, filled_grid.location_id order by filled_grid.date_day
                 rows between 90 preceding and 1 preceding
             ) as moving_avg_90d
 
