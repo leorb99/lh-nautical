@@ -22,7 +22,7 @@ models:
       outside their real selling window.
 
       Lag and rolling-window features are computed over this gap-free
-      monthly grid, so zero-sale months are correctly reflected. Moving
+      monthly grid, so zero-sale months are correctly reflected. Rolling
       averages exclude the current month, to avoid leaking same-month
       information into a feature meant to represent recent trend.
 
@@ -84,10 +84,10 @@ models:
       - name: lag_12m
         description: "quantity_sold for this same product+location+customer_state, 12 months before month_start (same month, prior year)."
 
-      - name: moving_avg_3m
+      - name: rolling_avg_3m
         description: "Average quantity_sold over the 3 months strictly before month_start (excludes month_start itself)."
 
-      - name: moving_avg_6m
+      - name: rolling_avg_6m
         description: "Average quantity_sold over the 6 months strictly before month_start (excludes month_start itself)."
 
     tests:

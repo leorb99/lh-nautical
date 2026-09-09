@@ -132,10 +132,10 @@ with
     )
 
     -- Lag and rolling-window features are computed on the gap-free grid, so
-    -- zero-sale months are correctly reflected in both lags and moving
+    -- zero-sale months are correctly reflected in both lags and rolling
     -- averages, not silently skipped.
     --
-    -- Moving averages deliberately exclude the current month (ROWS BETWEEN
+    -- Rolling averages deliberately exclude the current month (ROWS BETWEEN
     -- n PRECEDING AND 1 PRECEDING) to avoid leaking same-month information
     -- into a feature meant to represent "recent trend up to, but not
     -- including, this month."
@@ -172,13 +172,13 @@ with
                 partition by filled_grid.product_id, filled_grid.location_id, filled_grid.customer_state
                 order by filled_grid.month_start
                 rows between 3 preceding and 1 preceding
-            ) as moving_avg_3m
+            ) as rolling_avg_3m
 
             , avg(filled_grid.quantity_sold) over (
                 partition by filled_grid.product_id, filled_grid.location_id, filled_grid.customer_state
                 order by filled_grid.month_start
                 rows between 6 preceding and 1 preceding
-            ) as moving_avg_6m
+            ) as rolling_avg_6m
 
         from filled_grid
     )
@@ -200,8 +200,8 @@ with
             , with_lag_and_rolling_features.lag_6m
             , with_lag_and_rolling_features.lag_12m
 
-            , with_lag_and_rolling_features.moving_avg_3m
-            , with_lag_and_rolling_features.moving_avg_6m
+            , with_lag_and_rolling_features.rolling_avg_3m
+            , with_lag_and_rolling_features.rolling_avg_6m
 
         from with_lag_and_rolling_features
 
