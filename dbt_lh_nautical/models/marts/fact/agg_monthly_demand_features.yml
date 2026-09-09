@@ -1,0 +1,96 @@
+version: 2
+
+models:
+  - name: agg_monthly_demand_features
+    description: >
+      Monthly, regional demand feature table for the Checkpoint 5
+      forecasting models. Replaces the earlier daily/product-only
+      agg_daily_demand_features with the monthly + customer-state grain
+      requested for the regression models.
+
+      Grain: one row per product_id, location_id, customer_state, and
+      month_start.
+
+      Scope:
+      Only product+location+customer_state combinations with at least one
+      effective sale in their history are included. The calendar is spined
+      across each combination's own active month range (its first sale to
+      its last), so every month is represented — months with no sale appear
+      with quantity_sold = 0 rather than being absent. Using each
+      combination's own range (instead of one range shared by all) avoids
+      padding newer or discontinued combinations with zero-demand months
+      outside their real selling window.
+
+      Lag and rolling-window features are computed over this gap-free
+      monthly grid, so zero-sale months are correctly reflected. Moving
+      averages exclude the current month, to avoid leaking same-month
+      information into a feature meant to represent recent trend.
+
+      product_name/location_name are exposed alongside product_id/
+      location_id: dim_products has 500 distinct product_id but only 496
+      distinct product_name, so grouping or joining by name alone would
+      silently merge unrelated products.
+
+    columns:
+      - name: product_id
+        description: "Foreign key identifying the product (variants rolled up). Grain-defining column."
+        tests:
+          - not_null
+
+      - name: product_name
+        description: "Product name, from dim_products. Not unique on its own — use product_id for grouping/joins."
+
+      - name: location_id
+        description: "Foreign key identifying the business location. Grain-defining column."
+        tests:
+          - not_null
+
+      - name: location_name
+        description: "Business location name, from dim_locations."
+
+      - name: location_state
+        description: "State (UF) where the selling location is based, from dim_locations."
+
+      - name: customer_state
+        description: "State (UF) of the customer's primary address, from dim_customers. Grain-defining column: demand is split by this in addition to product and location."
+        tests:
+          - not_null
+
+      - name: month_start
+        description: "Calendar month (first day of month). Grain-defining column, spined across each active product+location+customer_state combination's full month range."
+        tests:
+          - not_null
+
+      - name: quantity_sold
+        description: >
+          Total quantity sold for this product+location+customer_state in
+          this month, from effective sales. 0 when the combination was
+          active but had no sale that month, not null/absent.
+        tests:
+          - not_null
+
+      - name: lag_1m
+        description: "quantity_sold for this same product+location+customer_state, 1 month before month_start."
+
+      - name: lag_2m
+        description: "quantity_sold for this same product+location+customer_state, 2 months before month_start."
+
+      - name: lag_3m
+        description: "quantity_sold for this same product+location+customer_state, 3 months before month_start."
+
+      - name: lag_6m
+        description: "quantity_sold for this same product+location+customer_state, 6 months before month_start."
+
+      - name: lag_12m
+        description: "quantity_sold for this same product+location+customer_state, 12 months before month_start (same month, prior year)."
+
+      - name: moving_avg_3m
+        description: "Average quantity_sold over the 3 months strictly before month_start (excludes month_start itself)."
+
+      - name: moving_avg_6m
+        description: "Average quantity_sold over the 6 months strictly before month_start (excludes month_start itself)."
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "quantity_sold >= 0"
