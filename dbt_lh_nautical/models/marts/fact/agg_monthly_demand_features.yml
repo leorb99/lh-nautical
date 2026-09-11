@@ -3,92 +3,96 @@ version: 2
 models:
   - name: agg_monthly_demand_features
     description: >
-      Monthly, regional demand feature table for the Checkpoint 5
-      forecasting models. Replaces the earlier daily/product-only
-      agg_daily_demand_features with the monthly + customer-state grain
-      requested for the regression models.
+      Monthly demand feature table for the Checkpoint 5 forecasting models.
+      National total per product (all locations combined).
 
-      Grain: one row per product_id, location_id, customer_state, and
-      month_start.
+      Grain: one row per product_name and month_start.
+
+      Products are deliberately grouped by product_name, not product_id:
+      dim_products has 500 distinct product_id but only 496 distinct
+      product_name, and the handful of catalog entries that share a name
+      are near-duplicates of the same real-world product. Merging them on
+      purpose pools their sales history together instead of splitting an
+      already sparse signal further.
 
       Scope:
-      Only product+location+customer_state combinations with at least one
-      effective sale in their history are included. The calendar is spined
-      across each combination's own active month range (its first sale to
-      its last), so every month is represented — months with no sale appear
-      with quantity_sold = 0 rather than being absent. Using each
-      combination's own range (instead of one range shared by all) avoids
-      padding newer or discontinued combinations with zero-demand months
-      outside their real selling window.
+      Only products with at least one effective sale in their history are
+      included. The calendar is spined across each product's own active
+      month range (its first sale to its last), so every month is
+      represented — months with no sale appear with quantity_sold = 0
+      rather than being absent. Using each product's own range (instead of
+      one range shared by all) avoids padding newer or discontinued
+      products with zero-demand months outside their real selling window.
 
       Lag and rolling-window features are computed over this gap-free
       monthly grid, so zero-sale months are correctly reflected. Rolling
-      averages exclude the current month, to avoid leaking same-month
-      information into a feature meant to represent recent trend.
-
-      product_name/location_name are exposed alongside product_id/
-      location_id: dim_products has 500 distinct product_id but only 496
-      distinct product_name, so grouping or joining by name alone would
-      silently merge unrelated products.
+      statistics exclude the current month, to avoid leaking same-month
+      information into a feature meant to represent recent trend/spread.
 
     columns:
-      - name: product_id
-        description: "Foreign key identifying the product (variants rolled up). Grain-defining column."
-        tests:
-          - not_null
-
       - name: product_name
-        description: "Product name, from dim_products. Not unique on its own — use product_id for grouping/joins."
-
-      - name: location_id
-        description: "Foreign key identifying the business location. Grain-defining column."
-        tests:
-          - not_null
-
-      - name: location_name
-        description: "Business location name, from dim_locations."
-
-      - name: location_state
-        description: "State (UF) where the selling location is based, from dim_locations."
-
-      - name: customer_state
-        description: "State (UF) of the customer's primary address, from dim_customers. Grain-defining column: demand is split by this in addition to product and location."
+        description: >
+          Product name, from dim_products. Grain-defining column. Grouped
+          by name on purpose (not product_id) to merge near-duplicate
+          catalog entries and increase volume density.
         tests:
           - not_null
 
       - name: month_start
-        description: "Calendar month (first day of month). Grain-defining column, spined across each active product+location+customer_state combination's full month range."
+        description: "Calendar month (first day of month). Grain-defining column, spined across each active product's full month range."
         tests:
           - not_null
 
+      - name: month_num
+        description: "Calendar month number (1-12) of month_start."
+
+      - name: quarter_num
+        description: "Calendar quarter number (1-4) of month_start."
+
       - name: quantity_sold
         description: >
-          Total quantity sold for this product+location+customer_state in
-          this month, from effective sales. 0 when the combination was
-          active but had no sale that month, not null/absent.
+          Total quantity sold for this product in this month, across all
+          locations, from effective sales. 0 when the product was active
+          but had no sale that month, not null/absent.
         tests:
           - not_null
 
       - name: lag_1m
-        description: "quantity_sold for this same product+location+customer_state, 1 month before month_start."
+        description: "quantity_sold for this same product, 1 month before month_start."
 
       - name: lag_2m
-        description: "quantity_sold for this same product+location+customer_state, 2 months before month_start."
+        description: "quantity_sold for this same product, 2 months before month_start."
 
       - name: lag_3m
-        description: "quantity_sold for this same product+location+customer_state, 3 months before month_start."
+        description: "quantity_sold for this same product, 3 months before month_start."
 
       - name: lag_6m
-        description: "quantity_sold for this same product+location+customer_state, 6 months before month_start."
+        description: "quantity_sold for this same product, 6 months before month_start."
 
       - name: lag_12m
-        description: "quantity_sold for this same product+location+customer_state, 12 months before month_start (same month, prior year)."
+        description: "quantity_sold for this same product, 12 months before month_start (same month, prior year)."
 
       - name: rolling_avg_3m
         description: "Average quantity_sold over the 3 months strictly before month_start (excludes month_start itself)."
 
       - name: rolling_avg_6m
         description: "Average quantity_sold over the 6 months strictly before month_start (excludes month_start itself)."
+
+      - name: rolling_std_6m
+        description: >
+          Standard deviation of quantity_sold over the 6 months strictly
+          before month_start. Recent volatility — separates stable
+          products from ones that spike, useful for telling high and low
+          quantile forecasts apart.
+
+      - name: rolling_max_6m
+        description: "Maximum quantity_sold over the 6 months strictly before month_start. Recent peak, not smoothed away like the rolling average."
+
+      - name: rolling_max_12m
+        description: "Maximum quantity_sold over the 12 months strictly before month_start."
+
+      - name: momentum
+        description: "rolling_avg_3m minus rolling_avg_6m. Positive means demand is accelerating recently; negative means it's slowing down."
 
     tests:
       - dbt_utils.expression_is_true:
