@@ -156,32 +156,37 @@ with
         from filled_grid
     )
 
+    -- Momentum: gap between the short and long rolling average shows
+    -- whether demand is accelerating (positive) or slowing down (negative).
+    , with_momentum as (
+        select
+            with_lag_and_rolling_features.*
+            , with_lag_and_rolling_features.rolling_avg_3m - with_lag_and_rolling_features.rolling_avg_6m as momentum
+        from with_lag_and_rolling_features
+    )
+
     , final as (
         select
-            with_lag_and_rolling_features.product_name
-            , with_lag_and_rolling_features.month_start
-            , month(with_lag_and_rolling_features.month_start) as month_num
-            , quarter(with_lag_and_rolling_features.month_start) as quarter_num
-            , with_lag_and_rolling_features.quantity_sold
+            with_momentum.product_name
+            , with_momentum.month_start
+            , month(with_momentum.month_start) as month_num
+            , quarter(with_momentum.month_start) as quarter_num
+            , with_momentum.quantity_sold
 
-            , with_lag_and_rolling_features.lag_1m
-            , with_lag_and_rolling_features.lag_2m
-            , with_lag_and_rolling_features.lag_3m
-            , with_lag_and_rolling_features.lag_6m
-            , with_lag_and_rolling_features.lag_12m
+            , with_momentum.lag_1m
+            , with_momentum.lag_2m
+            , with_momentum.lag_3m
+            , with_momentum.lag_6m
+            , with_momentum.lag_12m
 
-            , with_lag_and_rolling_features.rolling_avg_3m
-            , with_lag_and_rolling_features.rolling_avg_6m
-            , with_lag_and_rolling_features.rolling_std_6m
-            , with_lag_and_rolling_features.rolling_max_6m
-            , with_lag_and_rolling_features.rolling_max_12m
+            , with_momentum.rolling_avg_3m
+            , with_momentum.rolling_avg_6m
+            , with_momentum.rolling_std_6m
+            , with_momentum.rolling_max_6m
+            , with_momentum.rolling_max_12m
+            , with_momentum.momentum
 
-            -- Momentum: gap between the short and long rolling average
-            -- shows whether demand is accelerating (positive) or slowing
-            -- down (negative).
-            , with_lag_and_rolling_features.rolling_avg_3m - with_lag_and_rolling_features.rolling_avg_6m as momentum
-
-        from with_lag_and_rolling_features
+        from with_momentum
     )
 
 select *
