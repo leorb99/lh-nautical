@@ -1,0 +1,38 @@
+-- ============================================================================
+-- Bootstrap: RAG schema
+-- ============================================================================
+--
+-- Creates the schema that hosts the RAG persistence layer. Deliberately a
+-- schema of its own — `rag` — rather than reusing the existing dbt-managed
+-- `bronze`/`silver`/`gold` medallion schemas: `document_chunks` is not part
+-- of that lineage (it is populated by the Python RAG ingestion pipeline,
+-- rag/src/ingestion/run_ingestion.py, not by dbt), and keeping it isolated
+-- gives it independent governance/grants without perturbing the medallion
+-- schemas' own conventions. See rag/README.md — "Delta Persistence Design".
+--
+-- CATALOG PARAMETERIZATION: this project resolves the physical catalog per
+-- environment via the Databricks Asset Bundle variable ${var.catalog_name}
+-- (see databricks.yml — dev/ci/prod targets), but Asset Bundle variable
+-- substitution applies to YAML resource definitions, not to the literal
+-- contents of a plain .sql file — so this file cannot embed
+-- ${var.catalog_name} directly. Instead it uses a Databricks named
+-- parameter marker, `:catalog`, combined with the IDENTIFIER() clause —
+-- the officially supported, SQL-injection-safe mechanism for
+-- parameterizing object identifiers (catalog/schema/table names) in DDL
+-- (see https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-names-identifier-clause,
+-- confirmed to support `IDENTIFIER(:param || '.literal')`-style
+-- concatenation and to work with CREATE SCHEMA). No text substitution and
+-- no manual string interpolation is needed or used here.
+--
+-- This file is executed by binding a value to :catalog at run time, e.g.
+-- `spark.sql(sql_text, args={"catalog": "<resolved catalog name>"})` from a
+-- Python bootstrap step (not yet implemented — see rag/README.md), or via
+-- `EXECUTE IMMEDIATE ... USING <value> AS catalog`. The file itself is
+-- never edited to supply a catalog name.
+--
+-- The schema name `rag` is a closed MVP decision, expressed here as a
+-- literal string concatenated onto :catalog inside IDENTIFIER().
+-- ============================================================================
+
+CREATE SCHEMA IF NOT EXISTS IDENTIFIER(:catalog || '.rag')
+COMMENT 'RAG persistence layer for the LH Nautical canonical knowledge base. Populated by rag/src/ingestion/run_ingestion.py. Not part of the dbt-managed bronze/silver/gold medallion schemas.';
