@@ -270,13 +270,13 @@ def test_zero_chunks_across_multiple_processed_document_ids_accepted():
 
 
 # ---------------------------------------------------------------------------
-# Real corpus validation — the 5 canonical documents, end to end.
+# Real corpus validation — the 6 canonical documents, end to end.
 # ---------------------------------------------------------------------------
 
 
-def test_real_five_document_corpus_passes_validation():
+def test_real_six_document_corpus_passes_validation():
     documents = load_all_canonical_documents(_REPO_ROOT)
-    assert len(documents) == 5
+    assert len(documents) == 6
 
     all_chunks: list[Chunk] = []
     processed_document_ids: list[str] = []
@@ -286,7 +286,7 @@ def test_real_five_document_corpus_passes_validation():
         all_chunks.extend(chunks)
         processed_document_ids.append(document.document_id)
 
-    assert len(all_chunks) == 99
+    assert len(all_chunks) == 163
 
     # Does not depend on source_git_commit being non-null: rag/ may be
     # untracked in the working tree, in which case every chunk's

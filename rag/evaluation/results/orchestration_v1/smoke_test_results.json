@@ -1,0 +1,598 @@
+[
+  {
+    "case_id": "A",
+    "query": "GOLD-032",
+    "route": "EXACT_RULE_ID",
+    "top_k": 5,
+    "filters_json": "{\"rule_ids\": \"GOLD-032\"}",
+    "evidence_available": true,
+    "answer": "A regra GOLD-032 define um pedido de compra em aberto como aquele com status \"sent\" ou \"partially_received\" [S1, S4, S5]. Esta regra é mencionada em vários documentos, incluindo `powerbi_semantic_rules` [S1, S2], `inventory_and_stockout` [S3, S5] e `gold_business_rules` [S4]. \n\nEspecificamente, de acordo com [S4], um pedido de compra é considerado \"em aberto\" quando seu status é `sent` ou `partially_received`, excluindo pedidos em `draft`, `received` ou `cancelled`. \n\nAlém disso, [S5] menciona que a quantidade de pedidos de compra em aberto é usada nos cálculos de reposição, considerando somente pedidos com status `sent` ou `partially_received`. \n\nPortanto, a regra GOLD-032 estabelece a definição de um pedido de compra em aberto com base em seus status. [S1, S4, S5]",
+    "sources": [
+      {
+        "source_label": "S1",
+        "chunk_id": "d211a227a355a8ba9df23a0c57fc613ee57cd55f37497a8245e792491d108e49",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Estoque & Supply > `Pedidos Abertos`",
+        "section_title": "`Pedidos Abertos`",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-029"
+        ],
+        "rank": 1,
+        "score": 0.9765625
+      },
+      {
+        "source_label": "S2",
+        "chunk_id": "b2d1d42acdc78f7628b183949de6cf64deec81bae447830cb2a481fd43b999f9",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Relação com o Corpus Canônico Existente",
+        "section_title": "Relação com o Corpus Canônico Existente",
+        "rule_ids": [
+          "GOLD-004",
+          "GOLD-008",
+          "GOLD-029",
+          "GOLD-032",
+          "GOLD-017"
+        ],
+        "rank": 2,
+        "score": 0.9765625
+      },
+      {
+        "source_label": "S3",
+        "chunk_id": "670d8e9d974eea880c5903a0be9b0976f6b3036225a0d54bc9c3eef96e7e4b95",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Relações com outros documentos canônicos",
+        "section_title": "Relações com outros documentos canônicos",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-039",
+          "GOLD-034"
+        ],
+        "rank": 3,
+        "score": 0.9760624679979519
+      },
+      {
+        "source_label": "S4",
+        "chunk_id": "0daf65a73deb3aec53a0fc33799449e48d1eecdf2ba79ae83e7c504c49239530",
+        "document_id": "gold_business_rules",
+        "document_title": "Regras de Negócio da Camada Gold",
+        "section_path": "Fornecedores > Definição de pedido de compra em aberto",
+        "section_title": "Definição de pedido de compra em aberto",
+        "rule_ids": [
+          "GOLD-032"
+        ],
+        "rank": 4,
+        "score": 0.961166253101737
+      },
+      {
+        "source_label": "S5",
+        "chunk_id": "a4aed3617974b65ae9e585d3c7e569fb5ca24f97ac5d684183fa86746fa13205",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Regras de reposição > Pedidos de compra em aberto",
+        "section_title": "Pedidos de compra em aberto",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-029"
+        ],
+        "rank": 5,
+        "score": 0.9533577533577533
+      }
+    ],
+    "model": "databricks-meta-llama-3-3-70b-instruct",
+    "retrieval_latency_s": 1.2087267919998794,
+    "generation_latency_s": 3.3859820000000127,
+    "total_latency_s": 4.595236249999971,
+    "usage": {
+      "prompt_tokens": 1391,
+      "completion_tokens": 236,
+      "total_tokens": 1627
+    }
+  },
+  {
+    "case_id": "B",
+    "query": "GOLD-999",
+    "route": "EXACT_RULE_ID",
+    "top_k": 5,
+    "filters_json": "{\"rule_ids\": \"GOLD-999\"}",
+    "evidence_available": false,
+    "answer": null,
+    "sources": [],
+    "model": null,
+    "retrieval_latency_s": 0.35476666699992165,
+    "generation_latency_s": null,
+    "total_latency_s": 0.35480404100007945,
+    "usage": null
+  },
+  {
+    "case_id": "C",
+    "query": "Como o Power BI calcula a medida Ticket Médio?",
+    "route": "NORMAL",
+    "top_k": 8,
+    "filters_json": null,
+    "evidence_available": true,
+    "answer": "De acordo com a evidência [S1], o Power BI calcula a medida `Ticket Médio` utilizando a seguinte expressão DAX:\n\n```dax\nDIVIDE(\n    CALCULATE(\n        SUMX(\n            VALUES(fct_sales[order_id])\n            , CALCULATE(MAX(fct_sales[order_total_amount]))\n        )\n        , fct_sales[is_effective_sale] = TRUE()\n    )\n    , [Pedidos Efetivos]\n)\n```\n\nEssa expressão calcula o valor médio por pedido efetivo, dividindo a soma do valor total de cada pedido efetivo distinto pela contagem de pedidos efetivos. Além disso, a expressão utiliza a função `DIVIDE` para proteger contra divisão por zero, retornando `BLANK()` em vez de um erro quando `[Pedidos Efetivos] = 0`. \n\nA definição semântica da medida `Ticket Médio` é descrita como \"Valor médio por pedido efetivo — soma do valor total de cada pedido efetivo distinto, dividida pela contagem de pedidos efetivos\" [S1]. \n\nEssa medida depende de outra medida própria, `[Pedidos Efetivos]`, e utiliza `MAX(order_total_amount)` por `order_id` para evitar a duplicação de `order_total_amount` entre itens do mesmo pedido, conforme nota de grão [S1]. \n\nAlém disso, a regra de negócio GOLD-008, documentada em `gold_business_rules.md`, é mencionada como já tendo cuidado semelhante para evitar a soma direta",
+    "sources": [
+      {
+        "source_label": "S1",
+        "chunk_id": "0109cccad8f1c099e61678357255ccf0adada839efe890dcc9242442c8876c80",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Receita, vendas e visão geral (`Global (2+ abas)` / `Visão Geral` / `Vendas`) > `Ticket Médio`",
+        "section_title": "`Ticket Médio`",
+        "rule_ids": [
+          "GOLD-008"
+        ],
+        "rank": 1,
+        "score": 0.9841269841269842
+      },
+      {
+        "source_label": "S2",
+        "chunk_id": "e8dab7fea2da6c0662d038b258851b0403da1a53b9a174d8e569d43c88052c9b",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Objetivo",
+        "section_title": "Objetivo",
+        "rule_ids": [],
+        "rank": 2,
+        "score": 0.9692307692307692
+      },
+      {
+        "source_label": "S3",
+        "chunk_id": "6f554af7f98e9d1a31cb73f3fb211095d44824b8d92c9d0414717968feeb26ce",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Estrutura do Modelo Semântico > Tabelas de negócio e sua origem",
+        "section_title": "Tabelas de negócio e sua origem",
+        "rule_ids": [],
+        "rank": 3,
+        "score": 0.9317863805970149
+      },
+      {
+        "source_label": "S4",
+        "chunk_id": "65555c3c128abe4ce0efe274a83c8f4c5500e6b0a1410f9e0d0ddfd8e56a3390",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Clientes & RFM > `Recência Média` / `Frequência Média` / `Monetário Médio`",
+        "section_title": "`Recência Média` / `Frequência Média` / `Monetário Médio`",
+        "rule_ids": [],
+        "rank": 4,
+        "score": 0.917345092718227
+      },
+      {
+        "source_label": "S5",
+        "chunk_id": "c84e655715a8fd7fa404e7bffb734a78f47603b73c71919fe6159e2556adc848",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Proveniência e Escopo dos Artefatos",
+        "section_title": "Proveniência e Escopo dos Artefatos",
+        "rule_ids": [],
+        "rank": 5,
+        "score": 0.9041501976284585
+      },
+      {
+        "source_label": "S6",
+        "chunk_id": "8334b1ed23554bc10b99904e67f7fc7944706e08aa7bafa4a68087fa6bd707b0",
+        "document_id": "metrics_dictionary",
+        "document_title": "Dicionário de Métricas",
+        "section_path": "Taxas, razões e médias",
+        "section_title": "Taxas, razões e médias",
+        "rule_ids": [],
+        "rank": 6,
+        "score": 0.8907936507936508
+      },
+      {
+        "source_label": "S7",
+        "chunk_id": "2fa53782082af4bbec6d0aa7c9989b2ad33e77dae0428e6e399b28302cae9b05",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX",
+        "section_title": "Medidas DAX",
+        "rule_ids": [],
+        "rank": 7,
+        "score": 0.8663376309427882
+      },
+      {
+        "source_label": "S8",
+        "chunk_id": "2087a7791820076e8a116fb8f9f4acbb751aad10de957b76ed6b7ededc306c5c",
+        "document_id": "metrics_dictionary",
+        "document_title": "Dicionário de Métricas",
+        "section_path": "Métricas financeiras > `average_ticket_amount`",
+        "section_title": "`average_ticket_amount`",
+        "rule_ids": [
+          "GOLD-008",
+          "GOLD-010"
+        ],
+        "rank": 8,
+        "score": 0.8638867033831629
+      }
+    ],
+    "model": "databricks-meta-llama-3-3-70b-instruct",
+    "retrieval_latency_s": 0.3255882920000204,
+    "generation_latency_s": 5.0961141249999855,
+    "total_latency_s": 5.422139416999926,
+    "usage": {
+      "prompt_tokens": 3287,
+      "completion_tokens": 350,
+      "total_tokens": 3637
+    }
+  },
+  {
+    "case_id": "D",
+    "query": "Como o Ticket Médio é definido no Gold e implementado no Power BI?",
+    "route": "CROSS_SOURCE",
+    "top_k": 10,
+    "filters_json": null,
+    "evidence_available": true,
+    "answer": "De acordo com [S1] e [S9], o Ticket Médio é definido como o valor médio por pedido efetivo, calculado como a soma do valor total de cada pedido efetivo distinto dividida pela contagem de pedidos efetivos. \n\nNo Power BI, isso é implementado pela expressão DAX:\n```dax\nDIVIDE(\n    CALCULATE(\n        SUMX(\n            VALUES(fct_sales[order_id])\n            , CALCULATE(MAX(fct_sales[order_total_amount]))\n        )\n        , fct_sales[is_effective_sale] = TRUE()\n    )\n    , [Pedidos Efetivos]\n)\n```\nJá no Gold, a métrica correspondente é `average_ticket_amount`, definida como `effective_order_revenue_amount / effective_order_count` [S9]. \n\nAmbas as definições visam evitar a duplicação de `order_total_amount` entre itens do mesmo pedido, como descrito na regra `GOLD-008` [S1] e [S9].",
+    "sources": [
+      {
+        "source_label": "S1",
+        "chunk_id": "0109cccad8f1c099e61678357255ccf0adada839efe890dcc9242442c8876c80",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Receita, vendas e visão geral (`Global (2+ abas)` / `Visão Geral` / `Vendas`) > `Ticket Médio`",
+        "section_title": "`Ticket Médio`",
+        "rule_ids": [
+          "GOLD-008"
+        ],
+        "rank": 1,
+        "score": 0.9841269841269842
+      },
+      {
+        "source_label": "S2",
+        "chunk_id": "c84e655715a8fd7fa404e7bffb734a78f47603b73c71919fe6159e2556adc848",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Proveniência e Escopo dos Artefatos",
+        "section_title": "Proveniência e Escopo dos Artefatos",
+        "rule_ids": [],
+        "rank": 2,
+        "score": 0.9765625
+      },
+      {
+        "source_label": "S3",
+        "chunk_id": "e8dab7fea2da6c0662d038b258851b0403da1a53b9a174d8e569d43c88052c9b",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Objetivo",
+        "section_title": "Objetivo",
+        "rule_ids": [],
+        "rank": 3,
+        "score": 0.9760624679979519
+      },
+      {
+        "source_label": "S4",
+        "chunk_id": "6f554af7f98e9d1a31cb73f3fb211095d44824b8d92c9d0414717968feeb26ce",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Estrutura do Modelo Semântico > Tabelas de negócio e sua origem",
+        "section_title": "Tabelas de negócio e sua origem",
+        "rule_ids": [],
+        "rank": 4,
+        "score": 0.961166253101737
+      },
+      {
+        "source_label": "S5",
+        "chunk_id": "b2d1d42acdc78f7628b183949de6cf64deec81bae447830cb2a481fd43b999f9",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Relação com o Corpus Canônico Existente",
+        "section_title": "Relação com o Corpus Canônico Existente",
+        "rule_ids": [
+          "GOLD-004",
+          "GOLD-008",
+          "GOLD-029",
+          "GOLD-032",
+          "GOLD-017"
+        ],
+        "rank": 5,
+        "score": 0.9244546498277841
+      },
+      {
+        "source_label": "S6",
+        "chunk_id": "86dfd19522aa90e0efa07c4c0fa84f57c9a98e5b57a8e7fdb916872c55b07c2e",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Proveniência e Escopo dos Artefatos > Inventário exato do modelo (metadata factual)",
+        "section_title": "Inventário exato do modelo (metadata factual)",
+        "rule_ids": [],
+        "rank": 6,
+        "score": 0.8777432712215321
+      },
+      {
+        "source_label": "S7",
+        "chunk_id": "e159dcc4e4e4d2ee602f75f64cfca5a14a376db1d4a8a4a1fe6686be43f18276",
+        "document_id": "gold_business_rules",
+        "document_title": "Regras de Negócio da Camada Gold",
+        "section_path": "Regras Financeiras > Receita pendente de regularização fiscal é reportada separadamente",
+        "section_title": "Receita pendente de regularização fiscal é reportada separadamente",
+        "rule_ids": [
+          "GOLD-012"
+        ],
+        "rank": 7,
+        "score": 0.8687878787878788
+      },
+      {
+        "source_label": "S8",
+        "chunk_id": "058f7ffb6d2d3174a895b812b13bda74830b8e59427229a93ca72352615b1c7c",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Estrutura do Modelo Semântico > Relacionamentos",
+        "section_title": "Relacionamentos",
+        "rule_ids": [],
+        "rank": 8,
+        "score": 0.8673860427591771
+      },
+      {
+        "source_label": "S9",
+        "chunk_id": "2087a7791820076e8a116fb8f9f4acbb751aad10de957b76ed6b7ededc306c5c",
+        "document_id": "metrics_dictionary",
+        "document_title": "Dicionário de Métricas",
+        "section_path": "Métricas financeiras > `average_ticket_amount`",
+        "section_title": "`average_ticket_amount`",
+        "rule_ids": [
+          "GOLD-008",
+          "GOLD-010"
+        ],
+        "rank": 9,
+        "score": 0.8634370015948963
+      },
+      {
+        "source_label": "S10",
+        "chunk_id": "8334b1ed23554bc10b99904e67f7fc7944706e08aa7bafa4a68087fa6bd707b0",
+        "document_id": "metrics_dictionary",
+        "document_title": "Dicionário de Métricas",
+        "section_path": "Taxas, razões e médias",
+        "section_title": "Taxas, razões e médias",
+        "rule_ids": [],
+        "rank": 10,
+        "score": 0.8250726216412492
+      }
+    ],
+    "model": "databricks-meta-llama-3-3-70b-instruct",
+    "retrieval_latency_s": 0.46579929199992876,
+    "generation_latency_s": 3.665465875000109,
+    "total_latency_s": 4.1316696670000965,
+    "usage": {
+      "prompt_tokens": 4626,
+      "completion_tokens": 222,
+      "total_tokens": 4848
+    }
+  },
+  {
+    "case_id": "E",
+    "query": "O que acontece quando um mês não teve nenhuma venda registrada, no histórico usado para forecasting?",
+    "route": "NORMAL",
+    "top_k": 8,
+    "filters_json": null,
+    "evidence_available": true,
+    "answer": "De acordo com [S3], quando um mês não teve nenhuma venda registrada dentro do intervalo ativo de um produto, o mês permanece na série com `quantity_sold = 0`. Isso significa que, mesmo que não haja vendas, o mês ainda é incluído no histórico com uma quantidade vendida igual a zero. Além disso, meses anteriores à primeira venda ou posteriores à última venda observada não são gerados nesta tabela. [S6] também menciona que o tratamento de meses sem venda dentro do intervalo ativo de cada produto já está descrito em \"Construção do histórico mensal\" (GOLD-036), reforçando a ideia de que meses sem demanda são incluídos com `quantity_sold = 0`.",
+    "sources": [
+      {
+        "source_label": "S1",
+        "chunk_id": "a0c9fa789bc69cb861519c0cd3b075d3722fa4f9c26268570435b906f1c2f50b",
+        "document_id": "gold_data_architecture",
+        "document_title": "Arquitetura de Dados Gold",
+        "section_path": "5. Lineage principal > 5.4 Forecasting",
+        "section_title": "5.4 Forecasting",
+        "rule_ids": [],
+        "rank": 1,
+        "score": 0.9692307692307692
+      },
+      {
+        "source_label": "S2",
+        "chunk_id": "b4af941fc394aa77c6f7fc6ba346f1088dfb134170ac84cceda1449d432300cc",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Série de demanda utilizada para forecasting",
+        "section_title": "Série de demanda utilizada para forecasting",
+        "rule_ids": [
+          "GOLD-035"
+        ],
+        "rank": 2,
+        "score": 0.9684979838709677
+      },
+      {
+        "source_label": "S3",
+        "chunk_id": "17400b60926bb2a4a2d2de0c36d1e121a42aaee13ab6f7b982651f1791a934ca",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Construção do histórico mensal",
+        "section_title": "Construção do histórico mensal",
+        "rule_ids": [
+          "GOLD-036"
+        ],
+        "rank": 3,
+        "score": 0.9684979838709677
+      },
+      {
+        "source_label": "S4",
+        "chunk_id": "57ef3ccb3bd96946261dd7740c6f545515bbb59905319433c127ed501dc0bf70",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Estado atual do pipeline de forecasting",
+        "section_title": "Estado atual do pipeline de forecasting",
+        "rule_ids": [],
+        "rank": 4,
+        "score": 0.9037532923617209
+      },
+      {
+        "source_label": "S5",
+        "chunk_id": "b79bc1293c129998d052afa6f7e3d4127855451378c2c8416c5eb1817dc55ff9",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Objetivo",
+        "section_title": "Objetivo",
+        "rule_ids": [
+          "GOLD-001",
+          "GOLD-019"
+        ],
+        "rank": 5,
+        "score": 0.8857323232323232
+      },
+      {
+        "source_label": "S6",
+        "chunk_id": "bba233a90eb89423e756bdd57fd5426f2a027471c5c9302ee47eb56ac7725e6f",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Tratamento de meses sem demanda",
+        "section_title": "Tratamento de meses sem demanda",
+        "rule_ids": [
+          "GOLD-036"
+        ],
+        "rank": 6,
+        "score": 0.88125
+      },
+      {
+        "source_label": "S7",
+        "chunk_id": "9c00d126b78c385b9d088d8b3d6915f25d5c3b2ce8bf577561cecf1604140e1d",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Limitações e comportamento nas bordas do histórico",
+        "section_title": "Limitações e comportamento nas bordas do histórico",
+        "rule_ids": [],
+        "rank": 7,
+        "score": 0.8687878787878788
+      },
+      {
+        "source_label": "S8",
+        "chunk_id": "9dfe094189f545b019dbb0b8c41ee36900f8b73fbd34a4dca0acd4cdb818fa95",
+        "document_id": "demand_forecasting",
+        "document_title": "Demanda para Forecasting",
+        "section_path": "Relação com demanda operacional de estoque",
+        "section_title": "Relação com demanda operacional de estoque",
+        "rule_ids": [
+          "GOLD-019"
+        ],
+        "rank": 8,
+        "score": 0.8652917505030181
+      }
+    ],
+    "model": "databricks-meta-llama-3-3-70b-instruct",
+    "retrieval_latency_s": 0.38242941699991206,
+    "generation_latency_s": 2.483586083000091,
+    "total_latency_s": 2.866211791000069,
+    "usage": {
+      "prompt_tokens": 1997,
+      "completion_tokens": 176,
+      "total_tokens": 2173
+    }
+  },
+  {
+    "case_id": "F_OOD_DIAGNOSTIC",
+    "query": "Qual o algoritmo de recomendação de produtos usado no site de e-commerce da LH Nautical?",
+    "route": "NORMAL",
+    "top_k": 8,
+    "evidence_available": true,
+    "answer": "Não é possível determinar o algoritmo de recomendação de produtos usado no site de e-commerce da LH Nautical com base nos evidence blocks fornecidos [S1-S8]. Os evidence blocks fornecem informações sobre regras de reposição, lead time de fornecedores, medidas DAX para produtos, proveniência de artefatos e hierarquia de fallback para lead time, mas não mencionam explicitamente um algoritmo de recomendação de produtos. Portanto, não há evidência suficiente para responder a essa pergunta.",
+    "sources": [
+      {
+        "source_label": "S1",
+        "chunk_id": "d234576b11a86eb2cefd55d817725d8eac50403022f8497c491e0be313b58151",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Regras de reposição > Quantidade sugerida",
+        "section_title": "Quantidade sugerida",
+        "rule_ids": [
+          "GOLD-026"
+        ],
+        "rank": 1,
+        "score": 0.9552238805970149
+      },
+      {
+        "source_label": "S2",
+        "chunk_id": "4bb5f9764eb7a688c998aeaab1cb1031fcde1d4a7aeeba3ab94961055fdfa220",
+        "document_id": "gold_business_rules",
+        "document_title": "Regras de Negócio da Camada Gold",
+        "section_path": "Fornecedores > Lead time do fornecedor: histórico observado prevalece sobre o valor declarado",
+        "section_title": "Lead time do fornecedor: histórico observado prevalece sobre o valor declarado",
+        "rule_ids": [
+          "GOLD-039"
+        ],
+        "rank": 2,
+        "score": 0.8602564102564103
+      },
+      {
+        "source_label": "S3",
+        "chunk_id": "900ad2be50aef919f3b02b87a79935e073ae1587996618801ead7cabb05b2229",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Produtos > `Ranking por Quantidade` / `Ranking por Receita`",
+        "section_title": "`Ranking por Quantidade` / `Ranking por Receita`",
+        "rule_ids": [],
+        "rank": 3,
+        "score": 0.8531468531468531
+      },
+      {
+        "source_label": "S4",
+        "chunk_id": "0625b5a2f6215503ae684a6fe3a73553875959401d6437e4d87d6619d7815170",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Alvo recomendado de estoque",
+        "section_title": "Alvo recomendado de estoque",
+        "rule_ids": [
+          "GOLD-025"
+        ],
+        "rank": 4,
+        "score": 0.8472222222222222
+      },
+      {
+        "source_label": "S5",
+        "chunk_id": "cd33c7ddbdf2603e94235a686ac0b3acb68ac2777959af461db987605f4c349b",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Proveniência e Escopo dos Artefatos > Artefatos internos referenciados",
+        "section_title": "Artefatos internos referenciados",
+        "rule_ids": [],
+        "rank": 5,
+        "score": 0.836244131455399
+      },
+      {
+        "source_label": "S6",
+        "chunk_id": "6c35556b8375864624ff49308edd3bc8f534c277aad1a2396e9d4db297f999fc",
+        "document_id": "powerbi_semantic_rules",
+        "document_title": "Regras Semânticas do Power BI — Dashboard Gerencial Compass 360 (LH Nautical)",
+        "section_path": "Medidas DAX > Produtos > `Receita do Produto Campeão` / `Nome do Produto Campeão` / `Volume de Vendas do Produto Campeão`",
+        "section_title": "`Receita do Produto Campeão` / `Nome do Produto Campeão` / `Volume de Vendas do Produto Campeão`",
+        "rule_ids": [],
+        "rank": 6,
+        "score": 0.8307178932178932
+      },
+      {
+        "source_label": "S7",
+        "chunk_id": "e39cbbf3f8a9b066a6427132f1d84b29ab480bb05f65ea3a3ad2b21f6ace4761",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Lead time utilizado na reposição > Hierarquia de fallback",
+        "section_title": "Hierarquia de fallback",
+        "rule_ids": [
+          "GOLD-020"
+        ],
+        "rank": 7,
+        "score": 0.8197150072150072
+      },
+      {
+        "source_label": "S8",
+        "chunk_id": "7c46d4e5dd2dc75f61252818225f33db9437794faa2edd88bed3d15ac0b3603b",
+        "document_id": "inventory_and_stockout",
+        "document_title": "Estoque, Reposição e Risco de Ruptura",
+        "section_path": "Lead time utilizado na reposição > Confiança da estimativa",
+        "section_title": "Confiança da estimativa",
+        "rule_ids": [
+          "GOLD-021"
+        ],
+        "rank": 8,
+        "score": 0.8079824561403509
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 2161,
+      "completion_tokens": 119,
+      "total_tokens": 2280
+    }
+  }
+]

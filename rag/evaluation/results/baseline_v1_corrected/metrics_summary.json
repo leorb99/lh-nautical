@@ -1,0 +1,142 @@
+{
+  "dataset_size": 37,
+  "positive_queries": 33,
+  "negative_queries": 4,
+  "by_k": {
+    "3": {
+      "hit_rate": 0.9393939393939394,
+      "mean_evidence_coverage": 0.8939393939393939,
+      "mean_precision": 0.45454545454545453,
+      "mean_ndcg": 0.8222775351667585
+    },
+    "5": {
+      "hit_rate": 0.9393939393939394,
+      "mean_evidence_coverage": 0.9090909090909091,
+      "mean_precision": 0.296969696969697,
+      "mean_ndcg": 0.8189541187427011
+    },
+    "8": {
+      "hit_rate": 0.9696969696969697,
+      "mean_evidence_coverage": 0.9545454545454546,
+      "mean_precision": 0.21212121212121213,
+      "mean_ndcg": 0.8145562641042501
+    },
+    "10": {
+      "hit_rate": 0.9696969696969697,
+      "mean_evidence_coverage": 0.9696969696969697,
+      "mean_precision": 0.17575757575757575,
+      "mean_ndcg": 0.8110918478282619
+    },
+    "15": {
+      "hit_rate": 0.9696969696969697,
+      "mean_evidence_coverage": 0.9696969696969697,
+      "mean_precision": 0.12525252525252525,
+      "mean_ndcg": 0.7987741141188776
+    }
+  },
+  "overall_mrr": 0.7575757575757576,
+  "by_category": {
+    "business_rules": {
+      "query_count": 5,
+      "mrr": 0.8,
+      "hit_rate_at_5": 0.8,
+      "mean_evidence_coverage_at_5": 0.8
+    },
+    "cross_source": {
+      "query_count": 4,
+      "mrr": 0.875,
+      "hit_rate_at_5": 1.0,
+      "mean_evidence_coverage_at_5": 0.75
+    },
+    "data_architecture": {
+      "query_count": 4,
+      "mrr": 0.6666666666666666,
+      "hit_rate_at_5": 1.0,
+      "mean_evidence_coverage_at_5": 1.0
+    },
+    "forecasting": {
+      "query_count": 5,
+      "mrr": 0.4,
+      "hit_rate_at_5": 0.8,
+      "mean_evidence_coverage_at_5": 0.8
+    },
+    "inventory": {
+      "query_count": 5,
+      "mrr": 0.9,
+      "hit_rate_at_5": 1.0,
+      "mean_evidence_coverage_at_5": 1.0
+    },
+    "metrics": {
+      "query_count": 5,
+      "mrr": 0.9,
+      "hit_rate_at_5": 1.0,
+      "mean_evidence_coverage_at_5": 1.0
+    },
+    "negative": {
+      "query_count": 4
+    },
+    "powerbi": {
+      "query_count": 5,
+      "mrr": 0.7666666666666667,
+      "hit_rate_at_5": 1.0,
+      "mean_evidence_coverage_at_5": 1.0
+    }
+  },
+  "score_analysis": {
+    "positive_top1_scores": [
+      1.0,
+      1.0,
+      0.9919354838709677,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.9919354838709677,
+      0.9919354838709677,
+      1.0,
+      1.0,
+      0.9919354838709677,
+      0.9841269841269842,
+      0.9841269841269842,
+      0.9692307692307692,
+      1.0,
+      1.0,
+      1.0,
+      0.9919354838709677,
+      1.0,
+      0.9841269841269842,
+      1.0,
+      1.0,
+      0.9692307692307692,
+      0.9841269841269842,
+      1.0,
+      0.9919354838709677,
+      1.0,
+      1.0,
+      0.9841269841269842,
+      0.9919354838709677,
+      0.9841269841269842,
+      1.0
+    ],
+    "negative_top1_scores": [
+      0.9420289855072463,
+      0.9552238805970149,
+      0.9552238805970149,
+      0.5
+    ]
+  },
+  "generic_heading_hits": {
+    "top_3": 16,
+    "top_5": 31
+  },
+  "document_level_false_successes": [
+    {
+      "query_id": "BR-03",
+      "k": 15
+    },
+    {
+      "query_id": "FC-05",
+      "k": 5
+    }
+  ]
+}

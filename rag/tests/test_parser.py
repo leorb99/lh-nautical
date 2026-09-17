@@ -408,7 +408,7 @@ def test_rule_id_in_one_section_does_not_leak_into_sibling_section():
 
 
 # ---------------------------------------------------------------------------
-# End-to-end validation against the five real canonical documents
+# End-to-end validation against the six real canonical documents
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -434,7 +434,7 @@ def test_parses_real_gold_business_rules_document():
 )
 def test_real_canonical_document_parses_with_valid_provenance(spec):
     """Persistent, per-document validation of the full loader -> parser
-    pipeline against the five real canonical documents (not a synthetic
+    pipeline against the six real canonical documents (not a synthetic
     fixture), covering: successful parsing, non-empty title/sections, valid
     line provenance, section_path never including the H1 title, and strict
     GOLD-NNN Rule ID formatting.
@@ -467,8 +467,8 @@ def test_real_canonical_document_parses_with_valid_provenance(spec):
             assert _STRICT_RULE_ID_RE.match(rule_id), rule_id
 
 
-def test_all_five_canonical_documents_are_present_and_distinct():
-    assert len(CANONICAL_DOCUMENTS) == 5
+def test_all_six_canonical_documents_are_present_and_distinct():
+    assert len(CANONICAL_DOCUMENTS) == 6
     document_ids = {spec.document_id for spec in CANONICAL_DOCUMENTS}
-    assert len(document_ids) == 5
-    assert "powerbi_semantic_rules" not in document_ids
+    assert len(document_ids) == 6
+    assert "powerbi_semantic_rules" in document_ids

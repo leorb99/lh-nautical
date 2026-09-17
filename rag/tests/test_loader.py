@@ -135,7 +135,7 @@ def test_load_canonical_document_computes_document_hash(fake_repo: Path):
 
 def test_load_canonical_document_rejects_non_allowlisted_path(fake_repo: Path):
     with pytest.raises(AllowlistError):
-        load_canonical_document(fake_repo, "rag/knowledge_base/powerbi_semantic_rules.md")
+        load_canonical_document(fake_repo, "rag/knowledge_base/nonexistent_document.md")
 
 
 def test_load_canonical_document_rejects_arbitrary_path(fake_repo: Path):
@@ -163,9 +163,9 @@ def test_load_canonical_document_untracked_outside_git_has_no_commit(fake_repo: 
 # ---------------------------------------------------------------------------
 
 
-def test_load_all_canonical_documents_returns_exactly_five(fake_repo: Path):
+def test_load_all_canonical_documents_returns_exactly_six(fake_repo: Path):
     docs = load_all_canonical_documents(fake_repo)
-    assert len(docs) == 5
+    assert len(docs) == 6
 
 
 def test_load_all_canonical_documents_order_is_deterministic(fake_repo: Path):
@@ -179,10 +179,16 @@ def test_load_all_canonical_documents_order_is_deterministic(fake_repo: Path):
     assert ids_first == [spec.document_id for spec in CANONICAL_DOCUMENTS]
 
 
-def test_load_all_canonical_documents_excludes_powerbi(fake_repo: Path):
+def test_load_all_canonical_documents_includes_powerbi_semantic_rules(fake_repo: Path):
     docs = load_all_canonical_documents(fake_repo)
-    ids = {d.document_id for d in docs}
-    assert "powerbi_semantic_rules" not in ids
+    by_id = {d.document_id: d for d in docs}
+
+    assert "powerbi_semantic_rules" in by_id
+    doc = by_id["powerbi_semantic_rules"]
+    assert doc.canonical_domain == "powerbi_semantics"
+    assert doc.document_status == "CLOSED"
+    assert doc.source_path == "rag/knowledge_base/powerbi_semantic_rules.md"
+    assert doc.text.strip() != ""
 
 
 def test_load_all_canonical_documents_missing_one_raises(fake_repo: Path):

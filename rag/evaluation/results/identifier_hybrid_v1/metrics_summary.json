@@ -1,0 +1,73 @@
+{
+  "config": {
+    "dir": "identifier_hybrid_v1",
+    "query_type": "HYBRID",
+    "filter": false,
+    "expand": false
+  },
+  "dataset_size": 14,
+  "scored_queries": 14,
+  "skipped_queries": [],
+  "by_k": {
+    "1": {
+      "hit_rate": 0.0,
+      "mean_evidence_coverage": 0.0
+    },
+    "3": {
+      "hit_rate": 0.0,
+      "mean_evidence_coverage": 0.0
+    },
+    "5": {
+      "hit_rate": 0.07142857142857142,
+      "mean_evidence_coverage": 0.07142857142857142
+    },
+    "8": {
+      "hit_rate": 0.21428571428571427,
+      "mean_evidence_coverage": 0.21428571428571427
+    },
+    "15": {
+      "hit_rate": 0.2857142857142857,
+      "mean_evidence_coverage": 0.2857142857142857
+    }
+  },
+  "overall_mrr": 0.04492630385487528,
+  "exact_evidence_first_rank": {
+    "ID-01": null,
+    "ID-02": 7,
+    "ID-03": null,
+    "ID-04": null,
+    "ID-05": null,
+    "ID-06": 8,
+    "ID-07": 9,
+    "ID-08": 4,
+    "ID-09": null,
+    "ID-10": null,
+    "ID-11": null,
+    "ID-12": null,
+    "ID-13": null,
+    "ID-14": null
+  },
+  "result_counts": {
+    "ID-01": 15,
+    "ID-02": 15,
+    "ID-03": 15,
+    "ID-04": 15,
+    "ID-05": 15,
+    "ID-06": 15,
+    "ID-07": 15,
+    "ID-08": 15,
+    "ID-09": 15,
+    "ID-10": 15,
+    "ID-11": 15,
+    "ID-12": 15,
+    "ID-13": 15,
+    "ID-14": 15
+  },
+  "latency_ms": {
+    "count": 14,
+    "mean_ms": 656.9,
+    "p50_ms": 596.8,
+    "p95_ms": 892.6,
+    "max_ms": 1434.0
+  }
+}

@@ -59,8 +59,7 @@ class CanonicalDocumentSpec:
 _KNOWLEDGE_BASE_DIR = "rag/knowledge_base"
 
 # Explicit allowlist. The loader never discovers ``.md`` files by scanning the
-# directory — only documents listed here can be loaded. powerbi_semantic_rules.md
-# is intentionally absent (deferred, per the ingestion contract).
+# directory — only documents listed here can be loaded.
 CANONICAL_DOCUMENTS: tuple[CanonicalDocumentSpec, ...] = (
     CanonicalDocumentSpec(
         relative_path=f"{_KNOWLEDGE_BASE_DIR}/gold_business_rules.md",
@@ -90,6 +89,12 @@ CANONICAL_DOCUMENTS: tuple[CanonicalDocumentSpec, ...] = (
         relative_path=f"{_KNOWLEDGE_BASE_DIR}/gold_data_architecture.md",
         document_id="gold_data_architecture",
         canonical_domain="data_architecture",
+        document_status="CLOSED",
+    ),
+    CanonicalDocumentSpec(
+        relative_path=f"{_KNOWLEDGE_BASE_DIR}/powerbi_semantic_rules.md",
+        document_id="powerbi_semantic_rules",
+        canonical_domain="powerbi_semantics",
         document_status="CLOSED",
     ),
 )
@@ -258,7 +263,8 @@ def load_canonical_document(repo_root: Path, relative_path: str) -> LoadedDocume
 
 
 def load_all_canonical_documents(repo_root: Path) -> list[LoadedDocument]:
-    """Load exactly the five allowlisted documents, in deterministic order.
+    """Load exactly the allowlisted documents in ``CANONICAL_DOCUMENTS``, in
+    deterministic order.
 
     Order follows ``CANONICAL_DOCUMENTS`` (declaration order), never
     filesystem iteration order.

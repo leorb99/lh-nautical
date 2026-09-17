@@ -1,0 +1,73 @@
+{
+  "config": {
+    "dir": "identifier_fulltext_v1",
+    "query_type": "FULL_TEXT",
+    "filter": false,
+    "expand": false
+  },
+  "dataset_size": 14,
+  "scored_queries": 14,
+  "skipped_queries": [],
+  "by_k": {
+    "1": {
+      "hit_rate": 0.07142857142857142,
+      "mean_evidence_coverage": 0.07142857142857142
+    },
+    "3": {
+      "hit_rate": 0.7857142857142857,
+      "mean_evidence_coverage": 0.7857142857142857
+    },
+    "5": {
+      "hit_rate": 1.0,
+      "mean_evidence_coverage": 1.0
+    },
+    "8": {
+      "hit_rate": 1.0,
+      "mean_evidence_coverage": 1.0
+    },
+    "15": {
+      "hit_rate": 1.0,
+      "mean_evidence_coverage": 1.0
+    }
+  },
+  "overall_mrr": 0.4428571428571429,
+  "exact_evidence_first_rank": {
+    "ID-01": 3,
+    "ID-02": 5,
+    "ID-03": 3,
+    "ID-04": 1,
+    "ID-05": 2,
+    "ID-06": 2,
+    "ID-07": 4,
+    "ID-08": 2,
+    "ID-09": 2,
+    "ID-10": 3,
+    "ID-11": 4,
+    "ID-12": 2,
+    "ID-13": 2,
+    "ID-14": 2
+  },
+  "result_counts": {
+    "ID-01": 15,
+    "ID-02": 15,
+    "ID-03": 15,
+    "ID-04": 15,
+    "ID-05": 15,
+    "ID-06": 15,
+    "ID-07": 15,
+    "ID-08": 15,
+    "ID-09": 15,
+    "ID-10": 15,
+    "ID-11": 15,
+    "ID-12": 15,
+    "ID-13": 15,
+    "ID-14": 15
+  },
+  "latency_ms": {
+    "count": 14,
+    "mean_ms": 302.0,
+    "p50_ms": 246.0,
+    "p95_ms": 362.9,
+    "max_ms": 919.3
+  }
+}
