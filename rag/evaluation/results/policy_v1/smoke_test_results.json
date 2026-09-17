@@ -1,0 +1,340 @@
+[
+  {
+    "case_id": "A",
+    "query": "GOLD-032",
+    "decision": {
+      "route": "EXACT_RULE_ID",
+      "query_type": "HYBRID",
+      "top_k": 5,
+      "filters_json": "{\"rule_ids\": \"GOLD-032\"}",
+      "extracted_rule_id": "GOLD-032",
+      "reason": "Query is exactly one Rule ID. Phase 4B Experiment A2 (HYBRID + rule_ids filter) measured Hit@5=1.000, MRR=0.631 on the identifier subset — the strongest identifier route found."
+    },
+    "result_count": 5,
+    "results": [
+      {
+        "rank": 1,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Medidas DAX > Estoque & Supply > `Pedidos Abertos`",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-029"
+        ],
+        "score": 0.9765625
+      },
+      {
+        "rank": 2,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Relação com o Corpus Canônico Existente",
+        "rule_ids": [
+          "GOLD-004",
+          "GOLD-008",
+          "GOLD-029",
+          "GOLD-032",
+          "GOLD-017"
+        ],
+        "score": 0.9765625
+      },
+      {
+        "rank": 3,
+        "document_id": "inventory_and_stockout",
+        "section_path": "Relações com outros documentos canônicos",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-039",
+          "GOLD-034"
+        ],
+        "score": 0.9760624679979519
+      },
+      {
+        "rank": 4,
+        "document_id": "gold_business_rules",
+        "section_path": "Fornecedores > Definição de pedido de compra em aberto",
+        "rule_ids": [
+          "GOLD-032"
+        ],
+        "score": 0.961166253101737
+      },
+      {
+        "rank": 5,
+        "document_id": "inventory_and_stockout",
+        "section_path": "Regras de reposição > Pedidos de compra em aberto",
+        "rule_ids": [
+          "GOLD-032",
+          "GOLD-029"
+        ],
+        "score": 0.9533577533577533
+      }
+    ]
+  },
+  {
+    "case_id": "B",
+    "query": "GOLD-999",
+    "decision": {
+      "route": "EXACT_RULE_ID",
+      "query_type": "HYBRID",
+      "top_k": 5,
+      "filters_json": "{\"rule_ids\": \"GOLD-999\"}",
+      "extracted_rule_id": "GOLD-999",
+      "reason": "Query is exactly one Rule ID. Phase 4B Experiment A2 (HYBRID + rule_ids filter) measured Hit@5=1.000, MRR=0.631 on the identifier subset — the strongest identifier route found."
+    },
+    "result_count": 0,
+    "results": []
+  },
+  {
+    "case_id": "C",
+    "query": "Como o Power BI calcula a medida Ticket Médio?",
+    "decision": {
+      "route": "NORMAL",
+      "query_type": "HYBRID",
+      "top_k": 8,
+      "filters_json": null,
+      "extracted_rule_id": null,
+      "reason": "No exact-identifier or explicit cross-source cue detected; default single-source HYBRID route at normal_top_k."
+    },
+    "result_count": 8,
+    "results": [
+      {
+        "rank": 1,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Medidas DAX > Receita, vendas e visão geral (`Global (2+ abas)` / `Visão Geral` / `Vendas`) > `Ticket Médio`",
+        "rule_ids": [
+          "GOLD-008"
+        ],
+        "score": 0.9841269841269842
+      },
+      {
+        "rank": 2,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Objetivo",
+        "rule_ids": [],
+        "score": 0.9692307692307692
+      },
+      {
+        "rank": 3,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Estrutura do Modelo Semântico > Tabelas de negócio e sua origem",
+        "rule_ids": [],
+        "score": 0.9317863805970149
+      },
+      {
+        "rank": 4,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Medidas DAX > Clientes & RFM > `Recência Média` / `Frequência Média` / `Monetário Médio`",
+        "rule_ids": [],
+        "score": 0.917345092718227
+      },
+      {
+        "rank": 5,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Proveniência e Escopo dos Artefatos",
+        "rule_ids": [],
+        "score": 0.9041501976284585
+      },
+      {
+        "rank": 6,
+        "document_id": "metrics_dictionary",
+        "section_path": "Taxas, razões e médias",
+        "rule_ids": [],
+        "score": 0.8907936507936508
+      },
+      {
+        "rank": 7,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Medidas DAX",
+        "rule_ids": [],
+        "score": 0.8663376309427882
+      },
+      {
+        "rank": 8,
+        "document_id": "metrics_dictionary",
+        "section_path": "Métricas financeiras > `average_ticket_amount`",
+        "rule_ids": [
+          "GOLD-008",
+          "GOLD-010"
+        ],
+        "score": 0.8638867033831629
+      }
+    ]
+  },
+  {
+    "case_id": "D",
+    "query": "Como o Ticket Médio é definido no Gold e implementado no Power BI?",
+    "decision": {
+      "route": "CROSS_SOURCE",
+      "query_type": "HYBRID",
+      "top_k": 10,
+      "filters_json": null,
+      "extracted_rule_id": null,
+      "reason": "Query text explicitly names both a Gold-side and a Power BI-side cue. Routed at cross_source_top_k, derived from the Phase 4A.1 offline cross-source coverage analysis."
+    },
+    "result_count": 10,
+    "results": [
+      {
+        "rank": 1,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Medidas DAX > Receita, vendas e visão geral (`Global (2+ abas)` / `Visão Geral` / `Vendas`) > `Ticket Médio`",
+        "rule_ids": [
+          "GOLD-008"
+        ],
+        "score": 0.9841269841269842
+      },
+      {
+        "rank": 2,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Proveniência e Escopo dos Artefatos",
+        "rule_ids": [],
+        "score": 0.9765625
+      },
+      {
+        "rank": 3,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Objetivo",
+        "rule_ids": [],
+        "score": 0.9760624679979519
+      },
+      {
+        "rank": 4,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Estrutura do Modelo Semântico > Tabelas de negócio e sua origem",
+        "rule_ids": [],
+        "score": 0.961166253101737
+      },
+      {
+        "rank": 5,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Relação com o Corpus Canônico Existente",
+        "rule_ids": [
+          "GOLD-004",
+          "GOLD-008",
+          "GOLD-029",
+          "GOLD-032",
+          "GOLD-017"
+        ],
+        "score": 0.9244546498277841
+      },
+      {
+        "rank": 6,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Proveniência e Escopo dos Artefatos > Inventário exato do modelo (metadata factual)",
+        "rule_ids": [],
+        "score": 0.8777432712215321
+      },
+      {
+        "rank": 7,
+        "document_id": "gold_business_rules",
+        "section_path": "Regras Financeiras > Receita pendente de regularização fiscal é reportada separadamente",
+        "rule_ids": [
+          "GOLD-012"
+        ],
+        "score": 0.8687878787878788
+      },
+      {
+        "rank": 8,
+        "document_id": "powerbi_semantic_rules",
+        "section_path": "Estrutura do Modelo Semântico > Relacionamentos",
+        "rule_ids": [],
+        "score": 0.8673860427591771
+      },
+      {
+        "rank": 9,
+        "document_id": "metrics_dictionary",
+        "section_path": "Métricas financeiras > `average_ticket_amount`",
+        "rule_ids": [
+          "GOLD-008",
+          "GOLD-010"
+        ],
+        "score": 0.8634370015948963
+      },
+      {
+        "rank": 10,
+        "document_id": "metrics_dictionary",
+        "section_path": "Taxas, razões e médias",
+        "rule_ids": [],
+        "score": 0.8250726216412492
+      }
+    ]
+  },
+  {
+    "case_id": "E",
+    "query": "O que acontece quando um mês não teve nenhuma venda registrada, no histórico usado para forecasting?",
+    "decision": {
+      "route": "NORMAL",
+      "query_type": "HYBRID",
+      "top_k": 8,
+      "filters_json": null,
+      "extracted_rule_id": null,
+      "reason": "No exact-identifier or explicit cross-source cue detected; default single-source HYBRID route at normal_top_k."
+    },
+    "result_count": 8,
+    "results": [
+      {
+        "rank": 1,
+        "document_id": "gold_data_architecture",
+        "section_path": "5. Lineage principal > 5.4 Forecasting",
+        "rule_ids": [],
+        "score": 0.9692307692307692
+      },
+      {
+        "rank": 2,
+        "document_id": "demand_forecasting",
+        "section_path": "Série de demanda utilizada para forecasting",
+        "rule_ids": [
+          "GOLD-035"
+        ],
+        "score": 0.9684979838709677
+      },
+      {
+        "rank": 3,
+        "document_id": "demand_forecasting",
+        "section_path": "Construção do histórico mensal",
+        "rule_ids": [
+          "GOLD-036"
+        ],
+        "score": 0.9684979838709677
+      },
+      {
+        "rank": 4,
+        "document_id": "demand_forecasting",
+        "section_path": "Estado atual do pipeline de forecasting",
+        "rule_ids": [],
+        "score": 0.9037532923617209
+      },
+      {
+        "rank": 5,
+        "document_id": "demand_forecasting",
+        "section_path": "Objetivo",
+        "rule_ids": [
+          "GOLD-001",
+          "GOLD-019"
+        ],
+        "score": 0.8857323232323232
+      },
+      {
+        "rank": 6,
+        "document_id": "demand_forecasting",
+        "section_path": "Tratamento de meses sem demanda",
+        "rule_ids": [
+          "GOLD-036"
+        ],
+        "score": 0.88125
+      },
+      {
+        "rank": 7,
+        "document_id": "demand_forecasting",
+        "section_path": "Limitações e comportamento nas bordas do histórico",
+        "rule_ids": [],
+        "score": 0.8687878787878788
+      },
+      {
+        "rank": 8,
+        "document_id": "demand_forecasting",
+        "section_path": "Relação com demanda operacional de estoque",
+        "rule_ids": [
+          "GOLD-019"
+        ],
+        "score": 0.8652917505030181
+      }
+    ]
+  }
+]

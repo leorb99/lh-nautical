@@ -1,0 +1,7 @@
+# RAG orchestration (Phase 5A) — LlamaIndex orchestration primitives only
+# (BaseRetriever, NodeWithScore/TextNode, PromptTemplate, CustomLLM).
+# Generation itself goes through a custom adapter (src/orchestration/llm_adapter.py)
+# calling this project's existing Databricks SDK client directly — no
+# llama-index-llms-databricks / llama-index-llms-openai-like / openai
+# package is required (see llm_adapter.py module docstring for why).
+llama-index-core==0.14.24
