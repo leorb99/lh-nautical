@@ -1,0 +1,73 @@
+resources:
+  # MLflow experiment the RAG App writes request traces to (Phase 2A/2B
+  # tracing.py, wired in at rag/app.py's runtime initialization). A real,
+  # portable, per-target destination — never the Phase 2A/2B throwaway
+  # spike path (/Shared/ai_harness_tracing_spike_dev). Named under /Shared/
+  # (not a personal /Users/<email>/ path) and varies automatically per
+  # target via ${bundle.target}, so dev/ci/prod each get their own
+  # experiment without any manual per-target edits.
+  experiments:
+    rag_app_tracing:
+      name: "/Shared/${bundle.name}-${bundle.target}-rag-tracing"
+
+  apps:
+    rag_app:
+      name: "rag-api"
+      description: "RAG Harness API backend (Phase 4B) — POST /api/ask over the existing RagOrchestrator/AIHarness stack."
+      # Relative to this file's own directory (resources/), matching every
+      # other path reference already in resources/resources.yml (e.g.
+      # ../src/bronze/..., ../dbt_lh_nautical). Points at the whole rag/
+      # directory, not rag/app, specifically so rag/src/ is deployed
+      # alongside app.py/app.yaml/requirements.txt — see rag/app.py's own
+      # module docstring and the Phase 4B report's "Deployment Layout"
+      # section for why this is required (not merely convenient).
+      source_code_path: ../rag
+      config:
+        env:
+          # Reuses the existing catalog_name Bundle variable — the one
+          # value here that genuinely differs per target already.
+          - name: RAG_CATALOG
+            value: ${var.catalog_name}
+          - name: MLFLOW_TRACKING_URI
+            value: "databricks"
+          - name: MLFLOW_EXPERIMENT_ID
+            value: ${resources.experiments.rag_app_tracing.id}
+      resources:
+        - name: llm
+          serving_endpoint:
+            # Same reference model this project has used since Phase 5A
+            # (rag/src/generation/llama_client.py's DEFAULT_MODEL_ENDPOINT)
+            # — identical across every target today, so not parameterized
+            # into a new Bundle variable (see Phase 4B report).
+            name: "databricks-meta-llama-3-3-70b-instruct"
+            permission: CAN_QUERY
+        - name: tracing
+          experiment:
+            experiment_id: ${resources.experiments.rag_app_tracing.id}
+            permission: CAN_EDIT
+      permissions:
+        # leonardo.barbosa@indicium.ai already exists as a named project
+        # principal (resources/resources.yml's job failure-notification
+        # list) — reused here, not invented, as the Phase 4B task
+        # instructed. CAN_USE only, nothing higher.
+        - user_name: leonardo.barbosa@indicium.ai
+          level: CAN_USE
+
+      # NOTE (Phase 4B, deliberately NOT declared here, corrected finding):
+      # Vector Search index access for this App's service principal DOES
+      # have a real Bundle mechanism — `uc_securable` (securable_type:
+      # TABLE, permission: SELECT, securable_full_name: <catalog>.rag.
+      # document_chunks_index) — confirmed against `databricks bundle
+      # schema`, and confirmed *correct* because the live runtime error this
+      # App hit was literally "GRANT SELECT ON TABLE <catalog>.rag.document_
+      # chunks_index ... TO <client_id>", i.e. UC treats the index as a
+      # TABLE securable. It was added and attempted here, but
+      # `databricks bundle deploy -t dev` rejected it: the deploying
+      # identity (natalia.correia@indicium.ai) lacks USE CATALOG/MANAGE on
+      # `dev_natalia_correia_lh_nautical` and cannot grant SELECT on its own
+      # objects to the app's service principal through this path either.
+      # Reverted rather than left half-applied and breaking `bundle deploy`.
+      # See the Phase 4B report's "Remaining Blockers" section for the
+      # exact one-line grant a metastore admin (or the catalog owner) still
+      # needs to run — either re-add this `uc_securable` block and redeploy,
+      # or run the equivalent GRANT directly.
