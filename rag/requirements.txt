@@ -5,3 +5,30 @@
 # llama-index-llms-databricks / llama-index-llms-openai-like / openai
 # package is required (see llm_adapter.py module docstring for why).
 llama-index-core==0.14.24
+
+# Databricks App runtime (Phase 4B) — this file doubles as the App's own
+# requirements.txt (Databricks Apps expect it co-located with app.yaml at
+# source_code_path's root; see the Phase 4B report's "Deployment Layout").
+# Deliberately separate from this project's root/dbt requirements.txt: any
+# mlflow install (even mlflow-tracing alone) upgrades databricks-sdk past
+# dbt-databricks==1.9.8's pin in that shared environment (Phase 2A/2B
+# finding) — this file is never installed there.
+#
+# `mlflow-tracing` (the lightweight package) was verified in a clean
+# isolated environment to provide every API tracing.py uses (mlflow.trace,
+# mlflow.get_current_active_span, mlflow.llama_index.autolog,
+# mlflow.entities.SpanType) — but a real Databricks App deployment crashed
+# on startup with `ImportError: cannot import name 'EvaluationDataset' from
+# 'mlflow.entities'`, because the Databricks App base image already ships
+# a fuller mlflow variant, and mlflow-tracing's slimmer `mlflow.entities`
+# collides with it (exactly the conflict MLflow's own docs warn about:
+# "make sure the environment does not have the full MLflow package
+# installed" when using mlflow-tracing — except here the *platform's own
+# base image* is that other installation, not something this project
+# added). The full `mlflow` package resolves this by being a strict
+# superset instead of a conflicting slim variant — see the Phase 4B
+# report's "Dependency Boundary" section for the full live evidence.
+mlflow
+fastapi
+uvicorn
+databricks-sdk==0.139.0

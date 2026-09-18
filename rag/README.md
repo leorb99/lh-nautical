@@ -38,7 +38,7 @@ knowledge base — evolving toward a broader, multi-source document platform.
 | Databricks AI Search (own index on shared `rag_endpoint`) | IMPLEMENTED / RUNTIME VALIDATED (Phase 3A) |
 | `document_chunks_index` | READY / 163 indexed rows |
 | Hybrid Search | RUNTIME SMOKE/REGRESSION VALIDATED (old + new domains) |
-| AI Search Infrastructure as Code (Asset Bundle) | PLANNED / NON-BLOCKING HARDENING |
+| AI Search Infrastructure as Code (Asset Bundle) | `document_chunks_index` itself: PLANNED / NON-BLOCKING HARDENING. The Databricks App and its MLflow tracing experiment: IMPLEMENTED as Bundle resources (see Phase 8). |
 | Corpus Completion Checkpoint (Power BI promotion) | PASS / CLOSED |
 | Retrieval Layer | IMPLEMENTED / RUNTIME VALIDATED |
 | Retrieval Quality Baseline (Phase 4A, corrected in 4A.1) | IMPLEMENTED / VALIDATED |
@@ -53,20 +53,23 @@ knowledge base — evolving toward a broader, multi-source document platform.
 | **LlamaIndex Orchestration** (`orchestration/rag_pipeline.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Databricks Llama Generation** (`generation/llama_client.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Lean RAG Core** (orchestration consolidation review) | **REFACTORED / VALIDATED** |
-| AI Harness | NEXT / PLANNED (Phase 6A) |
-| Interface — Databricks App | PLANNED |
-| Quality/Observability plane (MLflow) | PLANNED |
+| **AI Harness** (`harness/harness.py`, Phase 6A) | **IMPLEMENTED** — request validation, `AI_SEARCH` source route, controlled-failure containment. `STRUCTURED_DATA`/`BOTH` remain unimplemented placeholders (Phase 6B, deferred); no semantic source router; no context/token-budget selection (see "Top-K vs Token Budget", still open) |
+| Citation Integrity Validation (`evaluation/citations.py`) | IMPLEMENTED — structural check only (cited `[Sn]` labels vs. real source labels); not a semantic groundedness judgment |
+| MLflow Request Tracing (`harness/tracing.py`, Phase 7) | **IMPLEMENTED / LIVE RUNTIME VALIDATED** — real live App requests produced real MLflow trace records (parent `AIHarness.ask`, correct inputs/outputs, `mlflow.user` matching the App's own service principal, real token usage/cost, span counts consistent with each request's code path). Individual child-span artifact retrieval was not inspectable with the tooling used (see Roadmap Phase 8) — a non-blocking observability limitation, not a functional gap. MLflow **evaluation harness** (systematic quality regression) remains PLANNED |
+| Interface — Databricks App (`app.py` + `resources/rag_app.yml`, Phase 8) | **IMPLEMENTED / DEPLOYED / LIVE VALIDATED** — App is `RUNNING`/`ACTIVE`. All three V1 API-contract paths validated against the real deployed App: `GOLD-032` → `AI_SEARCH_OK`; `GOLD-999` → `AI_SEARCH_NO_EVIDENCE`; whitespace query → `INVALID_REQUEST`/HTTP 400 (see Roadmap Phase 8). This is backend/API validation only — the chatbot UI is separate, in-progress work (see "Interface Layer — Databricks App") |
 | External document pipeline (PDF/DOCX/etc.) | PLANNED, DEFERRED until after core RAG |
 
 **Repository / branch state:**
 
 - `rag/` is versioned in Git (previously untracked during earlier
   development; now committed).
-- Work is on branch `feature/rag`.
-- A Bitbucket pull request already exists: **PR #108**.
-- The branch has **not** been merged into `develop`. This is intentional:
-  Databricks runtime validation of the persistence layer must happen
-  before merge.
+- Branch `feature/rag` (Phases 1–5A, through the Lean RAG Core review) was
+  merged via **PR #108** (commit `c6e1112`) — this work is on `main` now.
+- Current work (AI Harness, MLflow tracing, citation integrity, the
+  Databricks App, and the Bundle `resources/rag_app.yml`) is on a
+  **separate, newer branch, `feature/ai-harness`**, built on top of the
+  merged `feature/rag` work. As of this revision that work is **local and
+  uncommitted** — no commit, push, or merge has been made for it.
 - The confirmed development catalog for this project is
   `dev_natalia_correia_lh_nautical`.
 - `dev_natalia_correia_lh_nautical.rag` and
@@ -91,11 +94,15 @@ knowledge base — evolving toward a broader, multi-source document platform.
   successfully as real `spark_python_task` job submissions.
 - The shared `rag_endpoint` (Databricks AI Search, `STANDARD`, created by
   Adriano Takata) was observed as `ONLINE` with `num_indexes = 0`
-  immediately before this project created its own index there. This
-  project's own index, `document_chunks_index`, now exists on that
-  endpoint — see "Retrieval Architecture" below. Who/when a
+  immediately before this project created its own index there. Who/when a
   previously-observed index (from an earlier, unrelated observation) was
-  removed is unknown and not asserted here.
+  removed is unknown and not asserted here. **Freshly re-verified for this
+  revision** (`databricks vector-search-endpoints get-endpoint`/
+  `list-indexes`/`get-index`, read-only): `rag_endpoint` is `ONLINE` with
+  `num_indexes = 1`; this project's own index,
+  `document_chunks_index`, is `ready = true`, `HYBRID`, `TRIGGERED`,
+  `indexed_row_count = 163` — consistent with the Delta table's
+  last-documented 163-row state below — see "Retrieval Architecture" below.
 
 **Delta Runtime Validation Results (runtime-validated, not a design
 expectation):**
@@ -125,7 +132,7 @@ chunks while the 99 pre-existing chunks remain byte-identical — same
 `ingested_at`, zero rows removed or recreated (verified by snapshot
 comparison before/after version 3).
 
-**Latest complete local test run:**
+**Latest complete local test run for the Phase 1 ingestion test suite:**
 
 ```
 232 passed, 0 failed, 0 skipped
@@ -135,7 +142,11 @@ comparison before/after version 3).
 reflects three existing tests that are parametrized directly over
 `CANONICAL_DOCUMENTS` and therefore automatically gained one additional
 case each for the sixth document — no test was weakened to reach this
-number. See "Testing" below.)
+number. This 232 figure covers only the Phase 1 ingestion-scoped test
+files — it is not the whole-repository count. See "Testing" below for the
+current whole-repository figure: **433 passed, 0 failed, 0 skipped** — the
+last full-suite aggregate actually executed, now including the
+Harness/Tracing/Citations/App test files.)
 
 ## Knowledge Provenance — Distinct Origins
 
@@ -291,15 +302,39 @@ ParsedDocument / ParsedSection
    grounded answer + deterministic source metadata
         |
         v
-   ... see "Final Architecture — Six Layers" below for what remains
-       future (AI Harness / Interface Layer, and the MLflow plane) — this
-       diagram now covers the Knowledge/Data Layer, Retrieval Layer,
-       Orchestration Layer, and Generation Layer, all implemented and
-       runtime-validated. The AI Harness is NOT part of this implemented
-       path — it remains a future phase (see Roadmap): request validation,
-       source routing between AI Search and a future structured Delta/SQL
-       path, evidence sufficiency, citation validation, and guardrails are
-       not implemented anywhere in this diagram.
+[IMPLEMENTED, Phase 6A] AIHarness.ask()
+  (src/harness/harness.py — request validation, AI_SEARCH source route,
+   controlled-failure containment; calls RagOrchestrator.generate()
+   unchanged, adds no retrieval/generation logic of its own)
+        |
+        v
+[IMPLEMENTED, Phase 7] traced_ask()
+  (src/harness/tracing.py — one MLflow parent span around AIHarness.ask,
+   nesting the autologged retrieval/generation spans into one trace)
+        |
+        v
+[IMPLEMENTED] check_citation_integrity()
+  (src/evaluation/citations.py — structural check of the model's [Sn]
+   markers against the deterministic sources metadata; called by the App,
+   not by the Harness itself)
+        |
+        v
+[IMPLEMENTED, DEPLOYED dev, LIVE VALIDATED, Phase 8] Databricks App (rag/app.py)
+  POST /api/ask -> stable JSON contract (status/answer/sources/
+  citation_integrity/message) — see "Interface Layer — Databricks App"
+        |
+        v
+   ... see "Final Architecture — Six Layers" below for what is still
+       future within Layers 5–6 (structured-data source routing, Phase 6B;
+       context/token-budget selection; a full chatbot UI beyond this API;
+       and the MLflow evaluation harness half of the Quality plane) — this
+       diagram now covers all six layers at least partially, and the
+       Knowledge/Data, Retrieval, Orchestration, and Generation layers are
+       fully implemented and runtime-validated. The AI Harness and
+       Interface Layer are implemented for the AI_SEARCH route only;
+       structured-data source routing, general evidence-sufficiency
+       judgment beyond the empty-retrieval guard, and MLflow's evaluation
+       (as opposed to tracing) half remain not implemented.
 ```
 
 Everything up to and including `Chunk[]` is implemented and tested. The
@@ -321,8 +356,9 @@ its own evidence-derived Top-K — is also implemented and runtime-validated
 on top of that index; see "Retrieval Architecture" below for the full
 Phase 4A/4A.1/4B/4C evidence chain. This retrieval policy is retrieval-layer
 logic only — it is not the AI Harness (Layer 5) and does not decide
-between AI Search and the future structured Delta/SQL data path; a future
-Harness may own or call it, but does not exist yet.
+between AI Search and the future structured Delta/SQL data path; the
+Harness (Phase 6A) calls it indirectly, through `RagOrchestrator.generate`,
+unchanged — it does not own or reimplement it.
 
 As of Phase 5A, the pipeline no longer stops at candidate chunks: a
 LlamaIndex-based orchestrator (`orchestration/rag_pipeline.py`) consumes
@@ -334,9 +370,23 @@ path is now implemented and runtime-validated (see "Orchestration Layer —
 LlamaIndex" and "Generation Design" below for the full detail, including
 known limitations). LlamaIndex orchestrates execution; it does not
 re-decide retrieval routing, Top-K, or filtering — those remain owned
-entirely by the Phase 4C policy. Everything past this diagram — the AI
-Harness and the Interface Layer, plus the MLflow plane — is planned but
-not implemented.
+entirely by the Phase 4C policy.
+
+As of Phase 6A/7/8, the pipeline no longer stops at a generated answer
+either: `AIHarness.ask` (`harness/harness.py`) wraps
+`RagOrchestrator.generate` with request validation and a controlled
+`AI_SEARCH`-route result; `traced_ask` (`harness/tracing.py`) wraps that
+call in one MLflow parent span per request; `check_citation_integrity`
+(`evaluation/citations.py`) structurally validates the model's citations;
+and a FastAPI Databricks App (`app.py`) exposes all of it as `POST
+/api/ask`, deployed to the `dev` target via the existing root Bundle. What
+remains planned within these layers: structured-data source routing
+(`STRUCTURED_DATA`/`BOTH`, Phase 6B, deferred until a real data contract
+exists), context/token-budget selection (see "Top-K vs Token Budget"),
+semantic-groundedness/evidence-sufficiency judgment beyond the Phase 5A
+empty-retrieval guard, a full chatbot UI beyond this API contract, and the
+MLflow evaluation-harness half of the Quality plane (tracing itself is
+implemented; systematic quality regression is not).
 
 ## Final Architecture — Six Layers
 
@@ -366,13 +416,19 @@ is a six-layer system, plus a transversal Quality/Observability plane:
    LlamaIndex"). Consolidated into one lean module after the Architecture
    Scope Review (see "Roadmap").
 5. **AI Harness / Quality Layer** — custom application-control layer:
-   request validation, context/token budget, guardrails, evidence/citation
-   validation. PLANNED (see "AI Harness").
-6. **Interface Layer** — Databricks App (chatbot/UI). PLANNED (see
-   "Interface Layer — Databricks App").
+   request validation, `AI_SEARCH` source routing, citation validation.
+   IMPLEMENTED for the `AI_SEARCH` route (Phase 6A — see "AI Harness").
+   Context/token budget, guardrails beyond the Phase 5A empty-retrieval
+   guard, and `STRUCTURED_DATA`/`BOTH` routing remain PLANNED.
+6. **Interface Layer** — Databricks App. Backend IMPLEMENTED and DEPLOYED
+   to `dev` (`POST /api/ask`, Phase 8 — see "Interface Layer — Databricks
+   App"); full live-request validation is currently blocked on a Unity
+   Catalog permission grant. A chatbot UI beyond this API contract remains
+   PLANNED.
 
-Transversal: **MLflow** (tracing + evaluation) — see "Quality, Evaluation
-and Observability" below.
+Transversal: **MLflow** — request tracing IMPLEMENTED (Phase 7); the
+evaluation harness half remains PLANNED — see "Quality, Evaluation and
+Observability" below.
 
 ```
                          DATABRICKS APP
@@ -418,21 +474,27 @@ layer. The `DELTA / SQL` branch under LlamaIndex is the same Knowledge/Data
 Layer's physical storage (Unity Catalog), used through a **different access
 path** for dynamic structured data (see "Structured Runtime Data —
 Analytical / ML Outputs (PLANNED)" below), not a new architectural layer.
-The diagram above is the **target** architecture — it shows the AI Harness
-already routing between `AI Search`, `Delta/SQL`, and `Llama`; today, only
-the `AI Search -> Llama` path (via LlamaIndex) is implemented, driven
-directly by the Phase 4C Retrieval Policy, not yet by a Harness (see
-"Architecture — Current, Implemented" above for the diagram that reflects
-what actually runs today).
+The diagram above is still, in one respect, **target** architecture: it
+shows the AI Harness routing between `AI Search`, `Delta/SQL`, and `Llama`,
+but only the `AI Search` branch is real today — the Harness's `AI_SEARCH`
+route is implemented and calls the same Phase 4C-driven
+`AI Search -> Llama` path via LlamaIndex; the `Delta/SQL` branch and any
+routing decision between the two remain PLANNED (Phase 6B, deferred until
+a real structured-data contract exists) — see "Architecture — Current,
+Implemented" above for the diagram that reflects what actually runs today.
 
 Layer 1 (Knowledge/Data), Layer 2 (Retrieval, via `document_chunks_index`
 and the Phase 4C Retrieval Policy), Layer 3 (Generation, Databricks Llama)
 and Layer 4 (Orchestration, LlamaIndex) are **implemented and
-runtime-validated** today (Phase 5A) — see Status. The `DELTA / SQL`
-structured-data query path shown above is **PLANNED / DEFERRED UNTIL A
-REAL DATA CONTRACT EXISTS**, not implemented. Layers 5–6 (AI Harness,
-Interface) and the MLflow plane are **PLANNED** — none of their code
-exists in the repository yet.
+runtime-validated** today (Phase 5A) — see Status. Layer 5 (AI Harness) is
+implemented for the `AI_SEARCH` route (Phase 6A); Layer 6 (Interface,
+Databricks App) is implemented, deployed to `dev`, and **live
+end-to-end validated** (Phase 8) — the backend/API surface, not the
+chatbot UI, which remains separate ongoing work. The
+`DELTA / SQL` structured-data query path shown above is **PLANNED /
+DEFERRED UNTIL A REAL DATA CONTRACT EXISTS**, not implemented. MLflow
+tracing (part of the transversal plane) is implemented and live-validated;
+the MLflow evaluation harness is **PLANNED**.
 
 ## Architecture — Target, Multi-Source (PLANNED)
 
@@ -450,10 +512,11 @@ Below `document_chunks`, `Databricks AI Search`, `Hybrid Retrieval`,
 orchestration + Databricks Llama generation step are now runtime-validated
 (see "Retrieval Architecture" and "Orchestration Layer — LlamaIndex") —
 but only for the existing six-document corpus reachable today; the
-Context Manager/token-budget step and Response Verification remain
-PLANNED, and none of this diagram's left-hand "Data exploration" branch
-changes — this diagram is still specifically about the future
-external-document intake path on the right.
+Context Manager/token-budget step remains PLANNED, and Response
+Verification is PARTIAL (see "Response Verification / Groundedness") —
+none of this diagram's left-hand "Data exploration" branch changes — this
+diagram is still specifically about the future external-document intake
+path on the right.
 
 ```
                           KNOWLEDGE SOURCES
@@ -501,7 +564,7 @@ external-document intake path on the right.
                        LlamaIndex orchestration +      [RUNTIME VALIDATED,
                        Databricks Llama generation       Phase 5A]
                                        |
-                          Response Verification         [PLANNED]
+                          Response Verification         [PARTIAL]
                                        |
                           Answer + Evidence/Citations
 ```
@@ -911,8 +974,9 @@ Logical schema, defined in
 [`rag/sql/create_document_chunks.sql`](./sql/create_document_chunks.sql)
 (FINAL / CLOSED as a schema contract; **applied to a physical table** —
 `dev_natalia_correia_lh_nautical.rag.document_chunks` exists, has been
-runtime-validated against this exact contract, and holds 99 runtime-ingested
-rows — see Status):
+runtime-validated against this exact contract, and holds 163
+runtime-ingested rows (99 from the original 5-document corpus + 64 from
+the Power BI promotion) — see Status):
 
 ```
 chunk_id           STRING
@@ -1149,11 +1213,14 @@ shapes what the MVP architecture can rely on:
   exploratory queries should be avoided; validations should be batched into
   as few compute windows as practical. No exact DBU/billing figures are
   asserted here — see "No specific quotas..." note below.
-- Generation (Llama) is planned via the Foundation Model API's pay-per-token
+- Generation (Llama) runs via the Foundation Model API's pay-per-token
   billing mode, not provisioned throughput.
-- The planned Interface Layer (Databricks App) is expected to run within
-  the same Free Edition constraints — no additional compute tier is
-  planned for it.
+- The Interface Layer (Databricks App, deployed to `dev` — see "Interface
+  Layer — Databricks App") runs within the same Free Edition constraints —
+  no additional compute tier was needed for it; its own compute is the App
+  runtime container itself (`compute_size: MEDIUM`, observed via
+  `databricks apps get`), separate from the SQL warehouse / job compute
+  used elsewhere in this project.
 
 No specific quotas or numeric limits are documented here beyond what is
 already established above, to avoid stating figures without confirmed
@@ -1653,17 +1720,21 @@ Not blockers for Phase 5A (closed) or Phase 6A (next), but genuinely open:
   without a separate token-budget selection layer; this is now the actual
   behavior, not merely a planned gap (see "Retrieval Policy (Phase 4C)"
   above and "Orchestration Layer — LlamaIndex" below).
-- Formal citation/evidence-sufficiency verification (see "Response
-  Verification / Groundedness") — Phase 5A returns deterministic source
-  metadata and an empty-retrieval guard (no evidence -> no model call),
-  but does not verify that the model's own citation markers are correct.
-  The current retrieval policy (Phase 4C) decides behavior **within** AI
+- Evidence-sufficiency verification beyond the empty-retrieval guard (see
+  "Response Verification / Groundedness") — citation-*label* existence is
+  now checked structurally (Phase 6A/8, `check_citation_integrity`: every
+  `[Sn]` the model cites is checked against the real `sources` metadata),
+  but whether the cited source actually, semantically supports the claim
+  next to it (groundedness) is still not verified. The current retrieval
+  policy (Phase 4C) decides behavior **within** AI
   Search retrieval only; it is a distinct, narrower concern from the
-  future Harness-level decision of routing between AI Search and the
-  structured Delta/SQL data path (see "Structured Runtime Data —
-  Analytical / ML Outputs (PLANNED)") — that source-level routing is not
-  implemented and is not what Phase 4C's policy, or the Phase 5A
-  orchestrator, does.
+  Harness's routing between AI Search and the structured Delta/SQL data
+  path (see "Structured Runtime Data — Analytical / ML Outputs (PLANNED)")
+  — the Harness itself exists (Phase 6A), but its *semantic* source-routing
+  decision logic between `AI_SEARCH`/`STRUCTURED_DATA`/`BOTH` remains
+  future/deferred (Phase 6B); today it always defaults to `AI_SEARCH`. That
+  source-level routing is not implemented and is not what Phase 4C's
+  policy, or the Phase 5A orchestrator, does.
 
 ## Structured Runtime Data — Analytical / ML Outputs (PLANNED)
 
@@ -1924,25 +1995,30 @@ enters only **after** retrieval.
   model name, and retrieval/generation/total latency (plus token usage
   when the API returns it).
 
-**What LlamaIndex does NOT do here** (reserved for the future AI Harness,
-Phase 6A — see "AI Harness"):
+**What LlamaIndex does NOT do here** (owned by the AI Harness, Phase 6A —
+see "AI Harness" — or, where noted, still not implemented anywhere):
 
 - decide AI Search vs. structured/Delta/SQL data, or fetch structured
-  evidence — no structured-data provider exists in this codebase (see
-  "Structured-data decision" below);
-- score or gate evidence sufficiency;
-- validate citations;
-- apply guardrails;
-- log to MLflow.
+  evidence — no structured-data provider exists in this codebase yet
+  (Phase 6B, deferred; see "Structured-data decision" below);
+- score or gate evidence sufficiency beyond the empty-retrieval guard —
+  not implemented anywhere yet;
+- validate citations — **implemented**, but in `evaluation/citations.py`,
+  called from the App, not inside LlamaIndex or `rag_pipeline.py`;
+- apply guardrails beyond the empty-retrieval guard — not implemented
+  anywhere yet;
+- log to MLflow — **implemented**, but from `harness/tracing.py`,
+  external to both LlamaIndex and `rag_pipeline.py`.
 
 LlamaIndex does **not** replace any of this project's own closed
 engineering, and does **not** become a new source of truth — none of the
 following are, or will be, delegated to it: `loader.py`/`parser.py`/
 `chunker.py`; deterministic hashing/chunk IDs; Delta persistence/atomic
 `MERGE`; provenance; document lifecycle; quality gates for future external
-documents; context/token budgeting (owned by the future AI Harness's
-Context Manager); evidence/citation validation (owned by the future AI
-Harness); creating or computing ML predictions.
+documents; context/token budgeting (still not implemented anywhere, see
+"Top-K vs Token Budget"); evidence/citation validation (implemented, but
+in `evaluation/citations.py` and the App layer, not in LlamaIndex);
+creating or computing ML predictions.
 
 ### Current lean structure (`orchestration/rag_pipeline.py`)
 
@@ -2036,11 +2112,16 @@ physical schema is invented here.
 
 **Known observation from Case C:** the generated answer contained one
 attribution claim not strictly supported by the retrieved evidence blocks
-shown to the model. This is a concrete, observed example of why citation/
-claim validation still belongs to the future Harness (see "AI Harness")
-— Phase 5A's deterministic `sources` metadata is correct and independent
-of this regardless, but nothing today checks the model's own prose
-against it.
+shown to the model. This is a concrete, observed example of why claim-
+level (semantic) validation, not just citation-*label* validation, matters
+— the Phase 6A/8 citation checker (`check_citation_integrity`, see "AI
+Harness") would not have caught this specific case, because the model's
+`[Sn]` label was presumably still a real, existing source; what was wrong
+is that the label doesn't strictly support the specific claim next to it,
+which is a semantic-groundedness question the current structural checker
+explicitly does not answer (see "Response Verification / Groundedness").
+Phase 5A's deterministic `sources` metadata is correct and independent of
+this regardless.
 
 **Empty-retrieval behavior (validated):** for Case B (`"GOLD-999"`) the
 retrieval policy still routes `EXACT_RULE_ID` and the `rule_ids` filter
@@ -2147,15 +2228,14 @@ and `generation/search_results.py` remain **0-byte legacy placeholders,
 inactive** — Claude is not, and has not been, part of the active
 architecture (see "Current Architectural Decisions").
 
-## AI Harness (PLANNED — NEXT, Phase 6A)
+## AI Harness (Phase 6A — IMPLEMENTED, `AI_SEARCH` route scope)
 
 The target system treats the generation model as only **one component** of
-the RAG application, not the whole application. None of the modules or
-flow described in this section exist in the repository yet — this remains
-true even though the layer it would sit above is now fully implemented
-and runtime-validated end to end (Retrieval Policy → AI Search →
-LlamaIndex orchestration → Databricks Llama — see "Orchestration Layer —
-LlamaIndex"). The future runtime boundary is:
+the RAG application, not the whole application. The core control layer
+described in this section is now implemented and sits above the layer it
+was designed for (Retrieval Policy → AI Search → LlamaIndex orchestration
+→ Databricks Llama — see "Orchestration Layer — LlamaIndex"), scoped
+deliberately to the `AI_SEARCH` route only. The runtime boundary is:
 
 ```
 AI Harness
@@ -2169,24 +2249,17 @@ retrieval + generation
 
 The Phase 4C retrieval policy (`EXACT_RULE_ID`/`CROSS_SOURCE`/`NORMAL`
 routing, see "Retrieval Architecture") is retrieval-layer logic that
-decides behavior **within** AI Search — it is not the Harness's future
-source-routing policy below (which decides *between* `AI_SEARCH`,
-`STRUCTURED_DATA`, or `BOTH`). These are different levels of routing and
-must not be merged: Phase 4C's policy is already implemented and called
-automatically by `RagOrchestrator.generate` today; the Harness's
-source-routing policy does not exist yet, and `rag_pipeline.py` does not
-absorb it — the orchestrator only ever calls the existing AI Search path,
-never structured data, and never decides between them. A future Harness
-may own or call the Phase 4C policy plus the orchestrator as inputs, but
-does not exist yet, and this section describes target design, not current
-behavior.
+decides behavior **within** AI Search — it is not the Harness's
+source-routing (which decides *between* `AI_SEARCH`, `STRUCTURED_DATA`, or
+`BOTH`, via `SourceRoute`). These are different levels of routing and are
+not merged: Phase 4C's policy is called automatically by
+`RagOrchestrator.generate`, unchanged; `AIHarness.ask` calls
+`RagOrchestrator.generate` and never reimplements, duplicates, or bypasses
+it.
 
-The Harness is no longer described merely as `request → retrieval →
-generation`: with the structured-data path now architecturally decided
-(see "Structured Runtime Data — Analytical / ML Outputs (PLANNED)"), the
-Harness's target responsibility set explicitly includes **source routing**
-— deciding whether a request needs documentary retrieval, a structured
-analytical query, or both.
+The **full target** responsibility set (below) explicitly includes source
+routing between documentary retrieval and a future structured analytical
+query — implemented today only for the `AI_SEARCH` branch:
 
 ```
 User Request
@@ -2195,16 +2268,24 @@ User Request
 +-----------------------------------+
 |            AI HARNESS             |
 |                                    |
-| request validation                |
+| request validation      [DONE]    |
 | intent / source-routing policy    |
 |   (AI Search vs structured data   |
-|    vs both)                       |
+|    vs both)          [AI_SEARCH   |
+|                     hardcoded default;
+|                   no semantic router]
 | context / evidence assembly       |
-| token budget                      |
-| model invocation policy           |
-| response validation               |
+| token budget           [PLANNED]  |
+| model invocation policy [DONE, via|
+|                      RagOrchestrator]
+| response validation    [PARTIAL]  |
 | citation / evidence verification  |
+|            [DONE, evaluation/     |
+|             citations.py, called  |
+|             by the App — see below]
 | tracing / evaluation hooks        |
+|      [tracing: DONE, harness/     |
+|       tracing.py. evaluation: PLANNED]
 +----------------+-------------------+
                  |
                  v
@@ -2223,77 +2304,220 @@ User Request
           v
     Unity Catalog
 
-                    MLflow (tracing/evaluation hooks
-                     fired from the Harness — see
+                    MLflow (tracing implemented,
+                     see harness/tracing.py — see
                      "Quality, Evaluation and Observability")
 ```
 
-Target module structure:
+Actual module structure (differs from an earlier plan — see below):
 
 ```
 src/
 └── harness/
-    ├── orchestrator.py
-    ├── context_manager.py
-    ├── guardrails.py
-    └── tracing.py
+    ├── harness.py     <- SourceRoute, HarnessStatus, HarnessResult,
+    │                     AIHarness.ask() — request validation, source
+    │                     routing container, controlled-failure containment
+    └── tracing.py      <- enable_autolog(), traced_ask() — MLflow
+                            parent-span wrapper, called from OUTSIDE
+                            AIHarness (never imported by harness.py)
 ```
 
-Planned responsibilities (note: this `orchestrator.py` is the Harness's
-own future request-lifecycle module, a different file from — and one
-level above — `orchestration/rag_pipeline.py`'s `RagOrchestrator`, which
-already exists and is implemented):
+Responsibilities, as actually implemented:
 
-- **`orchestrator.py`** — coordinates the full request lifecycle: request
-  validation → intent/source-routing (`AI_SEARCH`, `STRUCTURED_DATA`, or
-  `BOTH`) → calls `rag_pipeline.py`'s `RagOrchestrator.generate` for the
-  AI Search side → context/evidence assembly across sources → validation.
-- **`context_manager.py`** — candidate selection, Top-K handling, token
-  budget, final context assembly across both documentary and structured
-  evidence (see "Top-K vs Token Budget"). Phase 5A's orchestrator does not
-  do this today — it sends the full retrieved evidence set as context.
-- **`guardrails.py`** — evidence sufficiency checks, citation/reference
-  and structured-evidence verification, and a controlled fallback response
-  when evidence is insufficient (see "Response Verification /
-  Groundedness"). Phase 5A implements only a much narrower deterministic
-  empty-retrieval guard (zero candidates → no model call), not this.
-- **`tracing.py`** — execution observability integration (see "MLflow
-  Tracing / Observability"). Every `RetrievalPolicyDecision` already
-  exposes route/query_type/top_k/filter metadata intended for this, but
-  nothing consumes it yet.
+- **`harness.py` (`AIHarness.ask`)** — validates the query (non-empty,
+  non-whitespace) before touching any route, returning `INVALID_REQUEST`
+  without ever calling `RagOrchestrator` or a structured-data provider;
+  resolves `source_route` (defaults to `AI_SEARCH` — there is still no
+  semantic/keyword router, deliberately: no real `StructuredDataProvider`
+  or data contract exists to route toward yet); for `AI_SEARCH`, calls
+  `RagOrchestrator.generate` unchanged and maps its outcome to
+  `AI_SEARCH_OK` / `AI_SEARCH_NO_EVIDENCE`; catches any exception from
+  that call and returns it as a controlled `RAG_EXECUTION_FAILED` result
+  instead of propagating it. `STRUCTURED_DATA`/`BOTH` remain real enum
+  values with defined `HarnessStatus` outcomes
+  (`STRUCTURED_DATA_UNAVAILABLE`, `STRUCTURED_DATA_FETCHED_NO_GENERATION`,
+  `BOTH_PARTIAL`) but no implementation reaches them today — no provider
+  is ever configured, so they are unreachable in practice (Phase 6B,
+  deferred). `harness.py` also re-declares a minimal, deliberately generic
+  `StructuredEvidence`/`StructuredDataProvider` interface (no
+  table/catalog/schema/SQL detail) — this is **not** a contradiction of
+  the Lean Core review's removal of orchestration's own
+  `structured_data.py`: that removal was about a zero-caller placeholder
+  sitting inside `rag_pipeline.py`'s package; this one exists specifically
+  so `AIHarness`'s constructor and routing logic have a typed shape to
+  route *toward*, with zero implementations of it anywhere in the
+  repository, same as before.
+- **`tracing.py` (`enable_autolog`, `traced_ask`)** — deliberately **not**
+  part of `harness.py`, so `AIHarness` stays fully observability-framework
+  agnostic (no `import mlflow` anywhere in that file). `enable_autolog()`
+  turns on `mlflow.llama_index.autolog()` once per process, which already
+  captures `PolicyRetriever.retrieve`/`_retrieve` and
+  `DatabricksLlamaLLM.complete` as spans with no manual instrumentation.
+  `traced_ask()` is a thin `@mlflow.trace`-decorated wrapper around
+  `AIHarness.ask` that adds exactly one thing autolog cannot know on its
+  own: one parent span (so the two autologged spans nest under one request
+  trace instead of two disconnected ones) plus a handful of request-level
+  attributes (`SourceRoute`, `HarnessStatus`, the resolved
+  `RetrievalRoute`/`top_k`, evidence count). It changes nothing about
+  Harness behavior — it only observes.
+- **Citation validation** — implemented, but lives in
+  `evaluation/citations.py` (`check_citation_integrity`), not in
+  `harness.py` — it is called from the Databricks App (`app.py`), not from
+  the Harness itself (see "Interface Layer — Databricks App" and "Response
+  Verification / Groundedness"). This keeps `AIHarness` focused on
+  routing/validation/failure-containment only.
+- **Context/token budget, general evidence-sufficiency judgment, and
+  structured-data guardrails** — **not implemented.** `RagOrchestrator`
+  still sends the full retrieved evidence set as context (see "Top-K vs
+  Token Budget", still open); the only sufficiency signal anywhere in the
+  system remains Phase 5A's narrow empty-retrieval guard.
 
-The Harness remains the future policy/control layer; `rag_pipeline.py`
-(LlamaIndex-based orchestration) remains the layer it would invoke.
-Business rules, governance, and validation policy are never delegated to
-LlamaIndex or to `rag_pipeline.py` (see "Orchestration Layer —
-LlamaIndex"). This is target architecture — `rag_pipeline.py` must not be
-read as already performing any of the Harness responsibilities above.
-None of `src/harness/orchestrator.py`, `context_manager.py`,
-`guardrails.py`, or `tracing.py` are implemented today.
+The originally planned four-file split (`orchestrator.py`,
+`context_manager.py`, `guardrails.py`, `tracing.py`) was **not** what got
+built: the actual implementation is two files (`harness.py`, `tracing.py`)
+plus reuse of an existing evaluation-layer function for citation checking,
+because a thin `AIHarness.ask` plus an external tracing wrapper covered
+the `AI_SEARCH`-only scope without the extra module boundaries a
+not-yet-real structured-data path would have justified. `rag_pipeline.py`
+(LlamaIndex-based orchestration) remains the layer the Harness invokes,
+unchanged; business rules, governance, and validation policy are still
+never delegated to LlamaIndex or `rag_pipeline.py` (see "Orchestration
+Layer — LlamaIndex").
 
-## Interface Layer — Databricks App (PLANNED)
+## Interface Layer — Databricks App (Phase 8 — IMPLEMENTED, DEPLOYED to `dev`)
 
-Databricks App is the planned chatbot/UI for this project — Layer 6 of
-the architecture, sitting above the AI Harness:
+Databricks App is Layer 6 of the architecture, sitting above the AI
+Harness. A backend now exists and is deployed:
 
 ```
-Databricks App
+Databricks App (rag/app.py, FastAPI)     [IMPLEMENTED, DEPLOYED dev]
+  POST /api/ask  {"query": "..."}
       |
       v
-  AI Harness            [PLANNED — NEXT, Phase 6A]
+  traced_ask()                           [IMPLEMENTED, Phase 7]
       |
       v
-  rag_pipeline.py        [IMPLEMENTED, Phase 5A]
+  AIHarness.ask()                        [IMPLEMENTED, Phase 6A]
+      |
+      v
+  rag_pipeline.py (RagOrchestrator)      [IMPLEMENTED, Phase 5A]
    /       \
 AI Search  Llama
 ```
 
-The App and the Harness are not implemented today. `rag_pipeline.py`
-(LlamaIndex orchestration → Databricks Llama) is implemented and
-runtime-validated, but is not yet reachable through any interface — it is
-currently called only directly (Python), not from a Harness or a UI. See
-"Databricks Free Edition Constraints" for the expected compute posture (no
-additional compute tier planned for the App).
+**What exists:** a single-endpoint FastAPI backend (`rag/app.py`) that is
+the App's entire V1 surface. Request contract is frozen to
+`{"query": "..."}` — no `source_route`, `top_k`, model selection, or any
+other retrieval control is accepted. Runtime (a `WorkspaceClient`, the
+`RagOrchestrator`, the `AIHarness`) is constructed exactly once per App
+process, not per request; `enable_autolog()` runs once at import time;
+each request calls `traced_ask()` exactly once. For an `AI_SEARCH_OK`
+result, the route calls `check_citation_integrity` and returns
+`status`/`answer`/`sources`/`citation_integrity`/`message`; other statuses
+map to a stable, minimal body with no internal exception text or stack
+trace ever included (`result.error` is logged server-side only). HTTP
+status is `200` for `AI_SEARCH_OK`/`AI_SEARCH_NO_EVIDENCE`, `400` for
+`INVALID_REQUEST`, `500` for `RAG_EXECUTION_FAILED` or any status the V1
+API does not otherwise expect. The App does not call AI Search or the
+Llama endpoint directly, does not classify the query itself, and does not
+duplicate any Harness/Orchestrator/Policy logic.
+
+**Deployment layout:** the Bundle App resource's `source_code_path` points
+at `rag/` (not `rag/app`), so `rag/src/` deploys as a sibling of `app.py`
+inside the App container — the same relative layout every other script in
+this repository already assumes when it imports `from src...` with `rag/`
+as the working directory. No RAG module is duplicated or copied into a
+separate App directory.
+
+**Dependencies:** `rag/requirements.txt` doubles as the App's own
+dependency file (co-located with `app.yaml`, per the documented Databricks
+App convention), and is deliberately separate from the shared dbt/root
+environment (any `mlflow` install upgrades `databricks-sdk` past
+`dbt-databricks==1.9.8`'s pin — see "Databricks Free Edition Constraints").
+One concrete, live-discovered finding: `mlflow-tracing` (the lightweight
+package) provides every API `tracing.py` uses when checked in an isolated
+venv, but crashed the actual deployed App container on import
+(`ImportError: cannot import name 'EvaluationDataset' from
+'mlflow.entities'`) — the platform's own App base image ships mlflow-
+related packages that conflict with `mlflow-tracing`'s slimmer
+`mlflow.entities`. The full `mlflow` package resolves this as a strict
+superset instead of a conflicting slim variant.
+
+**Bundle integration:** the App is declared in `resources/rag_app.yml`
+(auto-included via the existing root `databricks.yml`'s
+`include: resources/*.yml` — no second Bundle project), alongside a
+dedicated MLflow `experiments` resource
+(`/Shared/${bundle.name}-${bundle.target}-rag-tracing`, not the earlier
+throwaway spike path) that the App's `MLFLOW_EXPERIMENT_ID` env var
+references. Runtime configuration (`RAG_CATALOG`, derived index name,
+model endpoint) is environment-driven and reuses the existing Bundle
+`catalog_name` variable — no personal/hardcoded catalog, schema, or user
+path is embedded in App source or config. The App runs under its own
+Databricks-generated service-principal identity (no static token, no
+credentials file); `CAN_USE` is granted to an existing project principal
+already present in `resources/resources.yml`.
+
+**Deployed and LIVE VALIDATED (`dev` target only — `ci`/`prod` are not
+deployed):**
+
+- App resource `rag-api`, `app_status = RUNNING`, `compute_status = ACTIVE`.
+- URL: `https://rag-api-7474653394852199.aws.databricksapps.com`.
+- Unity Catalog access for the App's service principal is confirmed
+  sufficient in practice: `USE_CATALOG` on
+  `dev_natalia_correia_lh_nautical`, `USE_SCHEMA` on `...rag`, and
+  `SELECT` on `document_chunks_index` are all held and were exercised by
+  real, successful retrieval calls below — this is no longer an open
+  blocker (see "Current Architectural Decisions" and "Roadmap" for the
+  historical troubleshooting record, preserved as resolved history).
+- All three V1 API-contract paths were exercised against the real
+  deployed App, not merely called locally:
+
+  | Query | HTTP | `status` | Notes |
+  |---|---:|---|---|
+  | `"GOLD-032"` | 200 | `AI_SEARCH_OK` | grounded answer, 5 sources, `citation_integrity.status = VALID` |
+  | `"GOLD-999"` | 200 | `AI_SEARCH_NO_EVIDENCE` | `answer = null`, `sources = []`, no generation call made |
+  | `"   "` (whitespace) | 400 | `INVALID_REQUEST` | no retrieval/generation call made, no internal error exposed |
+
+  The `RAG_EXECUTION_FAILED` path was separately confirmed live during an
+  earlier, now-resolved permission gap: the App returned `HTTP 500` with
+  the correct stable minimal body and `result.error` confirmed absent
+  from the response (visible only in `databricks apps logs rag-api`) —
+  i.e. the controlled-error contract itself was validated live too, not
+  only the success path.
+
+**Deployment/runtime note (observed, not generalized beyond this case):**
+`databricks bundle deploy` updates the Bundle-tracked App resource
+definition and uploads source files, but in the one case observed here it
+did **not** itself start a new App process — an App that was `CRASHED`
+with `compute_status` still `ACTIVE` remained on its old, crashed process
+after a `bundle deploy`. Reaching a fresh, healthy process required a
+separate, explicit `databricks bundle run rag_app -t dev --restart`,
+which created a new deployment/process that started cleanly. This is
+recorded here as an observed runbook/troubleshooting fact for this
+project's specific App resource, not as a general claim about Databricks
+Apps' deploy semantics.
+
+**Handoff contract:** `rag/API_CONTRACT.md` documents the exact `POST
+/api/ask` contract (request/response JSON, status/HTTP-code mapping,
+`sources[]`/`citation_integrity` field shapes, authentication, the
+`CAN_USE` permission needed) for whoever builds the eventual UI on top of
+this API — intentionally scoped to the contract only, not RAG internals.
+The document is itself live-validated: its three example responses
+(`AI_SEARCH_OK`/`AI_SEARCH_NO_EVIDENCE`/`INVALID_REQUEST`) are the actual
+real response bodies from the three requests above, not hypothetical
+examples. It also documents an **open integration decision**, not a
+backend defect: CORS is not currently configured on the App, so a
+browser-based frontend running outside Databricks (e.g. local dev) cannot
+yet call `/api/ask` directly cross-origin — same-origin use from inside
+Databricks is unaffected, and this does not block UI development against
+the documented mock payloads. See "Databricks Free Edition Constraints"
+for the App's compute posture.
+
+**Backend/API vs. chatbot UI — do not conflate:** everything above is
+backend/API-contract validation, and it is now **PASS/CLOSED** for that
+scope. The chatbot UI itself (Layer 6's user-facing surface) is separate,
+ongoing work by another contributor, built against `rag/API_CONTRACT.md`
+— it is explicitly **not** part of what this section marks as validated.
 
 ## Top-K vs Token Budget (PLANNED)
 
@@ -2336,23 +2560,35 @@ grounded answer (see "Known Generation Limitations" in "Orchestration
 Layer — LlamaIndex"), not a token-budget decision on the input side, which
 does not exist yet.
 
-## Response Verification / Groundedness (PLANNED)
+## Response Verification / Groundedness (PARTIAL)
 
-**Only the first bullet below is implemented today**, as a narrow
+**Two of the four bullets below are implemented today.** (1) A narrow
 deterministic guard inside `rag_pipeline.py` (Phase 5A): when retrieval
 returns zero candidates (e.g. `"GOLD-999"` under `EXACT_RULE_ID`), the
 orchestrator returns `evidence_available = false` / `answer = null` /
 `sources = []` and makes **no model call** — see "Runtime validation" in
-"Orchestration Layer — LlamaIndex". This is not the full verification
-layer described below; the remaining bullets (citation checking, Rule-ID
-presence checking, a general sufficiency judgment) are not implemented.
-At minimum, the system should eventually verify:
+"Orchestration Layer — LlamaIndex". (2) Citation checking, via
+`evaluation/citations.py`'s `check_citation_integrity(answer, sources)`
+(Phase 6A/8): every `[Sn]` label the model's answer text actually used is
+compared against the deterministic `sources` metadata Phase 5A already
+returns, producing `VALID` (every cited label exists), `INVALID` (at
+least one cited label does not exist in `sources`), or `NO_CITATIONS`
+(the answer used no `[Sn]` marker at all). **This is a structural check
+only** — `VALID` means every citation label the model used actually
+exists; it does **not** mean the answer is correct, or that the cited
+source actually supports the specific claim next to it (semantic
+groundedness). It is called from the Databricks App (`app.py`), not from
+`AIHarness.ask` itself. The remaining two bullets — Rule-ID presence
+checking within the cited evidence, and a general evidence-sufficiency
+judgment beyond the empty-retrieval guard — are **not implemented**. At
+minimum, the system should eventually verify:
 
-- evidence was actually retrieved (not an empty candidate set);
+- evidence was actually retrieved (not an empty candidate set) — **DONE**;
 - cited chunks genuinely exist in the retrieved context (no fabricated
-  citation);
-- cited Rule IDs are present in the supplied evidence;
-- the response has sufficient supporting evidence to be returned as-is.
+  citation) — **DONE**, structural only (see above);
+- cited Rule IDs are present in the supplied evidence — not implemented;
+- the response has sufficient supporting evidence to be returned as-is
+  (semantic groundedness) — not implemented.
 
 Initial planned behavior:
 
@@ -2374,44 +2610,49 @@ Future evolution **may** include query reformulation, additional
 retrieval, reranking, or a second verification pass — none of these loops
 are implemented, and none should be assumed to exist.
 
-## Quality, Evaluation and Observability (MLflow) (PLANNED)
+## Quality, Evaluation and Observability (MLflow) (PARTIAL — tracing IMPLEMENTED, evaluation harness PLANNED)
 
-MLflow is the planned transversal Quality/Observability plane (see "Final
+MLflow is the transversal Quality/Observability plane (see "Final
 Architecture — Six Layers"). Two distinct things must not be conflated:
 
 - **A. Runtime AI Harness** — protects/controls each individual request in
-  production (validation, context budget, guardrails, evidence/citation
-  checks — see "AI Harness"). Runs on every request.
+  production (validation, source routing, citation checks — see "AI
+  Harness"). Runs on every request. **Implemented** for the `AI_SEARCH`
+  route (Phase 6A); context/token budget and general guardrails beyond the
+  empty-retrieval guard remain not implemented.
 - **B. MLflow Evaluation Harness** — systematically evaluates application
   *versions* during development and regression testing (not individual
   live requests). Runs on-demand / in CI-like cycles, not per-request.
+  **Not implemented.**
 
-Neither is implemented today. MLflow Tracing (feeding both) has this
-conceptual trace shape:
+**MLflow request tracing (Phase 7, feeding both A and B) is implemented**:
+`harness/tracing.py`'s `enable_autolog()` turns on
+`mlflow.llama_index.autolog()` once per process — this alone captures
+`PolicyRetriever.retrieve`/`_retrieve` and `DatabricksLlamaLLM.complete` as
+spans (chunks, scores, prompt, completion, token usage, model, latency),
+with no manual instrumentation. `traced_ask()` adds one parent span around
+`AIHarness.ask` so those two autologged spans nest under one request trace
+instead of two disconnected ones, plus request-level attributes
+(`SourceRoute`, `HarnessStatus`, resolved `RetrievalRoute`/`top_k`,
+evidence count). Deployed and running against a real, portable, per-target
+MLflow experiment (`/Shared/${bundle.name}-${bundle.target}-rag-tracing`,
+declared as a Bundle `experiments` resource — see "Interface Layer —
+Databricks App"), not the earlier throwaway spike path. The conceptual
+trace shape actually realized (via autolog + the one manual parent span,
+not a hand-built structure matching this exactly) is:
 
 ```
-trace_id
-├── user_query
-├── retrieval
-│   ├── query
-│   ├── candidates
-│   ├── scores
-│   └── selected chunks
-├── context
-│   ├── candidate count
-│   ├── selected evidence
-│   └── token count
-├── generation
-│   ├── model
-│   ├── latency
-│   └── usage
-├── validation
-└── final_answer
+trace_id  (AIHarness.ask — manual parent span, harness/tracing.py)
+├── SourceRoute / HarnessStatus / RetrievalRoute / top_k / evidence_count
+├── PolicyRetriever.retrieve  (autologged — query, candidates, scores)
+└── DatabricksLlamaLLM.complete  (autologged — prompt, completion, usage,
+    model, latency)
 ```
 
-Goals: debugging, retrieval inspection, groundedness analysis, latency,
-cost/usage tracking, reproducibility, auditability, and evaluation. Not
-implemented today.
+Goals achieved today: debugging, retrieval inspection, latency and
+usage/cost visibility (via autolog), one connected trace per request. Not
+yet achieved: groundedness analysis, reproducibility/auditability tooling
+beyond raw traces, and — see below — systematic evaluation.
 
 ## Evaluation (MLflow Evaluation Harness — "B" above)
 
@@ -2445,7 +2686,7 @@ Harness" for the components an evaluation harness would eventually exercise.
 Local pure-Python test suite, last validated (executed) run:
 
 ```
-373 passed, 0 failed, 0 skipped
+433 passed, 0 failed, 0 skipped
 ```
 
 (Historical progression: 229 → 232 when the sixth canonical document was
@@ -2457,9 +2698,9 @@ the Phase 5A orchestration tests (added across 7 files:
 `test_orchestration_evidence.py`, `test_orchestration_retriever_adapter.py`,
 `test_orchestration_context.py`, `test_orchestration_structured_data.py`,
 `test_orchestration_orchestrator.py`, `test_orchestration_llm_adapter.py`,
-`test_orchestration_no_oracle_leakage.py`) → **373** after the Lean RAG
-Core review. **373 is lower than 379, and this is not a coverage
-regression:** the Lean Core review removed the speculative
+`test_orchestration_no_oracle_leakage.py`) → 373 after the Lean RAG
+Core review (373 is lower than 379, and this is not a coverage
+regression: the Lean Core review removed the speculative
 `structured_data.py` module entirely (see "Structured-data decision" in
 "Orchestration Layer — LlamaIndex"), so its dedicated tests were removed
 with it, and the remaining 6 Phase 5A test files were consolidated into 2
@@ -2468,7 +2709,11 @@ files mirroring the new module layout (`test_rag_pipeline.py`,
 structural checks. Behavioral coverage for current runtime behavior —
 retrieval-policy preservation, evidence translation, deterministic source
 labels, grounding context, the Databricks Llama adapter, empty retrieval,
-and cross-source behavior — remains intact in the consolidated files.)
+and cross-source behavior — remains intact in the consolidated files) →
+**433** with the Phase 6A/7/8 additions: `test_harness.py` (20),
+`test_citations.py` (16), `test_app.py` (11), `test_tracing.py` (13) —
+373 + 20 + 16 + 11 + 13 = 433, confirmed by an actual full-suite run, not
+computed/assumed.)
 
 - `test_loader.py` + `test_parser.py` + `test_chunker.py`: 156 (includes
   the 12 heading-only-section scenarios and 6 indivisible-lexical-segment
@@ -2525,6 +2770,23 @@ LlamaIndex" above. This local suite passing is one input among several;
 Databricks runtime validation is documented independently, not inferred
 from it.
 
+**Added for Phase 6A/7/8, now folded into the 433 total above:**
+`test_harness.py` (20 — `AIHarness.ask` request validation, source
+routing, controlled-failure containment; `RagOrchestrator` always a fake,
+no network), `test_tracing.py` (13 — `enable_autolog`/`traced_ask`
+behavior, including root-span selection robust to autologged child spans
+from a genuinely LlamaIndex-instrumented fake orchestrator/LLM), plus
+`test_citations.py` (16 — `check_citation_integrity`'s
+`VALID`/`INVALID`/`NO_CITATIONS` logic, pure) and `test_app.py` (11 —
+FastAPI-`TestClient` cases against `app.py` with `traced_ask`
+monkeypatched — no Databricks, no live MLflow). `test_harness.py` and
+`test_citations.py` need no App-scoped dependency; `test_tracing.py` and
+`test_app.py` require the App-scoped `mlflow`/`fastapi` dependencies (see
+"Interface Layer — Databricks App") and are skipped, not failed, wherever
+those aren't installed (`pytest.importorskip`) — the 433 total above was
+obtained in an environment where all of them were importable, so none
+were skipped in that run.
+
 ## Provenance
 
 `rag/` is now versioned in Git (branch `feature/rag`). When a canonical
@@ -2555,9 +2817,39 @@ at that path (`HEAD` still tracks the original empty placeholder), so
 incorrect commit SHA. This is not treated as an error, and no commit was
 made solely to populate this field.
 
-## Roadmap
+## Roadmap — Project Completion (Next Steps to a Usable Databricks App)
 
-### Phase 1 — Knowledge Engineering
+Status legend used below: **DONE** (implemented and closed for current
+scope), **CURRENT** (implemented but with a specific, named remaining
+step before it's closed), **NEXT** (the immediate next unblocked step),
+**PLANNED** (not started; a later phase).
+
+**Immediate next steps, in order:**
+
+1. **[NEXT — Phase 7 remainder]** Build the MLflow evaluation harness
+   (systematic retrieval/answer-quality regression) — tracing itself is
+   now DONE and live-validated (see "Interface Layer — Databricks App"),
+   but that alone does not cover systematic quality regression.
+2. **[IN PROGRESS — Phase 8 remainder, separate contributor]** Full
+   chatbot UI beyond the current API contract — out of scope for the
+   backend work, which is DONE/live-validated;
+   `rag/API_CONTRACT.md` is the handoff point another contributor is
+   already building against.
+3. **[OPEN — Phase 8 integration decision]** Resolve the external-browser
+   CORS/authentication integration decision documented in
+   `rag/API_CONTRACT.md` (CORS is not currently configured) — only needed
+   if the chatbot UI ends up running as a browser app outside Databricks;
+   same-origin use inside Databricks is unaffected.
+4. **[PLANNED — Phase 9]** Multi-source document pipeline, once the core
+   RAG + App are fully closed out above.
+
+(Resolved since the previous revision of this section — kept out of the
+list above: the Unity Catalog `SELECT`/`USE_CATALOG`/`USE_SCHEMA` grant
+gap that previously blocked live App validation; live `GOLD-032`/
+`GOLD-999`/invalid-query validation through the deployed HTTP endpoint;
+MLflow trace-record inspection for those live requests.)
+
+### Phase 1 — Knowledge Engineering — **DONE**
 
 **STATUS: PASS — current canonical corpus complete for present scope.** 6
 canonical documents / 163 current chunks.
@@ -2574,7 +2866,7 @@ canonical documents / 163 current chunks.
 - Power BI semantic rules: promoted — see "Corpus Completion Checkpoint"
   below and "Power BI Semantic Rules" above.
 
-### Phase 2 — Delta Persistence Runtime Validation
+### Phase 2 — Delta Persistence Runtime Validation — **DONE**
 
 **STATUS: PASS / CLOSED.**
 
@@ -2590,7 +2882,7 @@ canonical documents / 163 current chunks.
 - CDF validated (99 `insert` records on the first `MERGE`'s version; zero
   records on the identical rerun's version).
 
-### Phase 3A — AI Search Runtime Infrastructure
+### Phase 3A — AI Search Runtime Infrastructure — **DONE**
 
 **STATUS: PASS / CLOSED.**
 
@@ -2606,7 +2898,7 @@ canonical documents / 163 current chunks.
 - Hybrid Search smoke tests: PASS (5 Portuguese queries across the 5
   knowledge categories, majority-relevant, fully traceable results).
 
-### Corpus Completion Checkpoint
+### Corpus Completion Checkpoint — **DONE**
 
 **STATUS: PASS / CLOSED.**
 
@@ -2653,9 +2945,9 @@ retrieval sanity checks passed
   BI-specific smoke tests, plus one cross-source smoke test (see
   "Retrieval Architecture" above).
 
-### Phase 3B — AI Search Infrastructure as Code
+### Phase 3B — AI Search Infrastructure as Code — **PLANNED** (non-blocking)
 
-**STATUS: PLANNED / NON-BLOCKING HARDENING.**
+**STATUS: PLANNED / NON-BLOCKING HARDENING** for `document_chunks_index` itself. Note: the Databricks App and its MLflow experiment *are* now Bundle-managed (Phase 8) — this phase is specifically about the vector-search index resource, not "no IaC anywhere in rag/".
 
 - represent/manage `document_chunks_index` through the Asset Bundle, if
   supported appropriately for a Vector Search index resource;
@@ -2669,7 +2961,7 @@ management, but was correctly **not** a prerequisite for completing the
 Power BI semantic corpus (the checkpoint above) — the promotion above
 completed independently of it, confirming that non-blocking sequencing.
 
-### Phase 4 — Retrieval Quality & Policy
+### Phase 4 — Retrieval Quality & Policy — **DONE**
 
 **STATUS: PASS / CLOSED FOR CURRENT RETRIEVAL SCOPE.** This does **not**
 mean retrieval is perfect or that every open retrieval question is
@@ -2729,7 +3021,7 @@ Search index configuration changes anywhere in this phase.
   known false negative in cross-source classification and the small
   (3-query) cross-source Top-K sample size.
 
-### Phase 5A — LlamaIndex + Databricks Llama Orchestration
+### Phase 5A — LlamaIndex + Databricks Llama Orchestration — **DONE**
 
 **STATUS: `ORCHESTRATION_RUNTIME_VALIDATED` / CLOSED.** This means the
 technical RAG path works end to end under the intended architecture — it
@@ -2762,7 +3054,7 @@ Design" above for full detail.
   Runtime Data — Analytical / ML Outputs (PLANNED)") remains conceptual
   only — no schema, no provider, no ML predictions implied to exist.
 
-### Architecture Scope Review — Lean RAG Core
+### Architecture Scope Review — Lean RAG Core — **DONE**
 
 **STATUS: `LEAN_CORE_REFACTORED` / CLOSED.** Immediately after Phase 5A,
 the orchestration package was inspected for real usage before any further
@@ -2779,28 +3071,35 @@ behavior changed: verified via the full test suite and one live
 re-run of the exact-identifier and nonexistent-identifier cases after the
 refactor — see "Lean refactor behavioral validation" above.
 
-### Phase 6A — AI Harness Core
+### Phase 6A — AI Harness Core — **DONE** (for `AI_SEARCH` route scope)
 
-**STATUS: NEXT FUNCTIONAL PHASE.** Does not require ML/structured data to
-proceed — this phase is scoped to the `AI_SEARCH` source route only, using
-the existing, unmodified Retrieval Policy and `rag_pipeline.py`.
+**STATUS: PASS / CLOSED FOR `AI_SEARCH`-ROUTE SCOPE.** Implemented without
+requiring ML/structured data, exactly as scoped — uses the existing,
+unmodified Retrieval Policy and `rag_pipeline.py`. See "AI Harness" above
+for full detail; summary:
 
-- request validation
-- `AI_SEARCH` source route (structured-data routing is Phase 6B, deferred)
+- request validation — **DONE** (`AIHarness.ask`, `INVALID_REQUEST` on
+  empty/whitespace query, never reaches `RagOrchestrator`).
+- `AI_SEARCH` source route — **DONE** (default route; structured-data
+  routing is Phase 6B, still deferred).
 - use of the existing Retrieval Policy (Phase 4C) and orchestrator (Phase
-  5A) as-is — no re-implementation
-- context/evidence controls (candidate selection, token budget — see
-  "Top-K vs Token Budget")
-- deterministic insufficient-evidence behavior where possible (building on
-  the Phase 5A empty-retrieval guard, not replacing it with an
-  unvalidated general sufficiency judgment)
-- citation validation (checking the model's `[Sn]` markers against the
-  deterministic `sources` metadata Phase 5A already returns)
-- guardrails
-- tracing-ready metadata/hooks (consuming the `RetrievalPolicyDecision`
-  metadata Phase 5A already exposes but nothing yet reads)
+  5A) as-is — **DONE**, no re-implementation.
+- controlled-failure containment — **DONE**: any exception from
+  `RagOrchestrator.generate` is caught and returned as
+  `RAG_EXECUTION_FAILED`, never propagated uncaught.
+- citation validation — **DONE**, but as a separately reusable function
+  (`evaluation/citations.py`), not inside `harness.py` — called by the App
+  layer (see "AI Harness" and "Response Verification / Groundedness").
+- tracing hooks — **DONE**, but as an external wrapper
+  (`harness/tracing.py`'s `traced_ask`), not inside `harness.py` (see
+  "AI Harness").
+- context/evidence controls (candidate selection, token budget) — **NOT
+  DONE**, remains open (see "Top-K vs Token Budget"); `RagOrchestrator`
+  still sends the full retrieved evidence set.
+- general guardrails/evidence-sufficiency judgment beyond the Phase 5A
+  empty-retrieval guard — **NOT DONE**.
 
-### Phase 6B — Structured Data Integration
+### Phase 6B — Structured Data Integration — **PLANNED** (deferred)
 
 **STATUS: DEFERRED UNTIL REAL ML / ANALYTICAL DATA CONTRACT EXISTS.** No
 physical schema is invented here; when a real contract exists, the
@@ -2822,26 +3121,68 @@ STRUCTURED_DATA or BOTH
 rag_pipeline.py
 ```
 
-### Phase 7 — MLflow Quality Plane
+`AIHarness`'s `SourceRoute.STRUCTURED_DATA`/`SourceRoute.BOTH` and their
+corresponding `HarnessStatus` outcomes already exist as typed values
+(Phase 6A) — this phase is about giving them a real, non-placeholder
+implementation, not about adding the enum values themselves.
 
-**STATUS: PLANNED.**
+### Phase 7 — MLflow Quality Plane — **CURRENT** (tracing done; evaluation harness remains)
 
-- tracing
-- evaluation harness
-- retrieval evaluation
-- answer evaluation
-- regression tests
-- latency/usage metrics
+**STATUS: PARTIAL.**
 
-### Phase 8 — Databricks App
+- tracing — **DONE** (`harness/tracing.py`; see "Quality, Evaluation and
+  Observability (MLflow)" above for full detail).
+- evaluation harness — **PLANNED / NEXT** (systematic retrieval/answer
+  quality regression against a stable dataset; not individual live
+  requests).
+- retrieval evaluation — **PARTIAL**: Phase 4A.1's evidence-level
+  evaluator (`evaluate_retrieval.py`) already exists and was used for the
+  retrieval-quality baseline, but it is not wired into an MLflow
+  evaluation harness or run on a regression cadence yet.
+- answer evaluation — **PLANNED**.
+- regression tests (RAG-quality, not unit tests) — **PLANNED**.
+- latency/usage metrics — **PARTIAL**: captured per-request today via
+  MLflow autolog (latency, token usage, model), but not yet aggregated or
+  tracked over time.
 
-**STATUS: PLANNED.**
+### Phase 8 — Databricks App — **DONE** (backend/API; chatbot UI remains separate ongoing work)
 
-- chatbot UI
-- connect to AI Harness
-- deployment validation
+**STATUS: backend/API functional validation PASS / CLOSED.** See
+"Interface Layer — Databricks App" above for full detail; summary:
 
-### Phase 9 — Multi-Source Document Pipeline
+- FastAPI backend (`rag/app.py`), frozen `POST /api/ask` contract —
+  **DONE**.
+- connect to AI Harness (via `traced_ask`) — **DONE**.
+- Bundle integration (`resources/rag_app.yml`, reusing the existing root
+  Bundle) — **DONE**.
+- `dev` deployment (App `RUNNING`/`ACTIVE`, reachable over real HTTP) —
+  **DONE**.
+- deployment validation (controlled-error contract shape, confirmed live
+  for a failing request) — **DONE**.
+- full live-request validation through the deployed HTTP endpoint —
+  **DONE**: `"GOLD-032"` → `AI_SEARCH_OK` (5 sources, `citation_integrity
+  = VALID`), `"GOLD-999"` → `AI_SEARCH_NO_EVIDENCE`, whitespace query →
+  `INVALID_REQUEST`/HTTP 400 — all three exercised live, not just
+  code-reviewed. The Unity Catalog permission gap that previously blocked
+  this is resolved (`USE_CATALOG`/`USE_SCHEMA`/`SELECT` on
+  `document_chunks_index` all confirmed held and exercised by the App's
+  service principal) — preserved as resolved history in "Current
+  Architectural Decisions", not as a current blocker.
+- real MLflow trace inspection for live App requests — **DONE at the
+  trace-record level**: parent `AIHarness.ask` span, correct
+  inputs/outputs, `mlflow.user` matching the App's own service principal,
+  real token usage/cost, and span counts consistent with each request's
+  code path were all confirmed for live `GOLD-032`/`GOLD-999`/invalid-query
+  traces. Individual child-span artifacts (the retrieval/generation
+  spans' own attributes) could not be retrieved with the read-only
+  tooling used — this remains a **non-blocking observability
+  limitation**, not something claimed as inspected.
+- chatbot UI — **PLANNED / IN PROGRESS (separate work)**, explicitly out
+  of scope for this phase's backend work; `rag/API_CONTRACT.md` is the
+  live-validated handoff contract another contributor is building the UI
+  against. Do not read Phase 8's backend closure as chatbot UI closure.
+
+### Phase 9 — Multi-Source Document Pipeline — **PLANNED**
 
 **STATUS: PLANNED.**
 
@@ -2860,15 +3201,105 @@ Corpus Completion Checkpoint followed Phase 3A and is now closed; Phase 4
 current retrieval scope; Phase 5A followed it and is now closed
 (`ORCHESTRATION_RUNTIME_VALIDATED`); the Architecture Scope Review — Lean
 RAG Core immediately followed Phase 5A and is now closed
-(`LEAN_CORE_REFACTORED`); Phase 6A — AI Harness Core is the next
-functional phase, and does not require Phase 6B (deferred until a real
-structured-data contract exists) to proceed. Infrastructure-hardening
-work such as Phase 3B may proceed independently (before, during, or after
-a functional checkpoint) when it does not change runtime semantics or
-block the next functional step — confirmed in practice, since Phase 3B
-remained PLANNED throughout both the Corpus Completion Checkpoint and
-Phase 4 without blocking either. The Corpus Completion Checkpoint and the
-Lean RAG Core review are not themselves numbered as phases.
+(`LEAN_CORE_REFACTORED`); Phase 6A — AI Harness Core followed it and is
+now closed for its scoped `AI_SEARCH`-route responsibilities; Phase 7
+(tracing) and Phase 8 (App backend + dev deploy) are both now partially
+done, each with one specific named remaining step (an MLflow evaluation
+harness; a Unity Catalog grant), not a full re-scope. Phase 6B remains
+deferred until a real structured-data contract exists — nothing in Phase
+7/8 required it. Infrastructure-hardening work such as Phase 3B may
+proceed independently (before, during, or after a functional checkpoint)
+when it does not change runtime semantics or block the next functional
+step — confirmed in practice, since Phase 3B remained PLANNED throughout
+both the Corpus Completion Checkpoint and Phase 4 without blocking either,
+and the Databricks App/MLflow-experiment Bundle resources (part of Phase
+8) were added without it. The Corpus Completion Checkpoint and the Lean
+RAG Core review are not themselves numbered as phases.
+
+## Compute Requirements by Phase
+
+Concepts, not numbers — no DBU or cost figures are asserted here (see
+"Databricks Free Edition Constraints"). The project should avoid
+unnecessary continuously-running workloads; prefer triggered/on-demand
+execution where appropriate for this MVP.
+
+- **Phase 1/2 — Knowledge Engineering / Delta runtime validation.**
+  Compute: serverless job/task execution for `run_ingestion.py`; SQL
+  warehouse queries for validation (`DESCRIBE HISTORY`, CDF, row counts).
+  Usage: temporary, only during an ingestion run or a validation check —
+  no standing compute.
+- **Phase 3A/3B — AI Search.** Compute/serving: one initial Delta Sync per
+  index creation; managed embedding generation during sync; AI Search
+  serving while the index exists (`rag_endpoint`, shared with other
+  projects); `TRIGGERED` sync only when explicitly requested, never
+  `CONTINUOUS`.
+- **Phase 4 — Retrieval evaluation.** Compute: AI Search queries issued by
+  evaluation/experiment scripts (`run_baseline.py`,
+  `run_identifier_experiments.py`, `run_policy_regression.py`).
+- **Phase 5A — LlamaIndex + Llama generation.** Compute/usage: AI Search
+  requests plus Foundation Model API token usage (pay-per-token, not
+  provisioned throughput).
+- **Phase 6A — AI Harness.** Compute: the calling process's own runtime
+  (no separate compute layer) plus whatever the retrieval/generation calls
+  underneath it use.
+- **Phase 7 — MLflow.** Compute: the LLM/retrieval calls tracing wraps
+  (already counted above) plus MLflow trace storage/logging itself.
+  Storing MLflow metadata does **not**, by itself, require any permanent
+  or continuously-running compute.
+- **Phase 8 — Databricks App.** Compute: the App's own runtime container
+  (`compute_size: MEDIUM`, observed via `databricks apps get` — a real,
+  currently-running App, not a projection) plus downstream AI Search and
+  LLM inference calls it triggers per request.
+- **Phase 9 — Document processing (future).** Compute: parsing/extraction,
+  chunking, Delta writes, embedding/index sync — same triggered pattern as
+  Phase 1–3, not continuous.
+
+## Definition of Done
+
+**MVP Definition of Done** — the project is complete when all of the
+following hold:
+
+1. deterministic canonical ingestion validated in Databricks — **DONE**
+   (Phase 1/2).
+2. idempotent Delta MERGE validated — **DONE** (Phase 2).
+3. AI Search index `ONLINE`/`ready=true` and reproducible — **DONE**
+   (Phase 3A; not yet Bundle-managed as IaC — Phase 3B, non-blocking).
+4. retrieval quality baseline — **DONE** (Phase 4).
+5. LlamaIndex orchestration working — **DONE** (Phase 5A).
+6. Databricks-hosted Llama generating grounded answers — **DONE**
+   (Phase 5A).
+7. AI Harness enforcing evidence/context/citation rules — **PARTIAL**:
+   request validation, source routing, and citation validation are
+   implemented (Phase 6A); context/token budget and general
+   evidence-sufficiency guardrails beyond the empty-retrieval guard are
+   not.
+8. MLflow tracing and evaluation baseline — **PARTIAL**: tracing is
+   implemented, deployed, and **live-validated** (real trace records for
+   real live App requests — see Phase 7/8; individual child-span
+   artifacts remain a non-blocking observability limitation, not a
+   functional gap); the evaluation baseline/harness is still **PLANNED**.
+9. Databricks App usable as a chatbot — **PARTIAL**: the backend API is
+   implemented, deployed to `dev`, and **live-validated** end to end
+   (`GOLD-032`/`GOLD-999`/invalid-query all exercised through the real
+   deployed HTTP endpoint — Phase 8 backend/API scope is DONE); there is
+   still no chatbot UI (separate, ongoing work by another contributor,
+   built against `rag/API_CONTRACT.md`).
+10. reproducible documentation — **DONE** (this document).
+11. regression evaluation — **PLANNED** (part of item 8/Phase 7).
+12. controlled failure when evidence is insufficient — **DONE** for the
+    empty-retrieval case (Phase 5A) and for App-level request/execution
+    failures (Phase 8); **not done** for a general semantic
+    evidence-sufficiency judgment.
+
+**Post-MVP / Multi-Source Expansion Definition of Done** (does not block
+the MVP above):
+
+- Unity Catalog Volume-based raw document intake.
+- PDF/DOCX/PPTX/HTML parsing, normalization, and quality gates.
+- Document registry with auto-approval/review/rejection states.
+- A documentary/source index alongside the canonical `document_chunks_index`,
+  with the AI Harness able to route between canonical-only, documentary-only,
+  or both.
 
 ## Current Architectural Decisions
 
@@ -2927,13 +3358,19 @@ Lean RAG Core review are not themselves numbered as phases.
     own ingestion, persistence, or quality control, and it does not
     re-decide the Retrieval Policy (Phase 4C remains authoritative for
     query classification, Top-K, and filtering).
-19. The AI Harness remains this project's own custom, planned
-    application-control layer (Layer 5, Phase 6A/6B) — not delegated to
-    LlamaIndex, `rag_pipeline.py`, or any third-party framework. It sits
-    above the now-implemented orchestration layer, not inside it.
-20. MLflow is selected as the transversal Quality/Observability plane
-    (tracing + a separate evaluation harness).
-21. Databricks App is selected as the planned chatbot interface (Layer 6).
+19. The AI Harness is this project's own custom application-control layer
+    (Layer 5) — not delegated to LlamaIndex, `rag_pipeline.py`, or any
+    third-party framework. It sits above the orchestration layer, not
+    inside it. Implemented for the `AI_SEARCH` route (Phase 6A);
+    `STRUCTURED_DATA`/`BOTH` remain deferred (Phase 6B).
+20. MLflow is the transversal Quality/Observability plane (tracing + a
+    separate evaluation harness) — tracing is implemented and deployed
+    (Phase 7); the evaluation harness remains a separate, not-yet-built
+    piece, deliberately not conflated with tracing.
+21. Databricks App is the Interface Layer (Layer 6) — its backend is
+    implemented and deployed to `dev` (Phase 8, `POST /api/ask`); a
+    chatbot UI beyond this API contract remains planned/future work, not
+    owned by this backend.
 22. Raw future client documents will use a separate, Volume-based
     ingestion pipeline, not Git.
 23. External PDF ingestion is planned for **after** the end-to-end core
@@ -3014,14 +3451,18 @@ Lean RAG Core review are not themselves numbered as phases.
     block, confirmed via the query API's own error response). No
     infrastructure change was attempted to enable it.
 40. Every retrieval policy decision exposes route/query_type/top_k/filter/
-    extracted-Rule-ID metadata (`RetrievalPolicyDecision`) — intended for
-    future MLflow tracing and Harness debugging, though neither is
-    implemented yet.
+    extracted-Rule-ID metadata (`RetrievalPolicyDecision`) — this now
+    feeds `harness/tracing.py`'s request-level MLflow span attributes
+    (Phase 7), and is exposed through `HarnessResult`/`app.py` for Harness
+    debugging (Phase 6A/8).
 41. LlamaIndex coordinates execution only — it does not decide retrieval
     policy. `orchestration/rag_pipeline.py` always obtains its routing
     decision from `src.retrieval.policy.classify_query` (or an explicitly
-    passed-in `RetrievalPolicyDecision`, e.g. from a future Harness); it
-    never invents its own classification (Phase 5A).
+    passed-in `RetrievalPolicyDecision`, e.g. from a caller such as
+    `AIHarness`); it never invents its own classification (Phase 5A).
+    `AIHarness.ask` (Phase 6A) does not currently exercise this override
+    path — it calls `RagOrchestrator.generate` the same way any other
+    caller does, without passing an explicit decision.
 42. A custom LlamaIndex `BaseRetriever` (`PolicyRetriever`) wraps the
     existing `ai_search.py` client rather than adopting the official
     `DatabricksVectorSearch` LlamaIndex integration — chosen specifically
@@ -3045,17 +3486,58 @@ Lean RAG Core review are not themselves numbered as phases.
 46. `orchestration/rag_pipeline.py` always returns deterministic source
     metadata (`S1`, `S2`, ... with chunk/document/section/rule-ID/score/
     rank) alongside the model's answer, independent of what the model
-    itself cites in prose — this metadata is intended for future citation
-    validation, Harness checks, and MLflow tracing.
+    itself cites in prose — this metadata supports citation validation,
+    Harness checks, and MLflow tracing (see items 48-50).
 47. No generation call is made when retrieval returns zero evidence (the
     Phase 5A empty-retrieval guard) — this is a narrow, deterministic
     guard against the "zero candidates" case specifically, not a general
     evidence-sufficiency judgment.
-48. Citation validation is not yet solved — the model's own `[Sn]`
-    citation markers are not checked against the deterministic `sources`
+48. Citation validation is implemented (`evaluation/citations.py`,
+    `check_citation_integrity`, Phase 6A/8) — the model's own `[Sn]`
+    citation markers are now checked against the deterministic `sources`
     metadata (see the Case C observation in "Runtime validation," under
-    "Orchestration Layer — LlamaIndex"); this remains explicit future
-    Harness scope (Phase 6A).
+    "Orchestration Layer — LlamaIndex", which this addresses). It is a
+    **structural** check only (label existence), not semantic
+    groundedness — see "Response Verification / Groundedness".
+49. MLflow tracing wraps `AIHarness.ask` from **outside**
+    (`harness/tracing.py`'s `traced_ask`), never from inside `harness.py`
+    — `AIHarness` has no `import mlflow` anywhere, keeping it fully
+    observability-framework agnostic. Autologging
+    (`mlflow.llama_index.autolog()`) already captures retrieval/generation
+    spans with no manual instrumentation; the manual span this project
+    adds is deliberately minimal (one parent span + a handful of
+    Harness-level attributes autolog cannot know).
+50. Citation validation lives in `evaluation/`, not in `harness/` — it is
+    called by the Databricks App (`app.py`), not by `AIHarness.ask`
+    itself, so the Harness stays focused on routing/validation/failure
+    containment and citation checking stays reusable independent of any
+    particular caller.
+51. The Databricks App is a thin FastAPI shim: it calls `traced_ask()` and
+    serializes the result — it does not call AI Search or the Llama
+    serving endpoint directly, does not classify the query itself, and
+    does not duplicate Harness/Orchestrator/Policy logic. The API request
+    contract is frozen to `{"query": "..."}` for V1 — no `source_route`,
+    `top_k`, or model-selection parameter is exposed to callers.
+52. The App's deployed source layout points `source_code_path` at `rag/`
+    (not `rag/app`) specifically so `rag/src/` deploys as a sibling of
+    `app.py` inside the container, matching every existing script's
+    `from src...`/`cwd=rag/` import convention — no RAG module is
+    duplicated into a separate App directory.
+53. Vector Search index access for an App's service principal is
+    representable as a Bundle `uc_securable` resource
+    (`securable_type: TABLE`, since Vector Search Delta Sync indexes are
+    themselves UC `TABLE` securables) — but granting it via that Bundle
+    path requires the deploying identity to hold `MANAGE`/`USE CATALOG`
+    on the source catalog, which is not automatically true just because
+    that identity can deploy the rest of the Bundle. **Historical/resolved:**
+    this was a real, live-discovered permission gap at the time it was
+    found — the App's service principal now holds `USE_CATALOG`,
+    `USE_SCHEMA`, and `SELECT` on `document_chunks_index` (granted outside
+    this Bundle path) and this has been exercised successfully by live
+    `POST /api/ask` requests (see "Interface Layer — Databricks App"). The
+    `uc_securable` Bundle mechanism itself remains a valid, documented
+    option for declaratively managing this grant in the future, but is not
+    currently what provides the access.
 
 ## Open Decisions
 
@@ -3079,15 +3561,9 @@ Genuinely unresolved items — not answered by this document:
   routing awareness) — a minimal Phase 5A grounding prompt exists
   (`GROUNDING_PROMPT_TEMPLATE`, see "Generation Design") but is explicitly
   not the final Harness prompt.
-- Final citation schema (how citations are represented/validated in a
-  response) — Phase 5A returns deterministic `sources` metadata and lets
-  the model emit its own `[Sn]` markers, but does not check the two
-  against each other (see item 48 above).
 - Evidence-sufficiency thresholds for response verification (Harness-level,
   distinct from the OOD retrieval-score question above, and distinct from
   Phase 5A's narrow empty-retrieval guard).
-- Reranker integration, if/once the workspace configuration allows it —
-  remains unevaluated, not rejected.
 - Final raw-document Volume path.
 - Document parser/extractor technology for the future PDF/DOCX pipeline.
 - Quantitative auto-approval thresholds (what counts as "plausible text
@@ -3113,6 +3589,10 @@ Genuinely unresolved items — not answered by this document:
   Harness, Phase 6A/6B — but not yet designed in detail; distinct from the
   Phase 4C retrieval policy, which only routes within AI Search, and from
   Phase 5A's `rag_pipeline.py`, which only ever calls the AI Search path).
+- External-browser CORS/authentication integration path for a future
+  chatbot UI running outside Databricks (see `rag/API_CONTRACT.md`'s
+  "Authentication / Integration" section) — same-origin use inside
+  Databricks is unaffected and does not need this resolved first.
 
 **Resolved since the previous revision of this document** (kept out of the
 list above; see the relevant sections for evidence): whether to use
@@ -3142,5 +3622,27 @@ sixth canonical document can be added without rewriting the existing
 corpus (yes — runtime-proved, see "Delta Runtime Validation Results"); and
 the Power BI promotion itself (complete — `powerbi_semantic_rules.md` is
 canonical, ingested, indexed, and retrieval-validated).
+
+**Also resolved since Phase 6A/7/8:** the final citation schema (resolved
+— `check_citation_integrity`'s `VALID`/`INVALID`/`NO_CITATIONS`, a
+structural label-existence check, see item 48 above); whether the AI
+Harness needs its own MLflow import (no — tracing wraps it from outside,
+item 49); where citation validation should live (in `evaluation/`, called
+by the App, not inside `harness.py`, item 50); the deployable App source
+layout (`source_code_path: rag`, not `rag/app`, item 52); whether
+`mlflow-tracing` alone is sufficient for the deployed App (no — it passes
+in an isolated venv but crashes the real App container; the full `mlflow`
+package is required, see "Interface Layer — Databricks App"); whether
+Vector Search index access is representable in the Bundle schema at all
+(yes, via `uc_securable`, `securable_type: TABLE`, item 53); whether the
+App's service principal actually has sufficient Unity Catalog access to
+serve real requests (yes — `USE_CATALOG`/`USE_SCHEMA`/`SELECT` all
+confirmed held and exercised by live `GOLD-032`/`GOLD-999`/invalid-query
+requests through the deployed HTTP endpoint); whether `databricks bundle
+deploy` alone reliably restarts a crashed App process (no — a separate
+`databricks bundle run <resource> -t dev --restart` was needed in the one
+case observed, see "Interface Layer — Databricks App"); and whether the
+full local test suite passes with the Phase 6A/7/8 additions folded in
+(yes — 433 passed, 0 failed, 0 skipped, see "Testing").
 
 Nothing above is prematurely resolved by this README.
