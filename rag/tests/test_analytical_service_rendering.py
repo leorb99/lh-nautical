@@ -19,7 +19,7 @@ from src.structured.analytical_request import AnalyticalRequest, DateRange, Requ
 from src.structured.compiler import compile_request
 from src.structured.models import StructuredExecutionError, StructuredIntent
 from src.structured.rendering import render_structured_answer
-from src.structured.semantic_model import METRICS, Dimension, Metric, Operation, TimeGrain, TimeModifier
+from src.structured.semantic_model import METRICS, Dimension, Metric, Operation, TimeGrain, TimeModifier, Unit
 from src.structured.service import MAX_RESULT_ROWS, StructuredQueryService
 
 ANALYTICS = StructuredIntent.ANALYTICS
@@ -417,7 +417,7 @@ def test_breakdown_has_a_short_introduction_and_one_line_per_group_in_the_order_
     text = _answer(_req(Metric.NET_REVENUE, Operation.BREAKDOWN, [Dimension.CATEGORY]), rows)
 
     assert text == (
-        "Veja o faturamento líquido por categoria:\n\n"
+        "O faturamento líquido por categoria foi:\n\n"
         "- Coletes — R$ 300,00\n- Motores — R$ 200,50\n- (não informado) — R$ 1,00\n\n"
         f"{SOURCE_SALES_PRODUCTS}"
     )
@@ -427,7 +427,7 @@ def test_breakdown_ratios_show_their_counts_and_a_period_when_given():
     rows = [{"category_name": "Coletes", "return_rate_numerator": "5", "return_rate_denominator": "100", "return_rate": "0.05"}]
     text = _answer(_req(Metric.RETURN_RATE, Operation.BREAKDOWN, [Dimension.CATEGORY], filters=RequestFilters(date_range=YEAR_2025)), rows)
 
-    assert text.startswith("Veja a taxa de devolução por categoria em 2025:\n\n- Coletes — 5,00% (5 de 100 unidades)")
+    assert text.startswith("Em 2025, a taxa de devolução por categoria foi:\n\n- Coletes — 5,00% (5 de 100 unidades)")
 
 
 def test_inventory_health_breakdown_uses_readable_status_names():
@@ -438,7 +438,7 @@ def test_inventory_health_breakdown_uses_readable_status_names():
     ]
     text = _answer(_req(Metric.INVENTORY_ITEMS, Operation.BREAKDOWN, [Dimension.INVENTORY_HEALTH_STATUS]), rows)
 
-    assert text.startswith("Veja os itens em estoque por status de saúde do estoque:")
+    assert text.startswith("Os itens em estoque por status de saúde do estoque são:")
     assert "- Fora de estoque — 5\n- Crítico — 12\n- Sem vendas recentes — 1.300" in text
 
 
@@ -454,7 +454,7 @@ def test_trend_is_chronological_with_readable_period_labels():
     text = _answer(_req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.MONTH), rows)
 
     assert text == (
-        "Veja o faturamento líquido por mês:\n\n"
+        "De janeiro a março de 2025, o faturamento líquido mensal foi:\n\n"
         "- jan/2025 — R$ 10,00\n- fev/2025 — R$ 20,00\n- mar/2025 — R$ 30,00\n\n"
         f"{SOURCE_SALES}"
     )
@@ -462,15 +462,16 @@ def test_trend_is_chronological_with_readable_period_labels():
 
 def test_trend_labels_follow_the_grain():
     rows = [{"period": "2025-01-01", "net_revenue": "10"}, {"period": "2025-04-01", "net_revenue": "20"}]
+    years = [{"period": "2024-01-01", "net_revenue": "10"}, {"period": "2025-01-01", "net_revenue": "20"}]
     quarterly = _answer(_req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.QUARTER), rows)
-    yearly = _answer(_req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.YEAR), rows)
+    yearly = _answer(_req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.YEAR), years)
     daily = _answer(
         _req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.DAY, filters=RequestFilters(date_range=YEAR_2025)), rows
     )
 
     assert "- 1º tri/2025 — R$ 10,00\n- 2º tri/2025 — R$ 20,00" in quarterly
-    assert yearly.startswith("Veja o faturamento líquido por ano:") and "- 2025 — R$ 20,00" in yearly
-    assert daily.startswith("Veja o faturamento líquido por dia em 2025:") and "- 01/04/2025 — R$ 20,00" in daily
+    assert yearly.startswith("De 2024 a 2025, o faturamento líquido anual foi:") and "- 2025 — R$ 20,00" in yearly
+    assert daily.startswith("De 01/01/2025 a 01/04/2025, o faturamento líquido diário foi:") and "- 01/04/2025 — R$ 20,00" in daily
 
 
 # ---------------------------------------------------------------------------
@@ -638,3 +639,133 @@ def test_other_ratios_still_show_their_counts():
     )
 
     assert text.splitlines()[0] == "A taxa de devolução foi de 4,32% (432 de 10.000 unidades)."
+
+
+# ---------------------------------------------------------------------------
+# introductions: built from the registry's presentation metadata, not per question
+# ---------------------------------------------------------------------------
+
+
+def _trend_rows(metric, periods):
+    """Rows for a trend of ``metric`` (whatever its columns), one per period."""
+    definition = METRICS[metric]
+    alias = definition.value_alias
+    cells = {alias: "0.5" if definition.unit is Unit.PERCENT else "10"}
+    if definition.numerator or definition.order_level:  # ratios and the order-level average
+        cells |= {f"{alias}_numerator": "5", f"{alias}_denominator": "10"}
+    return [{"period": period, **cells} for period in periods]
+
+
+def _intro(metric, periods, grain, **kwargs):
+    request = _req(metric, Operation.TREND, time_grain=grain, **kwargs)
+    return _answer(request, _trend_rows(metric, periods)).splitlines()[0]
+
+
+MONTHS_2025 = [f"2025-{m:02d}-01" for m in range(1, 13)]
+
+
+@pytest.mark.parametrize(
+    "periods, intro",
+    [
+        (MONTHS_2025, "Ao longo de 2025, o faturamento líquido mensal foi:"),  # jan-dez, same year
+        (["2026-01-01", "2026-02-01", "2026-08-01"], "De janeiro a agosto de 2026, o faturamento líquido mensal foi:"),  # partial
+        (["2025-11-01", "2025-12-01", "2026-01-01", "2026-02-01"], "De novembro de 2025 a fevereiro de 2026, o faturamento líquido mensal foi:"),
+        (["2026-01-01"], "Em janeiro de 2026, o faturamento líquido foi:"),  # a single month
+    ],
+)
+def test_a_monthly_trend_is_introduced_by_the_months_actually_returned(periods, intro):
+    assert _intro(Metric.NET_REVENUE, periods, TimeGrain.MONTH) == intro
+
+
+def test_the_introduction_describes_what_was_returned_not_what_was_asked():
+    # jan-dez 2025 requested, but sales only exist from March: the text must not claim the whole year.
+    request = _req(Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.MONTH, filters=RequestFilters(date_range=YEAR_2025))
+    text = _answer(request, _trend_rows(Metric.NET_REVENUE, MONTHS_2025[2:]))
+
+    assert text.splitlines()[0] == "De março a dezembro de 2025, o faturamento líquido mensal foi:"
+
+
+@pytest.mark.parametrize(
+    "grain, periods, intro",
+    [
+        (TimeGrain.QUARTER, ["2025-01-01", "2025-04-01", "2025-07-01", "2025-10-01"], "Ao longo de 2025, o faturamento líquido trimestral foi:"),
+        (TimeGrain.QUARTER, ["2025-01-01", "2025-04-01"], "Do 1º ao 2º trimestre de 2025, o faturamento líquido trimestral foi:"),
+        (TimeGrain.QUARTER, ["2025-10-01", "2026-01-01"], "Do 4º trimestre de 2025 ao 1º trimestre de 2026, o faturamento líquido trimestral foi:"),
+        (TimeGrain.QUARTER, ["2026-04-01"], "No 2º trimestre de 2026, o faturamento líquido foi:"),
+        (TimeGrain.YEAR, ["2023-01-01", "2024-01-01", "2025-01-01"], "De 2023 a 2025, o faturamento líquido anual foi:"),
+        (TimeGrain.YEAR, ["2025-01-01"], "Em 2025, o faturamento líquido foi:"),
+        (TimeGrain.DAY, ["2026-03-01", "2026-03-15", "2026-03-31"], "Em março de 2026, o faturamento líquido diário foi:"),
+        (TimeGrain.DAY, ["2026-03-05", "2026-03-20"], "De 05/03/2026 a 20/03/2026, o faturamento líquido diário foi:"),
+        (TimeGrain.DAY, ["2026-03-05"], "Em 05/03/2026, o faturamento líquido foi:"),
+    ],
+)
+def test_other_grains_follow_the_same_rules(grain, periods, intro):
+    filters = RequestFilters(date_range=DateRange(date(2026, 1, 1), date(2026, 12, 31)))
+    assert _intro(Metric.NET_REVENUE, periods, grain, filters=filters if grain is TimeGrain.DAY else RequestFilters()) == intro
+
+
+@pytest.mark.parametrize("metric", [m for m, d in METRICS.items() if Operation.TREND in d.operations])
+def test_every_trend_metric_gets_an_agreeing_introduction_from_its_metadata(metric):
+    definition = METRICS[metric]
+    plural = definition.display_pt.split()[0] in ("os", "as")
+    feminine = definition.display_pt.split()[0] in ("a", "as")
+    monthly = {(False, False): "mensal", (True, False): "mensal", (False, True): "mensais", (True, True): "mensais"}[(feminine, plural)]
+
+    multi = _intro(metric, ["2025-01-01", "2025-02-01"], TimeGrain.MONTH)
+    single = _intro(metric, ["2025-01-01"], TimeGrain.MONTH)
+    daily = _intro(metric, ["2025-01-05", "2025-01-06"], TimeGrain.DAY, filters=RequestFilters(date_range=YEAR_2025))
+
+    verb = "foram" if plural else "foi"
+    assert multi == f"De janeiro a fevereiro de 2025, {definition.display_pt} {monthly} {verb}:"
+    assert single == f"Em janeiro de 2025, {definition.display_pt} {verb}:"
+    assert daily == f"De 05/01/2025 a 06/01/2025, {definition.display_pt} {'diárias' if feminine and plural else 'diários' if plural else 'diária' if feminine else 'diário'} {verb}:"
+    assert "Veja" not in multi + single + daily
+
+
+def test_the_trend_introduction_keeps_the_filters_of_the_question():
+    request = _req(
+        Metric.NET_REVENUE, Operation.TREND, time_grain=TimeGrain.MONTH, filters=RequestFilters(categories=("Motores",))
+    )
+    text = _answer(request, _trend_rows(Metric.NET_REVENUE, MONTHS_2025))
+
+    assert text.splitlines()[0] == "Ao longo de 2025, o faturamento líquido mensal na categoria Motores foi:"
+
+
+@pytest.mark.parametrize(
+    "request_, rows, intro",
+    [
+        (
+            _req(Metric.NET_REVENUE, Operation.BREAKDOWN, [Dimension.CATEGORY]),
+            [{"category_name": "Coletes", "net_revenue": "1"}],
+            "O faturamento líquido por categoria foi:",
+        ),
+        (
+            _req(Metric.NET_REVENUE, Operation.BREAKDOWN, [Dimension.CATEGORY], filters=RequestFilters(date_range=YEAR_2025)),
+            [{"category_name": "Coletes", "net_revenue": "1"}],
+            "Em 2025, o faturamento líquido por categoria foi:",
+        ),
+        (
+            _req(
+                Metric.EFFECTIVE_ORDERS, Operation.BREAKDOWN, [Dimension.CATEGORY],
+                filters=RequestFilters(date_range=DateRange(date(2026, 1, 1), date(2026, 1, 31))),
+            ),
+            [{"category_name": "Coletes", "effective_orders": "3"}],
+            "Em janeiro de 2026, os pedidos efetivos por categoria foram:",
+        ),
+        (
+            _req(
+                Metric.TOTAL_QUANTITY_SOLD, Operation.BREAKDOWN, [Dimension.CATEGORY],
+                filters=RequestFilters(date_range=DateRange(date(2026, 3, 1), date(2026, 3, 15))),
+            ),
+            [{"category_name": "Coletes", "quantity_sold": "3"}],
+            "Entre 01/03/2026 e 15/03/2026, as unidades vendidas por categoria foram:",
+        ),
+        (
+            _req(Metric.STOCK_ON_HAND, Operation.BREAKDOWN, [Dimension.CATEGORY]),
+            [{"category_name": "Coletes", "stock_on_hand": "3"}],
+            "O estoque atual por categoria é:",  # a snapshot is stated in the present
+        ),
+    ],
+)
+def test_breakdown_introductions_carry_metric_dimension_and_period(request_, rows, intro):
+    assert _answer(request_, rows).splitlines()[0] == intro

@@ -201,6 +201,77 @@ def _scope(request) -> str:
 
 
 # ---------------------------------------------------------------------------
+# introductions of breakdowns and trends, generated from presentation metadata
+# ---------------------------------------------------------------------------
+
+#: Grain adjective by (masculine singular, feminine singular, masculine plural, feminine plural).
+_GRAIN_ADJECTIVE = {
+    TimeGrain.DAY: ("diário", "diária", "diários", "diárias"),
+    TimeGrain.MONTH: ("mensal", "mensal", "mensais", "mensais"),
+    TimeGrain.QUARTER: ("trimestral", "trimestral", "trimestrais", "trimestrais"),
+    TimeGrain.YEAR: ("anual", "anual", "anuais", "anuais"),
+}
+
+
+def _agreement(metric: MetricDef) -> tuple[bool, bool]:
+    """(feminine, plural) of the metric's noun phrase, read from the article
+    that starts ``display_pt`` ("o faturamento", "as unidades vendidas")."""
+    article = metric.display_pt.split()[0]
+    return article in ("a", "as"), article in ("os", "as")
+
+
+def _verb(metric: MetricDef, plural: bool) -> str:
+    """A snapshot is stated in the present ("é"), a period in the past ("foi")."""
+    if metric.snapshot:
+        return "são" if plural else "é"
+    return "foram" if plural else "foi"
+
+
+def _grain_adjective(metric: MetricDef, grain: TimeGrain) -> str:
+    feminine, plural = _agreement(metric)
+    return _GRAIN_ADJECTIVE[grain][(2 if plural else 0) + (1 if feminine else 0)]
+
+
+def _quarter(value: date) -> int:
+    return (value.month - 1) // 3 + 1
+
+
+def _trend_span(grain: TimeGrain, first: date, last: date) -> tuple[str, bool]:
+    """How the periods really returned are introduced ("Ao longo de 2025",
+    "De janeiro a agosto de 2026") and whether it is a single period."""
+    if grain is TimeGrain.YEAR:
+        return (f"Em {first.year}", True) if first.year == last.year else (f"De {first.year} a {last.year}", False)
+
+    if grain is TimeGrain.QUARTER:
+        q1, q2 = _quarter(first), _quarter(last)
+        if (first.year, q1) == (last.year, q2):
+            return f"No {q1}º trimestre de {first.year}", True
+        if first.year == last.year:
+            if (q1, q2) == (1, 4):
+                return f"Ao longo de {first.year}", False
+            return f"Do {q1}º ao {q2}º trimestre de {first.year}", False
+        return f"Do {q1}º trimestre de {first.year} ao {q2}º trimestre de {last.year}", False
+
+    if grain is TimeGrain.DAY:
+        if first == last:
+            return f"Em {_format_date(first)}", True
+        if first.year == last.year and (first.month, first.day, last.month, last.day) == (1, 1, 12, 31):
+            return f"Ao longo de {first.year}", False
+        if _is_whole_month(first, last):
+            return f"Em {_MONTHS[first.month - 1]} de {first.year}", False
+        return f"De {_format_date(first)} a {_format_date(last)}", False
+
+    # MONTH
+    if (first.year, first.month) == (last.year, last.month):
+        return f"Em {_MONTHS[first.month - 1]} de {first.year}", True
+    if first.year == last.year:
+        if (first.month, last.month) == (1, 12):
+            return f"Ao longo de {first.year}", False
+        return f"De {_MONTHS[first.month - 1]} a {_MONTHS[last.month - 1]} de {first.year}", False
+    return f"De {_MONTHS[first.month - 1]} de {first.year} a {_MONTHS[last.month - 1]} de {last.year}", False
+
+
+# ---------------------------------------------------------------------------
 # table access
 # ---------------------------------------------------------------------------
 
@@ -280,14 +351,22 @@ def _render_aggregate(request, table: AnalyticalTable, metric: MetricDef) -> lis
 def _render_trend(request, table: AnalyticalTable, metric: MetricDef) -> list[str]:
     period_index = table.column_index("period")
     rows = sorted(table.rows, key=lambda row: row[period_index])  # chronological, whatever order came back
-    lines = [f"Veja {metric.display_pt} por {_GRAIN_LABEL[request.time_grain]}{_scope(request)}:", ""]
-    lines += [f"- {_period_label(row[period_index], request.time_grain)} — {_metric_text(table, row, metric)}" for row in rows]
+    grain = request.time_grain
+    span, single = _trend_span(grain, rows[0][period_index], rows[-1][period_index])
+    _, plural = _agreement(metric)
+    subject = metric.display_pt if single else f"{metric.display_pt} {_grain_adjective(metric, grain)}"
+    lines = [f"{span}, {subject}{_filter_phrase(request)} {_verb(metric, plural)}:", ""]
+    lines += [f"- {_period_label(row[period_index], grain)} — {_metric_text(table, row, metric)}" for row in rows]
     return lines
 
 
 def _render_breakdown(request, table: AnalyticalTable, metric: MetricDef) -> list[str]:
     dimension = request.dimensions[0]
-    lines = [f"Veja {metric.display_pt} por {DIMENSIONS[dimension].label_pt}{_scope(request)}:", ""]
+    _, plural = _agreement(metric)
+    period = _period_phrase(request).strip()
+    subject = f"{period}, {metric.display_pt}" if period else metric.display_pt
+    title = f"{subject} por {DIMENSIONS[dimension].label_pt}{_filter_phrase(request)} {_verb(metric, plural)}:"
+    lines = [_capitalize(title), ""]
     lines += [f"- {_row_label(table, row, dimension)} — {_metric_text(table, row, metric)}" for row in table.rows]
     return lines
 

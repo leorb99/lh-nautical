@@ -268,14 +268,14 @@ metric, dimension or route. What the UI should be aware of:
 
                Fonte: camada Gold — fct_sales + dim_products.
 
-  Breakdown:   Veja o faturamento líquido por categoria:
+  Breakdown:   Em 2025, o faturamento líquido por categoria foi:
 
                - <category> — R$ 300,00
                - <category> — R$ 200,50
 
                Fonte: camada Gold — fct_sales + dim_products.
 
-  Trend:       Veja o faturamento líquido por mês:
+  Trend:       De janeiro a fevereiro de 2025, o faturamento líquido mensal foi:
 
                - jan/2025 — R$ 10,00
                - fev/2025 — R$ 20,00

@@ -193,7 +193,7 @@ def test_revenue_by_category_end_to_end():
 
     assert result.status is HarnessStatus.STRUCTURED_DATA_OK and result.rag_result is None
     assert result.answer == (
-        "Veja o faturamento líquido por categoria:\n\n- Coletes — R$ 300,00\n- Motores — R$ 200,00\n\nFonte: camada Gold — fct_sales + dim_products."
+        "O faturamento líquido por categoria foi:\n\n- Coletes — R$ 300,00\n- Motores — R$ 200,00\n\nFonte: camada Gold — fct_sales + dim_products."
     )
     assert orchestrator.calls == []  # no model is involved in a structured-only answer
     assert "GROUP BY\n    p.category_name" in executor.calls[0][0]
@@ -294,7 +294,7 @@ def test_both_is_the_deterministic_block_plus_the_documentary_explanation():
     result = harness.ask(question)
 
     assert result.source_route is SourceRoute.BOTH and result.status is HarnessStatus.BOTH_OK
-    block = "Veja o faturamento líquido por categoria:\n\n- Coletes — R$ 300,00\n\nFonte: camada Gold — fct_sales + dim_products."
+    block = "O faturamento líquido por categoria foi:\n\n- Coletes — R$ 300,00\n\nFonte: camada Gold — fct_sales + dim_products."
     assert result.answer == f"{block}\n\nA receita líquida é a receita após descontos e devoluções [S1]."
     assert orchestrator.calls == [(question, True)]  # the raw natural-language question reaches AI Search
     assert "[S" not in block  # no citation on a SQL value
@@ -310,7 +310,7 @@ def test_both_degrades_to_the_structured_block_when_the_explanation_fails():
     result = harness.ask("Qual a receita por categoria e como a receita líquida é calculada?")
 
     assert result.status is HarnessStatus.BOTH_DEGRADED
-    assert result.answer.startswith("Veja o faturamento líquido por categoria:")
+    assert result.answer.startswith("O faturamento líquido por categoria foi:")
 
 
 def test_documentary_questions_still_go_to_ai_search_with_the_raw_query():
@@ -338,7 +338,7 @@ def test_a_p1_metric_added_as_a_registry_entry_works_end_to_end():
     assert result.status is HarnessStatus.STRUCTURED_DATA_OK
     assert "AVG(k.recency_days) AS average_recency" in executor.calls[0][0]
     assert result.answer == (
-        "Veja a recência média por segmento RFM:\n\n- champions — 12,3 dias\n\n"
+        "A recência média por segmento RFM é:\n\n- champions — 12,3 dias\n\n"
         "Fonte: camada Gold — agg_customer_rfm."
     )
 

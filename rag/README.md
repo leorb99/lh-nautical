@@ -2590,8 +2590,11 @@ One renderer per operation — an aggregate is one sentence ("O faturamento
 líquido foi de R$ 1.234.567,89.", "Foram 12.345 pedidos efetivos.", "A taxa de
 devolução foi de 4,32%."), a ranking has a natural title and numbered lines
 ("Os 5 produtos com maior receita líquida foram:"), a breakdown and a trend
-have a short introduction and one line per group/period (trends
-chronological). There are **no per-question templates**: the wording is
+have an introduction built from the metric, the dimension and the period
+("Em 2025, o faturamento líquido por categoria foi:"; for a trend, the periods
+actually returned: "Ao longo de 2025, o faturamento líquido mensal foi:", "De
+janeiro a agosto de 2026, ...", "Em janeiro de 2026, ...") and one line per
+group/period (trends chronological). There are **no per-question templates**: the wording is
 presentation metadata in the registry (`MetricDef.display_pt`, `sentence_pt`,
 `ranking_pt` and the value format `Unit` — `CURRENCY_BRL`, `INTEGER`, `UNITS`,
 `DECIMAL`, `PERCENT`, `DAYS`) plus the dimension labels. **No model reproduces, reorders, summarizes or truncates
