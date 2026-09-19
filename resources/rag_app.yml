@@ -32,6 +32,20 @@ resources:
             value: "databricks"
           - name: MLFLOW_EXPERIMENT_ID
             value: ${resources.experiments.rag_app_tracing.id}
+          # Structured data access (Phase 6B.2 — read by
+          # rag/src/structured/config.py). DATA_CATALOG reuses the same
+          # per-target catalog_name variable as RAG_CATALOG; the Gold schema
+          # name is constant across targets. SQL_WAREHOUSE_ID is the same
+          # existing Serverless Starter Warehouse id already used by the dbt
+          # job in resources/resources.yml (hardcoded there too — there is no
+          # Bundle variable for it) and must match the `sql-warehouse` App
+          # resource below.
+          - name: DATA_CATALOG
+            value: ${var.catalog_name}
+          - name: DATA_SCHEMA
+            value: "gold"
+          - name: SQL_WAREHOUSE_ID
+            value: "e792e2cd0d725b8c"
       resources:
         - name: llm
           serving_endpoint:
@@ -45,6 +59,16 @@ resources:
           experiment:
             experiment_id: ${resources.experiments.rag_app_tracing.id}
             permission: CAN_EDIT
+        # Existing Serverless Starter Warehouse (not created or modified by
+        # this Bundle) — the App's service principal runs the structured-data
+        # queries on it. CAN_USE is the minimum needed to execute statements.
+        # Unity Catalog access to the Gold tables (USE_SCHEMA on gold, SELECT
+        # on gold.fct_sales and gold.dim_products) is NOT declared here; see
+        # the Phase 6B.2 plan.
+        - name: sql-warehouse
+          sql_warehouse:
+            id: "e792e2cd0d725b8c"
+            permission: CAN_USE
       permissions:
         # leonardo.barbosa@indicium.ai already exists as a named project
         # principal (resources/resources.yml's job failure-notification
