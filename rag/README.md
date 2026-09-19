@@ -49,11 +49,12 @@ knowledge base — evolving toward a broader, multi-source document platform.
 | Databricks Reranker | UNAVAILABLE IN CURRENT ENVIRONMENT / NOT PART OF CURRENT POLICY |
 | Generic-heading retrieval pollution | OPEN |
 | OOD / negative-query evidence sufficiency | OPEN / FUTURE HARNESS CONCERN |
-| Structured ML/analytical data path (Delta/SQL for dynamic outputs) | ARCHITECTURALLY DECIDED / DEFERRED UNTIL REAL DATA CONTRACT |
+| Structured ML/analytical data path (Delta/SQL for dynamic outputs) | **PARTIALLY IMPLEMENTED (Phase 6B.1, local only)** — one analytical intent over the Gold layer (`TOP_PRODUCTS_BY_QUANTITY`); see the next rows and "Structured Data & Source Routing". ML / forecast outputs remain ARCHITECTURALLY DECIDED / DEFERRED UNTIL REAL DATA CONTRACT |
 | **LlamaIndex Orchestration** (`orchestration/rag_pipeline.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Databricks Llama Generation** (`generation/llama_client.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Lean RAG Core** (orchestration consolidation review) | **REFACTORED / VALIDATED** |
-| **AI Harness** (`harness/harness.py`, Phase 6A) | **IMPLEMENTED** — request validation, `AI_SEARCH` source route, controlled-failure containment. `STRUCTURED_DATA`/`BOTH` remain unimplemented placeholders (Phase 6B, deferred); no semantic source router; no context/token-budget selection (see "Top-K vs Token Budget", still open) |
+| **AI Harness** (`harness/harness.py`, Phase 6A + 6B.1) | **IMPLEMENTED** — request validation, controlled-failure containment, and (Phase 6B.1) `AI_SEARCH` / `STRUCTURED_DATA` / `BOTH` source routing through a deterministic rule-based router (`harness/source_router.py`, no LLM classifier). The structured routes are **implemented and unit-tested locally, NOT LIVE** (see the next row); no context/token-budget selection (see "Top-K vs Token Budget", still open) |
+| **Structured Data & Source Routing** (`structured/*`, `harness/source_router.py`, Phase 6B.1) | **IMPLEMENTED LOCALLY / UNIT-TESTED / NOT LIVE** — `StructuredQueryService` runs one allowlisted, parameterized query (`TOP_PRODUCTS_BY_QUANTITY`) through an injectable SQL executor; ranked values are **rendered deterministically by code, never by the model**. Never executed against a real SQL Warehouse from the App. Live validation, the App's `sql_warehouse` resource and its Unity Catalog grants are **Phase 6B.2** — see "Structured Data & Source Routing" |
 | Citation Integrity Validation (`evaluation/citations.py`) | IMPLEMENTED — structural check only (cited `[Sn]` labels vs. real source labels); not a semantic groundedness judgment |
 | MLflow Request Tracing (`harness/tracing.py`, Phase 7) | **IMPLEMENTED / LIVE RUNTIME VALIDATED** — real live App requests produced real MLflow trace records (parent `AIHarness.ask`, correct inputs/outputs, `mlflow.user` matching the App's own service principal, real token usage/cost, span counts consistent with each request's code path). Individual child-span artifact retrieval was not inspectable with the tooling used (see Roadmap Phase 8) — a non-blocking observability limitation, not a functional gap. MLflow **evaluation harness** (systematic quality regression) remains PLANNED |
 | Interface — Databricks App (`app.py` + `resources/rag_app.yml`, Phase 8) | **IMPLEMENTED / DEPLOYED / LIVE VALIDATED** — App is `RUNNING`/`ACTIVE`. All three V1 API-contract paths validated against the real deployed App: `GOLD-032` → `AI_SEARCH_OK`; `GOLD-999` → `AI_SEARCH_NO_EVIDENCE`; whitespace query → `INVALID_REQUEST`/HTTP 400 (see Roadmap Phase 8). This is backend/API validation only — the chatbot UI is separate, in-progress work (see "Interface Layer — Databricks App") |
@@ -144,9 +145,10 @@ reflects three existing tests that are parametrized directly over
 case each for the sixth document — no test was weakened to reach this
 number. This 232 figure covers only the Phase 1 ingestion-scoped test
 files — it is not the whole-repository count. See "Testing" below for the
-current whole-repository figure: **433 passed, 0 failed, 0 skipped** — the
+current whole-repository figure: **699 passed, 0 failed, 0 skipped** — the
 last full-suite aggregate actually executed, now including the
-Harness/Tracing/Citations/App test files.)
+Harness/Tracing/Citations/App and Phase 6B.1 structured-data/router test
+files.)
 
 ## Knowledge Provenance — Distinct Origins
 
@@ -325,16 +327,19 @@ ParsedDocument / ParsedSection
         |
         v
    ... see "Final Architecture — Six Layers" below for what is still
-       future within Layers 5–6 (structured-data source routing, Phase 6B;
-       context/token-budget selection; a full chatbot UI beyond this API;
-       and the MLflow evaluation harness half of the Quality plane) — this
-       diagram now covers all six layers at least partially, and the
+       future within Layers 5–6 (live structured-data validation, Phase
+       6B.2; context/token-budget selection; a full chatbot UI beyond this
+       API; and the MLflow evaluation harness half of the Quality plane) —
+       this diagram now covers all six layers at least partially, and the
        Knowledge/Data, Retrieval, Orchestration, and Generation layers are
-       fully implemented and runtime-validated. The AI Harness and
-       Interface Layer are implemented for the AI_SEARCH route only;
-       structured-data source routing, general evidence-sufficiency
-       judgment beyond the empty-retrieval guard, and MLflow's evaluation
-       (as opposed to tracing) half remain not implemented.
+       fully implemented and runtime-validated. The AI Harness routes
+       between `AI_SEARCH`, `STRUCTURED_DATA` and `BOTH` (Phase 6B.1,
+       implemented and unit-tested locally, **not live** — the currently
+       deployed App does not contain this code and has no SQL Warehouse
+       configured, so only the `AI_SEARCH` path has been validated end to
+       end); general evidence-sufficiency judgment
+       beyond the empty-retrieval guard, and MLflow's evaluation (as
+       opposed to tracing) half, remain not implemented.
 ```
 
 Everything up to and including `Chunk[]` is implemented and tested. The
@@ -380,9 +385,9 @@ call in one MLflow parent span per request; `check_citation_integrity`
 (`evaluation/citations.py`) structurally validates the model's citations;
 and a FastAPI Databricks App (`app.py`) exposes all of it as `POST
 /api/ask`, deployed to the `dev` target via the existing root Bundle. What
-remains planned within these layers: structured-data source routing
-(`STRUCTURED_DATA`/`BOTH`, Phase 6B, deferred until a real data contract
-exists), context/token-budget selection (see "Top-K vs Token Budget"),
+remains planned within these layers: live validation of the
+structured-data routes (`STRUCTURED_DATA`/`BOTH` — implemented locally in
+Phase 6B.1, live in Phase 6B.2), context/token-budget selection (see "Top-K vs Token Budget"),
 semantic-groundedness/evidence-sufficiency judgment beyond the Phase 5A
 empty-retrieval guard, a full chatbot UI beyond this API contract, and the
 MLflow evaluation-harness half of the Quality plane (tracing itself is
@@ -416,10 +421,12 @@ is a six-layer system, plus a transversal Quality/Observability plane:
    LlamaIndex"). Consolidated into one lean module after the Architecture
    Scope Review (see "Roadmap").
 5. **AI Harness / Quality Layer** — custom application-control layer:
-   request validation, `AI_SEARCH` source routing, citation validation.
-   IMPLEMENTED for the `AI_SEARCH` route (Phase 6A — see "AI Harness").
-   Context/token budget, guardrails beyond the Phase 5A empty-retrieval
-   guard, and `STRUCTURED_DATA`/`BOTH` routing remain PLANNED.
+   request validation, source routing, citation validation. IMPLEMENTED and
+   live-validated for the `AI_SEARCH` route (Phase 6A — see "AI Harness");
+   `AI_SEARCH`/`STRUCTURED_DATA`/`BOTH` routing is IMPLEMENTED and
+   unit-tested locally (Phase 6B.1) but NOT LIVE until Phase 6B.2 (see
+   "Structured Data & Source Routing"). Context/token budget and guardrails
+   beyond the Phase 5A empty-retrieval guard remain PLANNED.
 6. **Interface Layer** — Databricks App. Backend IMPLEMENTED and DEPLOYED
    to `dev` (`POST /api/ask`, Phase 8 — see "Interface Layer — Databricks
    App"); full live-request validation is currently blocked on a Unity
@@ -478,21 +485,26 @@ The diagram above is still, in one respect, **target** architecture: it
 shows the AI Harness routing between `AI Search`, `Delta/SQL`, and `Llama`,
 but only the `AI Search` branch is real today — the Harness's `AI_SEARCH`
 route is implemented and calls the same Phase 4C-driven
-`AI Search -> Llama` path via LlamaIndex; the `Delta/SQL` branch and any
-routing decision between the two remain PLANNED (Phase 6B, deferred until
-a real structured-data contract exists) — see "Architecture — Current,
-Implemented" above for the diagram that reflects what actually runs today.
+`AI Search -> Llama` path via LlamaIndex. The `Delta/SQL` branch (one
+analytical intent over the Gold layer) and the routing decision between the
+two are implemented and unit-tested locally (Phase 6B.1) but **not live**:
+no SQL Warehouse is configured for the App yet (Phase 6B.2). Ranked
+structured values never pass through the model — they are rendered by
+code. See "Architecture — Current, Implemented" above for the diagram that
+reflects what actually runs today, and "Structured Data & Source Routing".
 
 Layer 1 (Knowledge/Data), Layer 2 (Retrieval, via `document_chunks_index`
 and the Phase 4C Retrieval Policy), Layer 3 (Generation, Databricks Llama)
 and Layer 4 (Orchestration, LlamaIndex) are **implemented and
 runtime-validated** today (Phase 5A) — see Status. Layer 5 (AI Harness) is
-implemented for the `AI_SEARCH` route (Phase 6A); Layer 6 (Interface,
+implemented and live-validated for the `AI_SEARCH` route (Phase 6A) and
+routes to structured data locally (Phase 6B.1, not live); Layer 6 (Interface,
 Databricks App) is implemented, deployed to `dev`, and **live
 end-to-end validated** (Phase 8) — the backend/API surface, not the
 chatbot UI, which remains separate ongoing work. The
-`DELTA / SQL` structured-data query path shown above is **PLANNED /
-DEFERRED UNTIL A REAL DATA CONTRACT EXISTS**, not implemented. MLflow
+`DELTA / SQL` structured-data query path shown above is **IMPLEMENTED
+LOCALLY for one Gold-layer intent (Phase 6B.1) but NOT LIVE**; ML/forecast
+outputs remain deferred until a real data contract exists. MLflow
 tracing (part of the transversal plane) is implemented and live-validated;
 the MLflow evaluation harness is **PLANNED**.
 
@@ -1730,17 +1742,20 @@ Not blockers for Phase 5A (closed) or Phase 6A (next), but genuinely open:
   Search retrieval only; it is a distinct, narrower concern from the
   Harness's routing between AI Search and the structured Delta/SQL data
   path (see "Structured Runtime Data — Analytical / ML Outputs (PLANNED)")
-  — the Harness itself exists (Phase 6A), but its *semantic* source-routing
-  decision logic between `AI_SEARCH`/`STRUCTURED_DATA`/`BOTH` remains
-  future/deferred (Phase 6B); today it always defaults to `AI_SEARCH`. That
-  source-level routing is not implemented and is not what Phase 4C's
-  policy, or the Phase 5A orchestrator, does.
+  — the Harness itself exists (Phase 6A), and since Phase 6B.1 it decides
+  between `AI_SEARCH`/`STRUCTURED_DATA`/`BOTH` with a deterministic
+  rule-based router (implemented and unit-tested locally, not live until
+  Phase 6B.2 — see "Structured Data & Source Routing"). That source-level
+  routing is not what Phase 4C's policy, or the Phase 5A orchestrator,
+  does.
 
 ## Structured Runtime Data — Analytical / ML Outputs (PLANNED)
 
 Canonical knowledge and dynamic analytical data use **different access
-paths**. This is an architectural decision, not yet implemented for the
-dynamic-data side — see Status.
+paths**. This is an architectural decision. As of Phase 6B.1 it is
+implemented locally for one Gold-layer intent (see "Structured Data &
+Source Routing"); the ML / forecast outputs described in this section
+remain PLANNED.
 
 ### Stable knowledge
 
@@ -1999,8 +2014,9 @@ enters only **after** retrieval.
 see "AI Harness" — or, where noted, still not implemented anywhere):
 
 - decide AI Search vs. structured/Delta/SQL data, or fetch structured
-  evidence — no structured-data provider exists in this codebase yet
-  (Phase 6B, deferred; see "Structured-data decision" below);
+  evidence — the Harness does (Phase 6B.1, see "Structured Data & Source
+  Routing"); `rag_pipeline.py` never sees structured values and contains no
+  SQL. For a `BOTH` question it only writes the documentary explanation;
 - score or gate evidence sufficiency beyond the empty-retrieval guard —
   not implemented anywhere yet;
 - validate citations — **implemented**, but in `evaluation/citations.py`,
@@ -2086,19 +2102,22 @@ ML / analytical pipeline
 Delta / SQL output
         |
         v
-future structured-data provider (not yet designed)
+structured query service (Phase 6B.1 — one Gold-layer intent implemented;
+ML/forecast outputs not yet designed)
         |
         v
-AI Harness source routing (Phase 6B)
+AI Harness source routing (Phase 6B.1)
         |
         v
 RAG orchestration
 ```
 
-and a concrete interface will be (re-)introduced only once a real
-Delta/SQL/ML data contract exists (see "Structured Runtime Data —
-Analytical / ML Outputs (PLANNED)" and "Phase 6B" in the Roadmap) — no
-physical schema is invented here.
+and a concrete implementation was introduced in Phase 6B.1 only for the Gold
+layer's product-ranking intent, under `src/structured/` (the removed
+placeholder here was not resurrected — see "Structured Data & Source
+Routing"); ML/forecast outputs still need a real data contract (see
+"Structured Runtime Data — Analytical / ML Outputs (PLANNED)" and "Phase
+6B" in the Roadmap) — no physical schema is invented here.
 
 ### Runtime validation (5 live smoke calls, Phase 5A)
 
@@ -2156,8 +2175,9 @@ Inputs to later phases, not Phase 5A failures:
    mechanism.
 4. The Databricks reranker remains unavailable in the current workspace
    (unchanged from Phase 4B).
-5. Structured ML data integration is not implemented (see "Structured-data
-   decision" above).
+5. Structured ML/forecast data integration is not implemented; one
+   Gold-layer analytical intent exists locally since Phase 6B.1, not live
+   (see "Structured Data & Source Routing").
 6. Answer-quality evaluation is not yet formal — no LLM-judge, no MLflow.
 7. The generation client's `max_output_tokens` budget (512 by default) can
    truncate longer grounded answers, as observed in Case C above.
@@ -2228,14 +2248,17 @@ and `generation/search_results.py` remain **0-byte legacy placeholders,
 inactive** — Claude is not, and has not been, part of the active
 architecture (see "Current Architectural Decisions").
 
-## AI Harness (Phase 6A — IMPLEMENTED, `AI_SEARCH` route scope)
+## AI Harness (Phase 6A — IMPLEMENTED for `AI_SEARCH`; Phase 6B.1 adds local structured routing, NOT LIVE)
 
 The target system treats the generation model as only **one component** of
 the RAG application, not the whole application. The core control layer
 described in this section is now implemented and sits above the layer it
 was designed for (Retrieval Policy → AI Search → LlamaIndex orchestration
-→ Databricks Llama — see "Orchestration Layer — LlamaIndex"), scoped
-deliberately to the `AI_SEARCH` route only. The runtime boundary is:
+→ Databricks Llama — see "Orchestration Layer — LlamaIndex"). Phase 6A
+scoped it deliberately to the `AI_SEARCH` route; Phase 6B.1 added the
+`STRUCTURED_DATA` and `BOTH` routes locally (see "Structured Data & Source
+Routing" — implemented and unit-tested, **not live**). The `AI_SEARCH`
+runtime boundary is:
 
 ```
 AI Harness
@@ -2258,8 +2281,9 @@ not merged: Phase 4C's policy is called automatically by
 it.
 
 The **full target** responsibility set (below) explicitly includes source
-routing between documentary retrieval and a future structured analytical
-query — implemented today only for the `AI_SEARCH` branch:
+routing between documentary retrieval and a structured analytical query —
+the `AI_SEARCH` branch is live-validated; the structured branch is
+implemented locally (Phase 6B.1) and not live:
 
 ```
 User Request
@@ -2271,9 +2295,9 @@ User Request
 | request validation      [DONE]    |
 | intent / source-routing policy    |
 |   (AI Search vs structured data   |
-|    vs both)          [AI_SEARCH   |
-|                     hardcoded default;
-|                   no semantic router]
+|    vs both)   [DONE locally, 6B.1:|
+|          deterministic rule-based |
+|          router; not live]        |
 | context / evidence assembly       |
 | token budget           [PLANNED]  |
 | model invocation policy [DONE, via|
@@ -2295,7 +2319,9 @@ User Request
            /        |        \
           v         v         v
      AI Search  Delta/SQL   Llama
-    [IMPLEMENTED] [FUTURE]  [IMPLEMENTED]
+    [IMPLEMENTED] [LOCAL,   [IMPLEMENTED]
+                  6B.1, not
+                  live]
           |          |
           v          v
   document_chunks  predictions /
@@ -2327,18 +2353,26 @@ Responsibilities, as actually implemented:
 - **`harness.py` (`AIHarness.ask`)** — validates the query (non-empty,
   non-whitespace) before touching any route, returning `INVALID_REQUEST`
   without ever calling `RagOrchestrator` or a structured-data provider;
-  resolves `source_route` (defaults to `AI_SEARCH` — there is still no
-  semantic/keyword router, deliberately: no real `StructuredDataProvider`
-  or data contract exists to route toward yet); for `AI_SEARCH`, calls
+  resolves `source_route` (with an injected `SourceRouter` — the App injects
+  the deterministic `RuleBasedSourceRouter` since Phase 6B.1 — from the
+  query text; without one it defaults to `AI_SEARCH`, the original Phase 6A
+  behavior; the route is never accepted from the request body); for `AI_SEARCH`, calls
   `RagOrchestrator.generate` unchanged and maps its outcome to
   `AI_SEARCH_OK` / `AI_SEARCH_NO_EVIDENCE`; catches any exception from
   that call and returns it as a controlled `RAG_EXECUTION_FAILED` result
-  instead of propagating it. `STRUCTURED_DATA`/`BOTH` remain real enum
-  values with defined `HarnessStatus` outcomes
-  (`STRUCTURED_DATA_UNAVAILABLE`, `STRUCTURED_DATA_FETCHED_NO_GENERATION`,
-  `BOTH_PARTIAL`) but no implementation reaches them today — no provider
-  is ever configured, so they are unreachable in practice (Phase 6B,
-  deferred). `harness.py` also re-declares a minimal, deliberately generic
+  instead of propagating it. `STRUCTURED_DATA`/`BOTH` are handled by
+  `StructuredQueryService` (Phase 6B.1, see "Structured Data & Source
+  Routing"; new statuses `STRUCTURED_DATA_OK`, `BOTH_OK`, `BOTH_DEGRADED`,
+  `STRUCTURED_DATA_NO_DATA`, `STRUCTURED_DATA_FAILED`,
+  `STRUCTURED_DATA_UNSUPPORTED`). The original placeholder statuses
+  (`STRUCTURED_DATA_UNAVAILABLE` — still used when a structured route is
+  selected but no service is configured, which is what would happen if the
+  6B.1 code were deployed before the Phase 6B.2 configuration —,
+  `STRUCTURED_DATA_FETCHED_NO_GENERATION`,
+  `BOTH_PARTIAL`) and the legacy `StructuredEvidence`/
+  `StructuredDataProvider` interface are retained only for the pre-6B.1
+  Harness tests: no production code builds a provider, and cleanup is
+  deferred. `harness.py` also re-declares a minimal, deliberately generic
   `StructuredEvidence`/`StructuredDataProvider` interface (no
   table/catalog/schema/SQL detail) — this is **not** a contradiction of
   the Lean Core review's removal of orchestration's own
@@ -2384,6 +2418,113 @@ unchanged; business rules, governance, and validation policy are still
 never delegated to LlamaIndex or `rag_pipeline.py` (see "Orchestration
 Layer — LlamaIndex").
 
+## Structured Data & Source Routing (Phase 6B.1 — IMPLEMENTED LOCALLY, NOT LIVE)
+
+**Status: implemented and unit-tested locally with fakes. Not live.** No
+code in this phase was executed against a real SQL Warehouse from the App:
+the currently deployed App does not contain this code, and it has no
+`sql_warehouse` resource, no `SQL_WAREHOUSE_ID`, and no structured-data Unity
+Catalog grants for its service principal. Those
+belong to **Phase 6B.2** (live validation), together with latency and
+production behavior — nothing about them is claimed here. (The underlying
+query was validated read-only against the Gold layer in an earlier
+discovery phase, separately from the App.)
+
+```
+POST /api/ask {"query": "..."}
+      |
+      v
+ AIHarness.ask
+      |
+      v
+ RuleBasedSourceRouter  (deterministic, no LLM)
+      |
+      +-- AI_SEARCH -------> RagOrchestrator.generate        (unchanged, live)
+      |
+      +-- STRUCTURED_DATA -> StructuredQueryService -> deterministic renderer
+      |                                                     (no model call)
+      +-- BOTH ------------> StructuredQueryService -> deterministic renderer
+                             + RagOrchestrator.generate (documentary
+                               explanation only)
+```
+
+**Supported structured intent (only one):** `TOP_PRODUCTS_BY_QUANTITY` —
+product ranking by total quantity sold over **effective sales only**
+(`fct_sales.is_effective_sale = TRUE`, joined to `dim_products`), all
+history, all locations, dense ranking. Default `top_n` is 10 (a stated
+number is honored, bounded 1..50). The filter is `ranking <= :top_n`, never
+`LIMIT`, so **ties are preserved** (rows can exceed `top_n`). The SQL is a
+fixed, allowlisted template with identifier validation and a bound INT
+parameter — **never model-generated SQL**; the executor
+(`DatabricksSqlExecutor`, injectable, SELECT-only) uses the Statement
+Execution API with a bounded wait, cancels on timeout, and treats a failed
+or truncated result as an error. Without `SQL_WAREHOUSE_ID` the service is
+not built and a structured route fails closed.
+
+**Source router (`harness/source_router.py`).** It only decides *which
+source family* a question needs; the Phase 4C retrieval policy
+(`EXACT_RULE_ID`/`NORMAL`/`CROSS_SOURCE`) still decides *how* AI Search
+retrieves and is untouched. Rule-based, with four cue families applied in a
+fixed precedence: documentary cues (how it is calculated/defined/where to
+find it) → supported analytical cues (the product ranking, in many
+wordings: "mais vendidos", "venderam mais", "campeão de vendas", "itens que
+mais saem", ...) → unsupported analytical cues (revenue, "menos vendidos",
+stores/customers rankings, totals) and unsupported scope (period, month,
+store, ...) → explanatory cues that turn a data request into `BOTH`. Scope
+words are read from the data part of the question only, so "período" inside
+the rule clause of a `BOTH` question is ignored. Questions that ask for
+live values the system cannot produce **fail closed** (`STRUCTURED_DATA_UNSUPPORTED`)
+instead of being answered with documentation. It is a deterministic set of
+Portuguese cues, not a semantic classifier: a data question phrased outside
+its cues falls through to `AI_SEARCH`.
+
+**Deterministic structured output.** The ranked list is produced by
+`structured/rendering.py` directly from the validated rows — rank, product
+name and quantity exactly as returned, ties kept with their shared rank,
+order preserved, thousands shown with `.` — followed by a `Fonte: dados de
+vendas efetivas.` line. **No model reproduces, reorders, summarizes or
+truncates these values**, so the output token limit cannot cut them, and a
+structured-only question makes no model call at all. Structured values never
+receive an `[Sn]` citation and never appear in `sources`.
+
+**`BOTH`.** The final answer is the deterministic structured block followed
+by a documentary explanation written by the model from AI Search evidence
+only (a prompt that never contains the structured values and forbids
+restating them). The natural-language query reaches AI Search unchanged.
+Documentary `[Sn]` citations and `sources` belong to the explanation only.
+
+| Case | Internal status | HTTP | Public status | Answer | `sources` |
+|---|---|---:|---|---|---|
+| Structured OK (structured-only) | `STRUCTURED_DATA_OK` | 200 | `AI_SEARCH_OK` | deterministic ranking | `[]` |
+| `BOTH`: structured OK + documentary OK | `BOTH_OK` | 200 | `AI_SEARCH_OK` | ranking + explanation | documentary |
+| `BOTH`: structured OK, no documentary evidence | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | ranking only | `[]` |
+| `BOTH`: structured OK, documentary technical failure | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | ranking only | `[]` |
+| Structured query returned zero rows | `STRUCTURED_DATA_NO_DATA` | 200 | `AI_SEARCH_NO_EVIDENCE` | none | `[]` |
+| Structured query failed (incl. `BOTH`) | `STRUCTURED_DATA_FAILED` | 500 | `RAG_EXECUTION_FAILED` | none | `[]` |
+| Unsupported analytical request | `STRUCTURED_DATA_UNSUPPORTED` | 200 | `AI_SEARCH_NO_EVIDENCE` | none | `[]` |
+| Structured route selected, no service configured (hypothetical: 6B.1 code deployed before 6B.2 configuration) | `STRUCTURED_DATA_UNAVAILABLE` | 500 | `RAG_EXECUTION_FAILED` | none | `[]` |
+
+The asymmetry is deliberate: if the values cannot be produced, documentation
+is **never** substituted for them; if only the documentary explanation is
+missing, valid structured data is **never** discarded.
+
+**Public API compatibility.** `/api/ask` request and response schemas and the
+four public statuses are unchanged (see `API_CONTRACT.md`). Successful
+structured/`BOTH` responses currently map to the public `AI_SEARCH_OK`, which
+means `AI_SEARCH_OK` can carry an `answer` with `sources: []`. No frontend
+change is required. A dedicated public status and structured provenance field
+are possible later, additively, and are not part of this phase.
+
+**What remains for Phase 6B.2 (live).** SQL Warehouse resource and
+`SQL_WAREHOUSE_ID`/`DATA_*` configuration for the App, service-principal
+grants on the Gold tables, a live end-to-end validation (correctness,
+cold-start latency, timeouts), and a live smoke of the changed documentary
+prompt. The currently deployed App does not contain the Phase 6B.1 router;
+structured data stays NOT LIVE until Phase 6B.2. If the 6B.1 code were
+deployed before that configuration, a structured-routed question would return
+the controlled `RAG_EXECUTION_FAILED` response (the structured service would be
+unavailable) rather than a documentation answer.
+
 ## Interface Layer — Databricks App (Phase 8 — IMPLEMENTED, DEPLOYED to `dev`)
 
 Databricks App is Layer 6 of the architecture, sitting above the AI
@@ -2418,7 +2559,12 @@ map to a stable, minimal body with no internal exception text or stack
 trace ever included (`result.error` is logged server-side only). HTTP
 status is `200` for `AI_SEARCH_OK`/`AI_SEARCH_NO_EVIDENCE`, `400` for
 `INVALID_REQUEST`, `500` for `RAG_EXECUTION_FAILED` or any status the V1
-API does not otherwise expect. The App does not call AI Search or the
+API does not otherwise expect. Since Phase 6B.1 the App also maps the
+internal structured-data statuses onto these same four public statuses
+(successful structured/`BOTH` answers → `AI_SEARCH_OK`, possibly with
+`sources: []`; see "Structured Data & Source Routing" and
+`API_CONTRACT.md`) — no public schema or status changed, and it is not live
+until Phase 6B.2. The App does not call AI Search or the
 Llama endpoint directly, does not classify the query itself, and does not
 duplicate any Harness/Orchestrator/Policy logic.
 
@@ -2686,7 +2832,7 @@ Harness" for the components an evaluation harness would eventually exercise.
 Local pure-Python test suite, last validated (executed) run:
 
 ```
-433 passed, 0 failed, 0 skipped
+699 passed, 0 failed, 0 skipped
 ```
 
 (Historical progression: 229 → 232 when the sixth canonical document was
@@ -2713,7 +2859,13 @@ and cross-source behavior — remains intact in the consolidated files) →
 **433** with the Phase 6A/7/8 additions: `test_harness.py` (20),
 `test_citations.py` (16), `test_app.py` (11), `test_tracing.py` (13) —
 373 + 20 + 16 + 11 + 13 = 433, confirmed by an actual full-suite run, not
-computed/assumed.)
+computed/assumed) → **699** with the Phase 6B.1 additions:
+`test_structured_service.py`, `test_structured_rendering.py`,
+`test_source_router.py`, `test_harness_structured.py`,
+`test_rag_pipeline_structured.py` and additional `test_app.py` cases, plus
+`tests/conftest.py`, which keeps MLflow from writing anything into the
+repository working directory during the run. 699 was confirmed by an actual
+full-suite run in the RAG-scoped environment (`rag/.venv`).)
 
 - `test_loader.py` + `test_parser.py` + `test_chunker.py`: 156 (includes
   the 12 heading-only-section scenarios and 6 indivisible-lexical-segment
@@ -2770,7 +2922,7 @@ LlamaIndex" above. This local suite passing is one input among several;
 Databricks runtime validation is documented independently, not inferred
 from it.
 
-**Added for Phase 6A/7/8, now folded into the 433 total above:**
+**Added for Phase 6A/7/8, folded into the totals above (433 at that point):**
 `test_harness.py` (20 — `AIHarness.ask` request validation, source
 routing, controlled-failure containment; `RagOrchestrator` always a fake,
 no network), `test_tracing.py` (13 — `enable_autolog`/`traced_ask`
@@ -2783,7 +2935,7 @@ monkeypatched — no Databricks, no live MLflow). `test_harness.py` and
 `test_citations.py` need no App-scoped dependency; `test_tracing.py` and
 `test_app.py` require the App-scoped `mlflow`/`fastapi` dependencies (see
 "Interface Layer — Databricks App") and are skipped, not failed, wherever
-those aren't installed (`pytest.importorskip`) — the 433 total above was
+those aren't installed (`pytest.importorskip`) — the 699 total above was
 obtained in an environment where all of them were importable, so none
 were skipped in that run.
 
@@ -3081,7 +3233,7 @@ for full detail; summary:
 - request validation — **DONE** (`AIHarness.ask`, `INVALID_REQUEST` on
   empty/whitespace query, never reaches `RagOrchestrator`).
 - `AI_SEARCH` source route — **DONE** (default route; structured-data
-  routing is Phase 6B, still deferred).
+  routing was added locally in Phase 6B.1 and is not live until 6B.2).
 - use of the existing Retrieval Policy (Phase 4C) and orchestrator (Phase
   5A) as-is — **DONE**, no re-implementation.
 - controlled-failure containment — **DONE**: any exception from
@@ -3099,32 +3251,27 @@ for full detail; summary:
 - general guardrails/evidence-sufficiency judgment beyond the Phase 5A
   empty-retrieval guard — **NOT DONE**.
 
-### Phase 6B — Structured Data Integration — **PLANNED** (deferred)
+### Phase 6B — Structured Data Integration — **6B.1 IMPLEMENTED LOCALLY; 6B.2 (LIVE) PLANNED**
 
-**STATUS: DEFERRED UNTIL REAL ML / ANALYTICAL DATA CONTRACT EXISTS.** No
-physical schema is invented here; when a real contract exists, the
-intended flow is:
+**STATUS: PARTIAL.**
 
-```
-real Delta table/view
-        |
-        v
-typed/deterministic structured-data access
-        |
-        v
-Harness source routing (Phase 6A)
-        |
-        v
-STRUCTURED_DATA or BOTH
-        |
-        v
-rag_pipeline.py
-```
-
-`AIHarness`'s `SourceRoute.STRUCTURED_DATA`/`SourceRoute.BOTH` and their
-corresponding `HarnessStatus` outcomes already exist as typed values
-(Phase 6A) — this phase is about giving them a real, non-placeholder
-implementation, not about adding the enum values themselves.
+- **Phase 6B.0 — runtime discovery — DONE.** Read-only validation of the
+  Gold-layer product-ranking query (join, effective-sales population, dense
+  ranking) outside the App.
+- **Phase 6B.1 — local implementation — DONE (unit-tested, NOT LIVE).**
+  Deterministic rule-based source router; `StructuredQueryService` with one
+  allowlisted intent (`TOP_PRODUCTS_BY_QUANTITY`) and an injectable SQL
+  executor; deterministic rendering of ranked values (no model reproduces
+  them); `BOTH` = deterministic block + documentary explanation, degrading
+  to the structured block if the explanation is unavailable; fail-closed
+  behavior for unsupported analytical requests and for structured failures;
+  public API contract unchanged. See "Structured Data & Source Routing".
+- **Phase 6B.2 — live validation — PLANNED / NEXT.** SQL Warehouse resource
+  and configuration for the App, service-principal grants on the Gold
+  tables, live end-to-end validation (correctness, cold-start latency,
+  timeouts) and a live smoke of the changed documentary prompt.
+- ML / forecast outputs — **still DEFERRED UNTIL A REAL DATA CONTRACT
+  EXISTS**; no physical schema is invented here.
 
 ### Phase 7 — MLflow Quality Plane — **CURRENT** (tracing done; evaluation harness remains)
 
@@ -3205,9 +3352,11 @@ RAG Core immediately followed Phase 5A and is now closed
 now closed for its scoped `AI_SEARCH`-route responsibilities; Phase 7
 (tracing) and Phase 8 (App backend + dev deploy) are both now partially
 done, each with one specific named remaining step (an MLflow evaluation
-harness; a Unity Catalog grant), not a full re-scope. Phase 6B remains
-deferred until a real structured-data contract exists — nothing in Phase
-7/8 required it. Infrastructure-hardening work such as Phase 3B may
+harness; a Unity Catalog grant), not a full re-scope. Phase 6B.1
+(structured routing for one Gold-layer intent) was later implemented
+locally and is not live until Phase 6B.2; ML/forecast outputs remain
+deferred until a real data contract exists — nothing in Phase 7/8 required
+it. Infrastructure-hardening work such as Phase 3B may
 proceed independently (before, during, or after a functional checkpoint)
 when it does not change runtime semantics or block the next functional
 step — confirmed in practice, since Phase 3B remained PLANNED throughout
@@ -3361,8 +3510,9 @@ the MVP above):
 19. The AI Harness is this project's own custom application-control layer
     (Layer 5) — not delegated to LlamaIndex, `rag_pipeline.py`, or any
     third-party framework. It sits above the orchestration layer, not
-    inside it. Implemented for the `AI_SEARCH` route (Phase 6A);
-    `STRUCTURED_DATA`/`BOTH` remain deferred (Phase 6B).
+    inside it. Implemented and live-validated for the `AI_SEARCH` route
+    (Phase 6A); `STRUCTURED_DATA`/`BOTH` implemented and unit-tested locally
+    (Phase 6B.1), live validation deferred to Phase 6B.2.
 20. MLflow is the transversal Quality/Observability plane (tracing + a
     separate evaluation harness) — tracing is implemented and deployed
     (Phase 7); the evaluation harness remains a separate, not-yet-built
@@ -3480,9 +3630,9 @@ the MVP above):
     files, so the separation added no value at this project's size.
 45. The speculative `structured_data.py` abstraction (a `Protocol` with no
     implementation and no caller) was removed, not merely deferred in
-    place — a future structured-data interface will be (re-)designed once
-    a real Delta/SQL/ML data contract exists (Phase 6B), not carried
-    forward as unused code until then.
+    place. A real structured-data implementation was later introduced in
+    Phase 6B.1 (`src/structured/`, one Gold-layer intent) for a real data
+    contract; the ML/forecast side still waits for its own contract.
 46. `orchestration/rag_pipeline.py` always returns deterministic source
     metadata (`S1`, `S2`, ... with chunk/document/section/rule-ID/score/
     rank) alongside the model's answer, independent of what the model
@@ -3581,14 +3731,15 @@ Genuinely unresolved items — not answered by this document:
   defined; the previous `StructuredEvidence`/`StructuredDataProvider`
   placeholder interface was removed during the Lean Core review, not kept
   as a stand-in for this).
-- Structured-query interface/tool contract (how the Harness or
-  `rag_pipeline.py` would query the Delta/SQL structured-data path, once
-  it exists) — to be designed only once a real contract exists (Phase 6B).
-- Routing rules between AI Search and structured data for a given request
-  (`AI_SEARCH` / `STRUCTURED_DATA` / `BOTH` — owned conceptually by the AI
-  Harness, Phase 6A/6B — but not yet designed in detail; distinct from the
-  Phase 4C retrieval policy, which only routes within AI Search, and from
-  Phase 5A's `rag_pipeline.py`, which only ever calls the AI Search path).
+- Structured-query interface for ML/forecast outputs (the Gold-layer
+  product-ranking intent has one since Phase 6B.1 — `StructuredQueryService`
+  — but ML/forecast outputs still need a real data contract).
+- Routing rules between AI Search and structured data beyond the single
+  implemented intent: Phase 6B.1 ships a deterministic rule-based router
+  (`AI_SEARCH` / `STRUCTURED_DATA` / `BOTH`, owned by the AI Harness;
+  distinct from the Phase 4C retrieval policy, which only routes within AI
+  Search). Whether a semantic router is ever warranted, and how to route
+  further intents, remains open.
 - External-browser CORS/authentication integration path for a future
   chatbot UI running outside Databricks (see `rag/API_CONTRACT.md`'s
   "Authentication / Integration" section) — same-origin use inside
@@ -3642,7 +3793,7 @@ requests through the deployed HTTP endpoint); whether `databricks bundle
 deploy` alone reliably restarts a crashed App process (no — a separate
 `databricks bundle run <resource> -t dev --restart` was needed in the one
 case observed, see "Interface Layer — Databricks App"); and whether the
-full local test suite passes with the Phase 6A/7/8 additions folded in
-(yes — 433 passed, 0 failed, 0 skipped, see "Testing").
+full local test suite passes (yes — 699 passed, 0 failed, 0 skipped after
+the Phase 6B.1 additions, see "Testing").
 
 Nothing above is prematurely resolved by this README.
