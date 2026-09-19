@@ -64,17 +64,20 @@ history / conversation_id — not accepted; every call is independent (see below
 ```
 
 There is no routing/model/retrieval parameter to send today or in the
-future: later Structured Data / combined-source integration is designed
-to happen behind this same `{"query": "..."}` contract, not by adding new
-request fields for the UI to manage. The frontend does not, and should
-not try to, control retrieval internals.
+future: Structured Data / combined-source answers are implemented
+(locally — see "Structured answers" below) behind this same
+`{"query": "..."}` contract, not by adding new request fields for the UI to
+manage. The backend decides internally which source a question needs. The
+frontend does not, and should not try to, control retrieval internals.
 
 ### Response schema (all fields, from `rag/app.py`'s `AskResponse` model)
 
 ```text
 status               string                          always present
 answer                string | null                   present only for AI_SEARCH_OK
-sources               array of source objects (below)  [] when there's no answer
+sources               array of source objects (below)  [] when there is no documentary source
+                                                       (no answer, or an answer built only from
+                                                       structured data — see "Structured answers")
 citation_integrity     object | null (below)            present only for AI_SEARCH_OK
 message                string | null                    present for non-OK statuses
 ```
@@ -187,31 +190,87 @@ the response body).
 
 | API `status` | HTTP | Meaning | Recommended UI behavior |
 |---|---:|---|---|
-| `AI_SEARCH_OK` | 200 | Grounded answer produced, with sources and a structural citation check | Render `answer`, `sources`, and citation UX (see below) |
+| `AI_SEARCH_OK` | 200 | An answer was produced. Documentary answers carry `sources` and a structural citation check; an answer built only from structured data (see "Structured answers") has `sources: []` and `citation_integrity.status == "NO_CITATIONS"` | Render `answer` (preserve line breaks); render `sources` and citation UX only when `sources` is non-empty (see below) |
 | `AI_SEARCH_NO_EVIDENCE` | 200 | Retrieval found nothing; no model call was made | Render `message` as a neutral "no answer found" state — **not** an error |
 | `INVALID_REQUEST` | 400 | `query` was empty/whitespace-only | Render `message`; ideally validate client-side too, but still handle this response |
 | `RAG_EXECUTION_FAILED` | 500 | An unhandled failure occurred somewhere in retrieval/generation | Render a generic failure/retry message; never surface `message` as if it were a stack trace (it isn't one, but don't build UI that would leak more if the contract ever changes) |
 
-### Internal/not currently reachable through V1
+### Internal statuses (never returned)
 
-These are real `HarnessStatus` values that exist in the backend's internal
-enum (`rag/src/harness/harness.py`), but the V1 API can never actually
-return them, because `source_route` is never accepted from the request —
-every call is forced to the `AI_SEARCH` route internally. **Do not build
-UI for these** — they are documented only so nobody mistakes them for part
-of the public contract:
+These are real `HarnessStatus` values in the backend's internal enum
+(`rag/src/harness/harness.py`). **None of them is ever returned by the
+API** — the backend maps every one of them onto one of the four public
+statuses above, and never accepts a route from the request. **Do not build
+UI for these**:
 
 ```text
-STRUCTURED_DATA_UNAVAILABLE
-STRUCTURED_DATA_FETCHED_NO_GENERATION
-BOTH_PARTIAL
+STRUCTURED_DATA_OK            -> AI_SEARCH_OK          (200, sources [])
+BOTH_OK                       -> AI_SEARCH_OK          (200, documentary sources)
+BOTH_DEGRADED                 -> AI_SEARCH_OK          (200, sources [])
+STRUCTURED_DATA_NO_DATA       -> AI_SEARCH_NO_EVIDENCE (200)
+STRUCTURED_DATA_UNSUPPORTED   -> AI_SEARCH_NO_EVIDENCE (200, message "This question asks for data that is not supported yet.")
+STRUCTURED_DATA_FAILED        -> RAG_EXECUTION_FAILED  (500)
+STRUCTURED_DATA_UNAVAILABLE   -> RAG_EXECUTION_FAILED  (500)
+STRUCTURED_DATA_FETCHED_NO_GENERATION, BOTH_PARTIAL (legacy placeholders)
+                              -> RAG_EXECUTION_FAILED  (500)
 ```
 
-If one of these were ever somehow reached, `rag/app.py`'s code falls back
-to a safe generic response (`HTTP 500`, `message: "This request type is
-not supported yet."`, `status` set to the raw internal enum value) rather
-than pretending success — but this path is not exercised by V1 and should
-not be designed against.
+The public `status` is never a raw internal value.
+
+## Structured answers (implemented locally; NOT LIVE until Phase 6B.2)
+
+The backend can answer one kind of live-data question — the ranking of the
+best-selling products by quantity (effective sales, all history, all
+locations) — behind the unchanged `POST /api/ask`. **This is implemented in
+the repository and unit-tested locally, but is not live**: the currently
+deployed App does not contain the Phase 6B.1 routing. If this code were
+deployed before the Phase 6B.2 infrastructure configuration (SQL Warehouse,
+`SQL_WAREHOUSE_ID`/`DATA_*` settings and service-principal grants), a
+structured-routed request would return the controlled `RAG_EXECUTION_FAILED`
+(HTTP 500) response because the structured service would be unavailable —
+never a documentation answer. Nothing below has been observed against the
+live App.
+
+**No frontend change is required.** Request schema, response schema and the
+four public statuses are unchanged. What the UI should be aware of:
+
+- A successful structured answer currently comes back as
+  `status: "AI_SEARCH_OK"` (V1 compatibility; a dedicated status is possible
+  later) with a non-null `answer`, **`sources: []`** and
+  `citation_integrity.status: "NO_CITATIONS"`. `AI_SEARCH_OK` can therefore
+  have an empty `sources` list: render the `answer` and simply omit the
+  sources section. Values from live data are **never** given a `[Sn]`
+  citation and never appear in `sources`.
+- The ranked list is produced deterministically by the backend (not by the
+  model), one line per product, in plain text with line breaks, for example:
+
+  ```text
+  Os produtos mais vendidos, por quantidade de unidades, são:
+
+  1. <product name> — 1.737 unidades
+  2. <product name> — 1.731 unidades
+  8. <product name> — 1.638 unidades
+  8. <product name> — 1.638 unidades
+
+  Produtos com a mesma quantidade vendida compartilham a mesma posição.
+  Fonte: dados de vendas efetivas.
+  ```
+
+  (The example shows the format only — the product names and quantities
+  shown here are placeholders/illustrative, not live data.) Tied products
+  repeat their rank, so a list can be longer than the requested count.
+- A question that asks for both the values and the rule behind them returns
+  the ranking followed by a documentary explanation; only the explanation
+  carries `[Sn]` citations and `sources`. If the explanation is unavailable
+  (no documentary evidence, or a technical failure), the ranking is still
+  returned as `AI_SEARCH_OK` with `sources: []` and no explanation.
+- A question that asks for data the backend cannot produce (other periods,
+  stores, revenue, "least sold", customers, ...) returns HTTP 200
+  `AI_SEARCH_NO_EVIDENCE` with `message` `"This question asks for data that
+  is not supported yet."` — render it like any other no-answer message.
+- A data question whose values cannot be obtained returns HTTP 500
+  `RAG_EXECUTION_FAILED`; the backend never substitutes a documentation
+  answer for the missing values.
 
 ## `sources[]` object shape
 
@@ -233,7 +292,9 @@ All fields actually present on every `SourceOut` returned by the API
 ## `citation_integrity` shape
 
 Present only when `status == "AI_SEARCH_OK"`; `null` for every other status
-(there is no answer to check citations on).
+(there is no answer to check citations on). For an answer built only from
+structured data (see "Structured answers") `sources` is `[]` and this object
+is `{"status": "NO_CITATIONS", "cited_labels": [], "valid_labels": [], "unknown_labels": []}`.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -290,7 +351,8 @@ sample, not an SLA or latency guarantee — size the loading UX for at
 least this order of magnitude, ideally with some headroom.
 
 **Success** (`status == "AI_SEARCH_OK"`) — render `answer`, citations, and
-`sources`.
+`sources`. If `sources` is empty (a structured-data answer), render the
+`answer` only — keep its line breaks — and omit the sources section.
 
 **No evidence** (`status == "AI_SEARCH_NO_EVIDENCE"`) — render `message`.
 Do not render a fabricated answer; there isn't one (`answer` is `null`).
@@ -464,9 +526,13 @@ backend actually does:
 - conversation history / multi-turn memory (every call is independent —
   there is no session state on the server between requests)
 - `conversation_id` (not part of the request schema)
-- structured-data route (`STRUCTURED_DATA`) — exists internally, not
-  reachable from this API
-- `BOTH` (documentary + structured) route — same
+- a public status or field dedicated to structured data — structured/`BOTH`
+  answers reuse `AI_SEARCH_OK` for now (see "Structured answers"); the
+  structured route itself is implemented locally but **not live** until
+  Phase 6B.2
+- structured provenance (which table/query a number came from) — not
+  exposed; structured values have no `sources[]` entry
+- any analytical intent other than the best-selling-products ranking
 - UI-selectable retrieval mode / source route
 - UI-selectable Top-K
 - model selection
@@ -489,6 +555,7 @@ backend actually does:
 [x] mock payloads available (4, copy/paste-ready above)
 [x] non-streaming behavior documented
 
+[ ] structured-data answers live on the deployed App — Phase 6B.2 (implemented locally; no contract change, no UI change needed)
 [ ] final external-browser authentication/integration path — OPEN UI INTEGRATION DECISION (see "Authentication / Integration")
 [ ] CORS decision, if a browser-based frontend outside Databricks is required
 ```
