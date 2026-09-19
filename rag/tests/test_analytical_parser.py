@@ -295,3 +295,41 @@ def test_every_supported_outcome_passes_the_compatibility_matrix():
         "Quantos clientes estão em risco?",
     ):
         check_compatibility(request_of(question))
+
+
+def test_supplier_breakdown_is_refused_instead_of_silently_dropped():
+    from src.harness.source_router import normalize_query
+    from src.structured.parser import parse_analytical_request
+
+    for query in (
+        "Qual foi o faturamento por fornecedor em janeiro de 2026?",
+        "Qual foi o faturamento por fornecedores em janeiro de 2026?",
+    ):
+        outcome = parse_analytical_request(
+            normalize_query(query),
+            raw=query,
+        )
+
+        assert outcome.request is None
+        assert outcome.unsupported_reason is not None
+        assert "breakdown by" in outcome.unsupported_reason
+        assert "fornecedor" in outcome.unsupported_reason
+
+
+def test_supplier_breakdown_is_refused_instead_of_silently_dropped():
+    from src.harness.source_router import normalize_query
+    from src.structured.parser import parse_analytical_request
+
+    for query in (
+        "Qual foi o faturamento por fornecedor em janeiro de 2026?",
+        "Qual foi o faturamento por fornecedores em janeiro de 2026?",
+    ):
+        outcome = parse_analytical_request(
+            normalize_query(query),
+            raw=query,
+        )
+
+        assert outcome.request is None
+        assert outcome.unsupported_reason is not None
+        assert "breakdown by" in outcome.unsupported_reason
+        assert "fornecedor" in outcome.unsupported_reason
