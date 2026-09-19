@@ -63,8 +63,8 @@ _MAX_VALUE_LENGTH = 80
 
 @dataclass(frozen=True)
 class DateRange:
-    """Inclusive date interval on the fact's business date (sales:
-    ``order_date``, which Power BI relates to ``dim_dates[date_day]``)."""
+    """Inclusive date interval on the fact's business date (sales: the date
+    of ``placed_at``, ``CAST(s.placed_at AS DATE)``)."""
 
     start: date
     end: date

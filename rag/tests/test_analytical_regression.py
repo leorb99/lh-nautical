@@ -227,7 +227,7 @@ def test_a_snapshot_question_end_to_end():
     assert result.answer.startswith("A parcela de itens em risco de ruptura é de 12,00%.")
     assert "itens monitorados" not in result.answer  # no count until the replenishment grain is validated
     assert result.answer.endswith("Fonte: camada Gold — fct_inventory_replenishment.")
-    assert "order_date" not in executor.calls[0][0]
+    assert "placed_at" not in executor.calls[0][0]  # a snapshot has no date
 
 
 def test_zero_rows_is_a_controlled_no_data_outcome_not_a_documentation_answer():

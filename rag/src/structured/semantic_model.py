@@ -280,7 +280,10 @@ FACTS: Mapping[str, FactDef] = MappingProxyType(
             base_predicates=("s.is_effective_sale = TRUE",),
             source_note_pt="Fonte: dados de vendas efetivas.",
             population="effective_sales",
-            date_column="s.order_date",
+            # The business date of a sale is the date of its placed_at timestamp.
+            # The deployed gold.fct_sales has no order_date (nor a date_id to
+            # join dim_dates), so the date is derived here, without a join.
+            date_column="CAST(s.placed_at AS DATE)",
             bindings=MappingProxyType(
                 {
                     **_product_bindings("s"),

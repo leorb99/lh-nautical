@@ -123,8 +123,8 @@ def test_a_date_filtered_query_uses_bound_dates():
         "    SUM(s.order_item_net_revenue_after_returns) AS net_revenue\n"
         "FROM test_catalog.gold.fct_sales AS s\n"
         "WHERE s.is_effective_sale = TRUE\n"
-        "    AND s.order_date >= CAST(:date_from AS DATE)\n"
-        "    AND s.order_date <= CAST(:date_to AS DATE)\n"
+        "    AND CAST(s.placed_at AS DATE) >= CAST(:date_from AS DATE)\n"
+        "    AND CAST(s.placed_at AS DATE) <= CAST(:date_to AS DATE)\n"
     )
     assert query.parameters == {"date_from": "2025-01-01", "date_to": "2025-12-31"}
     assert "2025" not in query.statement  # the dates are parameters, not text
@@ -132,9 +132,9 @@ def test_a_date_filtered_query_uses_bound_dates():
 
 
 @pytest.mark.parametrize("grain, expected", [
-    (TimeGrain.MONTH, "date_trunc('MONTH', s.order_date)"),
-    (TimeGrain.QUARTER, "date_trunc('QUARTER', s.order_date)"),
-    (TimeGrain.YEAR, "date_trunc('YEAR', s.order_date)"),
+    (TimeGrain.MONTH, "date_trunc('MONTH', CAST(s.placed_at AS DATE))"),
+    (TimeGrain.QUARTER, "date_trunc('QUARTER', CAST(s.placed_at AS DATE))"),
+    (TimeGrain.YEAR, "date_trunc('YEAR', CAST(s.placed_at AS DATE))"),
 ])
 def test_trend_groups_by_the_time_grain(grain, expected):
     sql = _norm(compile_(_req(Metric.NET_REVENUE, Operation.TREND, time_grain=grain)).statement)
@@ -148,7 +148,7 @@ def test_a_daily_trend_needs_and_uses_a_bounded_period():
     )
     sql = _norm(compile_(request).statement)
 
-    assert "s.order_date AS period" in sql and "GROUP BY s.order_date" in sql
+    assert "CAST(s.placed_at AS DATE) AS period" in sql and "GROUP BY CAST(s.placed_at AS DATE)" in sql
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ def test_return_rate_is_a_divide_with_visible_numerator_and_denominator():
 def test_snapshot_metrics_have_no_date_predicate_and_no_effective_sale_filter():
     for metric in (Metric.STOCK_ON_HAND, Metric.INVENTORY_ITEMS, Metric.STOCKOUT_RISK, Metric.CUSTOMER_COUNT):
         query = compile_(_req(metric))
-        assert "order_date" not in query.statement and ":date" not in query.statement
+        assert "placed_at" not in query.statement and ":date" not in query.statement
         assert "is_effective_sale" not in query.statement
         assert query.applied_filters["period"] == "snapshot"
 
@@ -292,8 +292,8 @@ def test_year_to_date_is_anchored_on_the_end_of_the_given_period_like_totalytd()
         "    SUM(s.order_item_net_revenue_after_returns) AS net_revenue\n"
         "FROM test_catalog.gold.fct_sales AS s\n"
         "WHERE s.is_effective_sale = TRUE\n"
-        "    AND s.order_date >= trunc(CAST(:date_to AS DATE), 'YEAR')\n"
-        "    AND s.order_date <= CAST(:date_to AS DATE)\n"
+        "    AND CAST(s.placed_at AS DATE) >= trunc(CAST(:date_to AS DATE), 'YEAR')\n"
+        "    AND CAST(s.placed_at AS DATE) <= CAST(:date_to AS DATE)\n"
     )
     # Only the end of the period is used (TOTALYTD replaces the date filter with the year-to-date window).
     assert query.parameters == {"date_to": "2025-03-31"}
@@ -305,7 +305,7 @@ def test_last_twelve_months_window_matches_datesinperiod_on_the_end_of_the_perio
     query = compile_(request)
     sql = _norm(query.statement)
 
-    assert "s.order_date > add_months(CAST(:date_to AS DATE), -12) AND s.order_date <= CAST(:date_to AS DATE)" in sql
+    assert "CAST(s.placed_at AS DATE) > add_months(CAST(:date_to AS DATE), -12) AND CAST(s.placed_at AS DATE) <= CAST(:date_to AS DATE)" in sql
     assert "s.is_effective_sale = TRUE" in sql
     assert query.parameters == {"date_to": "2025-12-31"} and query.applied_filters["period"] == "LTM@2025-12-31"
 
@@ -512,3 +512,45 @@ def test_prepare_query_still_rejects_unknown_intents_and_parameters():
         prepare_query(StructuredIntent.ANALYTICS, {"request": _req(Metric.NET_REVENUE), "sql": "x"}, catalog=CATALOG, schema=SCHEMA)
     with pytest.raises(InvalidParameterError, match="AnalyticalRequest"):
         prepare_query(StructuredIntent.ANALYTICS, {"request": "SELECT 1"}, catalog=CATALOG, schema=SCHEMA)
+
+
+# ---------------------------------------------------------------------------
+# the sales date is the date of placed_at (the deployed fct_sales has no order_date / date_id)
+# ---------------------------------------------------------------------------
+
+SALES_DATE = "CAST(s.placed_at AS DATE)"
+_PERIOD = RequestFilters(date_range=YEAR_2025)
+
+
+def _temporal_sales_requests():
+    revenue = Metric.NET_REVENUE
+    requests = [
+        _req(revenue, filters=_PERIOD),  # date_from / date_to filter
+        _req(revenue, Operation.RANKING, [Dimension.PRODUCT], filters=_PERIOD, top_n=3),
+        _req(revenue, Operation.BREAKDOWN, [Dimension.CATEGORY], filters=_PERIOD),
+        _req(Metric.AVERAGE_TICKET, filters=_PERIOD),  # order-level path
+        _req(revenue, time_modifier=TimeModifier.YTD, filters=_PERIOD),
+        _req(revenue, time_modifier=TimeModifier.LTM, filters=_PERIOD),
+        _req(revenue, time_modifier=TimeModifier.YOY, filters=_PERIOD),
+    ]
+    for grain in TimeGrain:
+        requests.append(_req(revenue, Operation.TREND, time_grain=grain, filters=_PERIOD))
+        requests.append(_req(Metric.AVERAGE_TICKET, Operation.TREND, time_grain=grain, filters=_PERIOD))
+    return requests
+
+
+@pytest.mark.parametrize("request_", _temporal_sales_requests(), ids=lambda r: f"{r.metric.name}-{r.operation.name}-{r.time_grain}-{r.time_modifier}")
+def test_every_temporal_path_over_fct_sales_uses_the_date_of_placed_at(request_):
+    statement = compile_(request_).statement
+
+    assert FACTS["sales"].date_column == SALES_DATE
+    assert SALES_DATE in statement
+    assert "order_date" not in statement and "date_id" not in statement and "dim_dates" not in statement  # no such column, no join
+    assert re.sub(re.escape(SALES_DATE), "", statement).count("placed_at") == 0  # never the raw timestamp
+
+
+def test_a_period_adds_no_table_to_a_sales_query():
+    without = compile_(_req(Metric.NET_REVENUE))
+    with_period = compile_(_req(Metric.NET_REVENUE, filters=_PERIOD))
+
+    assert without.source_tables == with_period.source_tables == (f"{SCHEMA}.fct_sales",)

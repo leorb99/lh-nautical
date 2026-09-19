@@ -2647,8 +2647,9 @@ individual metric. `AVERAGE_RECENCY` was added this way.
   the registry uses**: `fct_sales` and `dim_products` are granted;
   `dim_locations`, `dim_customers`, `dim_employees`, `fct_inventory_replenishment`,
   `fct_current_inventory` and `agg_customer_rfm` are not.
-- Confirming the `'Salesperson'` role value in Gold, and that `fct_sales.order_date`
-  agrees with Power BI's `dim_dates` relationship.
+- Confirming the `'Salesperson'` role value in Gold, and that the date of
+  `fct_sales.placed_at` (the sales business date; the deployed table has no
+  `order_date`) agrees with Power BI's `dim_dates` relationship.
 - A live smoke of the changed documentary prompt.
 
 The currently deployed App does not contain this code; structured data stays
