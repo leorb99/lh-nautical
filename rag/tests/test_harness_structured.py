@@ -29,6 +29,7 @@ from src.harness.source_router import RuleBasedSourceRouter
 from src.orchestration.rag_pipeline import OrchestrationResult, RagOrchestrator
 from src.retrieval.ai_search import RetrievedChunk
 from src.retrieval.policy import RetrievalPolicyDecision, RetrievalRoute
+from src.structured.analytical_request import AnalyticalRequest
 from src.structured.models import (
     InvalidParameterError,
     StructuredExecutionError,
@@ -37,9 +38,17 @@ from src.structured.models import (
     TopProductRow,
 )
 from src.structured.rendering import render_structured_answer
+from src.structured.semantic_model import Dimension, Metric, Operation
 from src.structured.service import StructuredQueryService
 
 TOP = StructuredIntent.TOP_PRODUCTS_BY_QUANTITY
+ANALYTICS = StructuredIntent.ANALYTICS
+
+
+def _quantity_ranking(top_n=None) -> AnalyticalRequest:
+    """What the router derives from "produtos mais vendidos": the Phase 6B.1
+    top-products ranking, expressed as an analytical request."""
+    return AnalyticalRequest(Metric.TOTAL_QUANTITY_SOLD, Operation.RANKING, (Dimension.PRODUCT,), top_n=top_n)
 DATA_Q = "Quais são os produtos mais vendidos?"
 DOC_Q = "Como é calculado o ranking de produtos?"
 BOTH_Q = "Quais são os produtos mais vendidos e qual regra define esse ranking?"
@@ -193,7 +202,7 @@ def test_structured_data_success_returns_the_deterministic_rendering_without_any
 
     assert result.source_route is SourceRoute.STRUCTURED_DATA
     assert result.status is HarnessStatus.STRUCTURED_DATA_OK
-    assert service.calls == [(TOP, {})]
+    assert service.calls == [(ANALYTICS, {"request": _quantity_ranking()})]
     assert events == ["structured"]  # no retrieval, no generation: nothing else ran
     assert orch.generate_calls == []
     assert result.answer == render_structured_answer(_structured_result())
@@ -225,7 +234,7 @@ def test_a_large_structured_result_is_never_truncated_because_no_model_writes_it
 
     assert len([line for line in result.answer.splitlines() if line[:1].isdigit()]) == 50
     assert "50. Produto 050 — 8.950 unidades" in result.answer
-    assert result.answer.endswith("Fonte: dados de vendas efetivas.")
+    assert result.answer.endswith("Fonte: camada Gold — fct_sales + dim_products.")
     assert orch.generate_calls == []
 
 
@@ -234,7 +243,7 @@ def test_structured_route_passes_a_stated_top_n_to_the_service():
 
     harness.ask("Top 5 produtos mais vendidos")
 
-    assert service.calls == [(TOP, {"top_n": 5})]
+    assert service.calls == [(ANALYTICS, {"request": _quantity_ranking(5)})]
 
 
 def test_structured_data_empty_result_is_no_data_and_not_answered_from_documents():
@@ -302,7 +311,9 @@ def test_a_rendering_failure_is_contained_like_any_other_structured_failure(monk
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("query", ["Quais são os produtos mais vendidos em 2024?", "Qual foi o faturamento do mês?"])
+@pytest.mark.parametrize(
+    "query", ["Quais são os produtos mais vendidos em março?", "Qual foi o faturamento do mês?", "Quais produtos venderam menos?"]
+)
 def test_unsupported_structured_question_is_controlled_and_executes_nothing(query):
     harness, orch, service, events = _harness()
 
@@ -441,7 +452,7 @@ def test_both_where_both_sources_fail_reports_the_structured_failure_first():
 def test_both_unsupported_scope_is_unsupported_not_half_answered():
     harness, _, _, events = _harness()
 
-    result = harness.ask("Quais são os produtos mais vendidos em 2024 e qual regra define esse ranking?")
+    result = harness.ask("Quais são os produtos mais vendidos em março e qual regra define esse ranking?")
 
     assert result.status is HarnessStatus.STRUCTURED_DATA_UNSUPPORTED
     assert events == []

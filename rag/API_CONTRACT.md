@@ -208,7 +208,7 @@ STRUCTURED_DATA_OK            -> AI_SEARCH_OK          (200, sources [])
 BOTH_OK                       -> AI_SEARCH_OK          (200, documentary sources)
 BOTH_DEGRADED                 -> AI_SEARCH_OK          (200, sources [])
 STRUCTURED_DATA_NO_DATA       -> AI_SEARCH_NO_EVIDENCE (200)
-STRUCTURED_DATA_UNSUPPORTED   -> AI_SEARCH_NO_EVIDENCE (200, message "This question asks for data that is not supported yet.")
+STRUCTURED_DATA_UNSUPPORTED   -> AI_SEARCH_NO_EVIDENCE (200, message "Esta consulta ainda não é suportada pelos dados estruturados disponíveis.")
 STRUCTURED_DATA_FAILED        -> RAG_EXECUTION_FAILED  (500)
 STRUCTURED_DATA_UNAVAILABLE   -> RAG_EXECUTION_FAILED  (500)
 STRUCTURED_DATA_FETCHED_NO_GENERATION, BOTH_PARTIAL (legacy placeholders)
@@ -219,11 +219,14 @@ The public `status` is never a raw internal value.
 
 ## Structured answers (implemented locally; NOT LIVE until Phase 6B.2)
 
-The backend can answer one kind of live-data question — the ranking of the
-best-selling products by quantity (effective sales, all history, all
-locations) — behind the unchanged `POST /api/ask`. **This is implemented in
-the repository and unit-tested locally, but is not live**: the currently
-deployed App does not contain the Phase 6B.1 routing. If this code were
+The backend can answer live-data questions about the business — sales,
+returns, inventory and customers — behind the unchanged `POST /api/ask`.
+Internally this is **generic Structured Analytics**: every supported question
+is one *approved metric* (taken from the Power BI semantic model) combined
+with an *operation* (`aggregate`, `ranking`, `breakdown` or `trend`), approved
+*dimensions* and approved *filters*; the backend never turns free text into
+SQL. **This is implemented in the repository and unit-tested locally, but is
+not live**: the currently deployed App does not contain this code. If it were
 deployed before the Phase 6B.2 infrastructure configuration (SQL Warehouse,
 `SQL_WAREHOUSE_ID`/`DATA_*` settings and service-principal grants), a
 structured-routed request would return the controlled `RAG_EXECUTION_FAILED`
@@ -231,8 +234,10 @@ structured-routed request would return the controlled `RAG_EXECUTION_FAILED`
 never a documentation answer. Nothing below has been observed against the
 live App.
 
-**No frontend change is required.** Request schema, response schema and the
-four public statuses are unchanged. What the UI should be aware of:
+**No frontend change is required.** The request schema, the response schema
+and the four public statuses are unchanged — generic structured analytics is
+entirely behind the same `{"query": "..."}` contract, and the UI never sees a
+metric, dimension or route. What the UI should be aware of:
 
 - A successful structured answer currently comes back as
   `status: "AI_SEARCH_OK"` (V1 compatibility; a dedicated status is possible
@@ -241,36 +246,96 @@ four public statuses are unchanged. What the UI should be aware of:
   have an empty `sources` list: render the `answer` and simply omit the
   sources section. Values from live data are **never** given a `[Sn]`
   citation and never appear in `sources`.
-- The ranked list is produced deterministically by the backend (not by the
-  model), one line per product, in plain text with line breaks, for example:
+- The `answer` is plain Portuguese text with line breaks, produced
+  deterministically by the backend (not by the model), so numbers are exact.
+  It is always the *result* in natural language — never the internal
+  semantic request. Keep the line breaks. There are four shapes (examples show
+  the format only — names and values are placeholders/illustrative, not live
+  data):
 
   ```text
-  Os produtos mais vendidos, por quantidade de unidades, são:
+  Aggregate:   O faturamento líquido em 2025 foi de R$ 1.234.567,89.
 
-  1. <product name> — 1.737 unidades
-  2. <product name> — 1.731 unidades
-  8. <product name> — 1.638 unidades
-  8. <product name> — 1.638 unidades
+               Fonte: camada Gold — fct_sales.
 
-  Produtos com a mesma quantidade vendida compartilham a mesma posição.
-  Fonte: dados de vendas efetivas.
+  Ranking:     Os 3 produtos com mais unidades vendidas foram:
+
+               1. <product name> — 1.737 unidades
+               8. <product name> — 1.638 unidades
+               8. <product name> — 1.638 unidades
+
+               Produtos empatados compartilham a mesma posição.
+
+               Fonte: camada Gold — fct_sales + dim_products.
+
+  Breakdown:   Em 2025, o faturamento líquido por categoria foi:
+
+               - <category> — R$ 300,00
+               - <category> — R$ 200,50
+
+               Fonte: camada Gold — fct_sales + dim_products.
+
+  Trend:       De janeiro a fevereiro de 2025, o faturamento líquido mensal foi:
+
+               - jan/2025 — R$ 10,00
+               - fev/2025 — R$ 20,00
+
+               Fonte: camada Gold — fct_sales.
   ```
 
-  (The example shows the format only — the product names and quantities
-  shown here are placeholders/illustrative, not live data.) Tied products
-  repeat their rank, so a list can be longer than the requested count.
+  Other aggregates read the same way ("Foram 12.345 pedidos efetivos.", "O
+  ticket médio foi de R$ 432,10.", "A taxa de devolução foi de 4,32% (432 de
+  10.000 unidades)."). Money uses `R$ 1.234,56`, whole numbers use `.` for
+  thousands, percentages use a comma.
+
+  A ranking can list more rows than requested: tied items repeat their rank,
+  and the text says so. The last line names the Gold tables the query actually
+  read (`Fonte: camada Gold — <table> [+ <table>].`, table names only — never
+  the catalog or schema); it is not a documentary citation and `sources`
+  stays `[]`. A ratio such as the return rate shows its counts (`4,32% (432
+  de 10.000 unidades)`); the stockout-risk and replenishment-required percentages are shown alone until
+  the grain of `fct_inventory_replenishment` is validated. Some answers add a line stating a rule that the
+  reader should know (for example the salesperson ranking says it "considera
+  apenas funcionários com cargo Salesperson").
+- **What can be asked (families, not a fixed list of questions):** revenue,
+  units sold, orders, average ticket, refunds and return rate; ranking of
+  products, categories, establishments or salespeople (top N); breakdowns by
+  category, establishment, establishment state, customer state, channel, RFM
+  segment or inventory health status; monthly/quarterly/yearly/daily trends;
+  year-to-date, last-12-months and year-over-year revenue; current inventory
+  (stock, days to stockout, items needing replenishment or at risk of
+  stockout, health status counts) and stock on hand as of a past date or month
+  ("quantos coletes havia em janeiro de 2026?"), optionally for a named
+  product, category or location ("Loja X"); the answer states the position it
+  describes ("Na posição atual disponível no sistema", "Na posição de estoque de
+  31/01/2026"); and customers (count, at risk, revenue at
+  risk). Periods are calendar years or a month with its year (for example
+  "em 2024"); the *product champion* is the product with the highest **net
+  revenue**, while "mais vendidos" ranks by **units**.
+- Year-to-date, last-12-months and year-over-year answers need an explicit
+  period in the question; without one they are refused (no period is assumed).
+- A question that asks for something the backend cannot produce returns HTTP
+  200 `AI_SEARCH_NO_EVIDENCE` with `message` `"Esta consulta ainda não é suportada pelos dados estruturados disponíveis."` — render it like any other no-answer message.
+  This covers: "least sold" rankings, customer rankings, forecasts,
+  profit/margin, relative periods ("last month", "yesterday"), a month without
+  a year, an ambiguous "state", filters on one specific store/state/category/
+  product (except in stock questions, which accept a named product, category
+  or location — anything else in them that cannot be represented is refused), rankings by two dimensions, order-level metrics split by product,
+  inventory or customer snapshots asked over a period, and any request for
+  personal data (email, telephone, address, documents).
 - A question that asks for both the values and the rule behind them returns
-  the ranking followed by a documentary explanation; only the explanation
-  carries `[Sn]` citations and `sources`. If the explanation is unavailable
-  (no documentary evidence, or a technical failure), the ranking is still
-  returned as `AI_SEARCH_OK` with `sources: []` and no explanation.
-- A question that asks for data the backend cannot produce (other periods,
-  stores, revenue, "least sold", customers, ...) returns HTTP 200
-  `AI_SEARCH_NO_EVIDENCE` with `message` `"This question asks for data that
-  is not supported yet."` — render it like any other no-answer message.
-- A data question whose values cannot be obtained returns HTTP 500
-  `RAG_EXECUTION_FAILED`; the backend never substitutes a documentation
-  answer for the missing values.
+  the deterministic values followed by a documentary explanation; only the
+  explanation carries `[Sn]` citations and `sources`. If the explanation is
+  unavailable (no documentary evidence, or a technical failure), the values
+  are still returned as `AI_SEARCH_OK` with `sources: []` and no explanation.
+- A structured query that returns no rows returns HTTP 200
+  `AI_SEARCH_NO_EVIDENCE` ("No relevant information was found for this
+  question."). A data question whose values cannot be obtained returns HTTP
+  500 `RAG_EXECUTION_FAILED`; the backend never substitutes a documentation
+  answer for missing values.
+- Wording outside the backend's vocabulary (for example "Quais produtos são
+  mais populares?") is answered from documentation, not from data; it never
+  runs SQL.
 
 ## `sources[]` object shape
 
@@ -532,7 +597,7 @@ backend actually does:
   Phase 6B.2
 - structured provenance (which table/query a number came from) — not
   exposed; structured values have no `sources[]` entry
-- any analytical intent other than the best-selling-products ranking
+- any analytical question outside the approved metrics/dimensions/filters (see "Structured answers": ad-hoc filters on one specific store/state/category/product, ascending rankings, forecasts, personal data); no free-form or user-supplied queries of any kind
 - UI-selectable retrieval mode / source route
 - UI-selectable Top-K
 - model selection

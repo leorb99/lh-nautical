@@ -49,12 +49,12 @@ knowledge base — evolving toward a broader, multi-source document platform.
 | Databricks Reranker | UNAVAILABLE IN CURRENT ENVIRONMENT / NOT PART OF CURRENT POLICY |
 | Generic-heading retrieval pollution | OPEN |
 | OOD / negative-query evidence sufficiency | OPEN / FUTURE HARNESS CONCERN |
-| Structured ML/analytical data path (Delta/SQL for dynamic outputs) | **PARTIALLY IMPLEMENTED (Phase 6B.1, local only)** — one analytical intent over the Gold layer (`TOP_PRODUCTS_BY_QUANTITY`); see the next rows and "Structured Data & Source Routing". ML / forecast outputs remain ARCHITECTURALLY DECIDED / DEFERRED UNTIL REAL DATA CONTRACT |
+| Structured ML/analytical data path (Delta/SQL for dynamic outputs) | **PARTIALLY IMPLEMENTED (Phase 6B.1, local only)** — generic Structured Analytics over the Gold layer (approved metric + operation + dimension + filters, from the Power BI semantic model); see the next rows and "Structured Data & Source Routing". ML / forecast outputs remain ARCHITECTURALLY DECIDED / DEFERRED UNTIL REAL DATA CONTRACT |
 | **LlamaIndex Orchestration** (`orchestration/rag_pipeline.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Databricks Llama Generation** (`generation/llama_client.py`, Phase 5A) | **IMPLEMENTED / RUNTIME VALIDATED** |
 | **Lean RAG Core** (orchestration consolidation review) | **REFACTORED / VALIDATED** |
 | **AI Harness** (`harness/harness.py`, Phase 6A + 6B.1) | **IMPLEMENTED** — request validation, controlled-failure containment, and (Phase 6B.1) `AI_SEARCH` / `STRUCTURED_DATA` / `BOTH` source routing through a deterministic rule-based router (`harness/source_router.py`, no LLM classifier). The structured routes are **implemented and unit-tested locally, NOT LIVE** (see the next row); no context/token-budget selection (see "Top-K vs Token Budget", still open) |
-| **Structured Data & Source Routing** (`structured/*`, `harness/source_router.py`, Phase 6B.1) | **IMPLEMENTED LOCALLY / UNIT-TESTED / NOT LIVE** — `StructuredQueryService` runs one allowlisted, parameterized query (`TOP_PRODUCTS_BY_QUANTITY`) through an injectable SQL executor; ranked values are **rendered deterministically by code, never by the model**. Never executed against a real SQL Warehouse from the App. Live validation, the App's `sql_warehouse` resource and its Unity Catalog grants are **Phase 6B.2** — see "Structured Data & Source Routing" |
+| **Structured Data & Source Routing / Structured Analytics** (`structured/*`, `harness/source_router.py`, Phase 6B.1 and its generalization) | **IMPLEMENTED LOCALLY / UNIT-TESTED / NOT LIVE** — a typed `AnalyticalRequest` (15 approved metrics from the Power BI semantic model, 9 dimensions, aggregate/ranking/breakdown/trend) is compiled by a deterministic SQL compiler and run through an injectable SQL executor; values are **rendered deterministically by code, never by the model**, and unsupported combinations fail closed. Never executed against a real SQL Warehouse from the App. Live validation, the App's `sql_warehouse` resource and its Unity Catalog grants are **Phase 6B.2** — see "Structured Data & Source Routing" |
 | Citation Integrity Validation (`evaluation/citations.py`) | IMPLEMENTED — structural check only (cited `[Sn]` labels vs. real source labels); not a semantic groundedness judgment |
 | MLflow Request Tracing (`harness/tracing.py`, Phase 7) | **IMPLEMENTED / LIVE RUNTIME VALIDATED** — real live App requests produced real MLflow trace records (parent `AIHarness.ask`, correct inputs/outputs, `mlflow.user` matching the App's own service principal, real token usage/cost, span counts consistent with each request's code path). Individual child-span artifact retrieval was not inspectable with the tooling used (see Roadmap Phase 8) — a non-blocking observability limitation, not a functional gap. MLflow **evaluation harness** (systematic quality regression) remains PLANNED |
 | Interface — Databricks App (`app.py` + `resources/rag_app.yml`, Phase 8) | **IMPLEMENTED / DEPLOYED / LIVE VALIDATED** — App is `RUNNING`/`ACTIVE`. All three V1 API-contract paths validated against the real deployed App: `GOLD-032` → `AI_SEARCH_OK`; `GOLD-999` → `AI_SEARCH_NO_EVIDENCE`; whitespace query → `INVALID_REQUEST`/HTTP 400 (see Roadmap Phase 8). This is backend/API validation only — the chatbot UI is separate, in-progress work (see "Interface Layer — Databricks App") |
@@ -145,10 +145,10 @@ reflects three existing tests that are parametrized directly over
 case each for the sixth document — no test was weakened to reach this
 number. This 232 figure covers only the Phase 1 ingestion-scoped test
 files — it is not the whole-repository count. See "Testing" below for the
-current whole-repository figure: **699 passed, 0 failed, 0 skipped** — the
+current whole-repository figure: **1208 passed, 0 failed, 0 skipped** — the
 last full-suite aggregate actually executed, now including the
-Harness/Tracing/Citations/App and Phase 6B.1 structured-data/router test
-files.)
+Harness/Tracing/Citations/App and the structured-data/Structured Analytics
+(registry, compatibility, parser, compiler, renderer) test files.)
 
 ## Knowledge Provenance — Distinct Origins
 
@@ -503,7 +503,7 @@ Databricks App) is implemented, deployed to `dev`, and **live
 end-to-end validated** (Phase 8) — the backend/API surface, not the
 chatbot UI, which remains separate ongoing work. The
 `DELTA / SQL` structured-data query path shown above is **IMPLEMENTED
-LOCALLY for one Gold-layer intent (Phase 6B.1) but NOT LIVE**; ML/forecast
+LOCALLY as generic Structured Analytics over the Gold layer (Phase 6B.1 and its generalization) but NOT LIVE**; ML/forecast
 outputs remain deferred until a real data contract exists. MLflow
 tracing (part of the transversal plane) is implemented and live-validated;
 the MLflow evaluation harness is **PLANNED**.
@@ -1753,8 +1753,8 @@ Not blockers for Phase 5A (closed) or Phase 6A (next), but genuinely open:
 
 Canonical knowledge and dynamic analytical data use **different access
 paths**. This is an architectural decision. As of Phase 6B.1 it is
-implemented locally for one Gold-layer intent (see "Structured Data &
-Source Routing"); the ML / forecast outputs described in this section
+implemented locally as generic Structured Analytics over the Gold layer (see
+"Structured Data & Source Routing"); the ML / forecast outputs described in this section
 remain PLANNED.
 
 ### Stable knowledge
@@ -2102,7 +2102,7 @@ ML / analytical pipeline
 Delta / SQL output
         |
         v
-structured query service (Phase 6B.1 — one Gold-layer intent implemented;
+structured query service (Phase 6B.1 and generic Structured Analytics implemented;
 ML/forecast outputs not yet designed)
         |
         v
@@ -2112,8 +2112,8 @@ AI Harness source routing (Phase 6B.1)
 RAG orchestration
 ```
 
-and a concrete implementation was introduced in Phase 6B.1 only for the Gold
-layer's product-ranking intent, under `src/structured/` (the removed
+and a concrete implementation was introduced in Phase 6B.1 and generalized to
+approved metrics from the Power BI semantic model, under `src/structured/` (the removed
 placeholder here was not resurrected — see "Structured Data & Source
 Routing"); ML/forecast outputs still need a real data contract (see
 "Structured Runtime Data — Analytical / ML Outputs (PLANNED)" and "Phase
@@ -2418,17 +2418,17 @@ unchanged; business rules, governance, and validation policy are still
 never delegated to LlamaIndex or `rag_pipeline.py` (see "Orchestration
 Layer — LlamaIndex").
 
-## Structured Data & Source Routing (Phase 6B.1 — IMPLEMENTED LOCALLY, NOT LIVE)
+## Structured Data & Source Routing (Phase 6B.1 + Structured Analytics — IMPLEMENTED LOCALLY, NOT LIVE)
 
 **Status: implemented and unit-tested locally with fakes. Not live.** No
 code in this phase was executed against a real SQL Warehouse from the App:
 the currently deployed App does not contain this code, and it has no
 `sql_warehouse` resource, no `SQL_WAREHOUSE_ID`, and no structured-data Unity
-Catalog grants for its service principal. Those
-belong to **Phase 6B.2** (live validation), together with latency and
-production behavior — nothing about them is claimed here. (The underlying
-query was validated read-only against the Gold layer in an earlier
-discovery phase, separately from the App.)
+Catalog grants for its service principal beyond those listed under "What
+remains for Phase 6B.2". Those belong to **Phase 6B.2** (live validation),
+together with latency and production behavior — nothing about them is claimed
+here. The generated SQL has been compiled to strings and checked against the
+dbt Gold YAML, but it has never run on a Warehouse.
 
 ```
 POST /api/ask {"query": "..."}
@@ -2441,51 +2441,200 @@ POST /api/ask {"query": "..."}
       |
       +-- AI_SEARCH -------> RagOrchestrator.generate        (unchanged, live)
       |
-      +-- STRUCTURED_DATA -> StructuredQueryService -> deterministic renderer
+      +-- STRUCTURED_DATA -> parser -> AnalyticalRequest -> compiler
+      |                      -> DatabricksSqlExecutor -> deterministic renderer
       |                                                     (no model call)
-      +-- BOTH ------------> StructuredQueryService -> deterministic renderer
+      +-- BOTH ------------> the same structured path
                              + RagOrchestrator.generate (documentary
                                explanation only)
 ```
 
-**Supported structured intent (only one):** `TOP_PRODUCTS_BY_QUANTITY` —
-product ranking by total quantity sold over **effective sales only**
-(`fct_sales.is_effective_sale = TRUE`, joined to `dim_products`), all
-history, all locations, dense ranking. Default `top_n` is 10 (a stated
-number is honored, bounded 1..50). The filter is `ranking <= :top_n`, never
-`LIMIT`, so **ties are preserved** (rows can exceed `top_n`). The SQL is a
-fixed, allowlisted template with identifier validation and a bound INT
-parameter — **never model-generated SQL**; the executor
-(`DatabricksSqlExecutor`, injectable, SELECT-only) uses the Statement
-Execution API with a bounded wait, cancels on timeout, and treats a failed
-or truncated result as an error. Without `SQL_WAREHOUSE_ID` the service is
-not built and a structured route fails closed.
+### Structured Analytics: metric + operation + dimension + filters
 
-**Source router (`harness/source_router.py`).** It only decides *which
-source family* a question needs; the Phase 4C retrieval policy
+Structured data is **generic**, not one intent per question. A question is
+mapped to one typed `AnalyticalRequest` — an **approved metric**, an
+**operation**, approved **dimensions**, approved **filters**, a time grain or
+modifier, and a bounded `top_n` — and a deterministic compiler turns that
+request into SQL:
+
+```
+natural language
+  -> AnalyticalRequest      (enums + bounded integer + dates; no SQL text)
+  -> registry validation    (compatibility matrix; fail-closed)
+  -> SQL compiler           (allowlisted tables/columns, named parameters only)
+  -> DatabricksSqlExecutor  (unchanged)
+  -> deterministic renderer (no model reproduces a value)
+```
+
+**Power BI is the semantic contract; Gold is the runtime data source.** Every
+metric in the registry (`src/structured/semantic_model.py`) names the exact
+measure of the "Dashboard Gerencial Compass 360 - LH Nautical" model it
+mirrors (documented in `knowledge_base/powerbi_semantic_rules.md`); tests
+check every registered table and column against the dbt Gold YAML and every
+measure name against that document. The Power BI file is never used at
+runtime. There is a single structured intent, `ANALYTICS`; the Phase 6B.1
+intent `TOP_PRODUCTS_BY_QUANTITY` is kept for compatibility and is just the
+equivalent ranking request, compiled by the same code (its statement is
+byte-identical to the one validated against Gold in Phase 6B.0, apart from a
+CTE name). There is **no model-generated SQL**: no natural-language string, and
+no model output, ever becomes SQL text.
+
+**Operations:** `AGGREGATE`, `RANKING` (top N), `BREAKDOWN` (one dimension),
+`TREND` (day/month/quarter/year).
+
+**Metrics (15).**
+
+| Metric | Power BI measure / rule | Gold |
+|---|---|---|
+| `NET_REVENUE` | Receita Líquida | `fct_sales` (effective sales) |
+| `TOTAL_QUANTITY_SOLD` | Quantidade Total Vendida | `fct_sales` |
+| `EFFECTIVE_ORDERS` | Pedidos Efetivos | `fct_sales` |
+| `AVERAGE_TICKET` | Ticket Médio (one row per order; `order_total_amount` is order-level) | `fct_sales` |
+| `RETURN_AMOUNT` | Valor Total Reembolsado | `fct_sales` |
+| `RETURN_RATE` | Taxa de Devolução | `fct_sales` |
+| `STOCK_ON_HAND` | Estoque Atual | `fct_inventory_replenishment` (snapshot) |
+| `DAYS_TO_STOCKOUT` | Dias até Ruptura | `fct_inventory_replenishment` (snapshot) |
+| `REPLENISHMENT_REQUIRED` | Itens em Reposição (%) | `fct_inventory_replenishment` (snapshot) |
+| `STOCKOUT_RISK` | Itens em Risco de Ruptura | `fct_inventory_replenishment` (snapshot) |
+| `INVENTORY_ITEMS` | Itens por Status de Saúde (the four status measures are its health filter) | `fct_current_inventory` (snapshot) |
+| `CUSTOMER_COUNT` | Total Clientes | `agg_customer_rfm` (snapshot) |
+| `AT_RISK_CUSTOMERS` | Clientes em Risco | `agg_customer_rfm` (snapshot) |
+| `AT_RISK_REVENUE` | Receita em Risco (Churn) | `agg_customer_rfm` (snapshot) |
+| `AVERAGE_RECENCY` | Recência Média (P1; added only to show a metric is a registry entry) | `agg_customer_rfm` (snapshot) |
+
+Ratios (`DIVIDE` in Power BI) show the percentage together with its numerator
+and denominator. `YTD`, `LTM` and `YOY` are **modifiers** of `NET_REVENUE`
+(Power BI `TOTALYTD`, `DATESINPERIOD(..., -12, MONTH)`, `SAMEPERIODLASTYEAR`),
+not separate metrics.
+
+**Dimensions (9).** `PRODUCT` (product grain: variants folded into
+`product_id`), `CATEGORY`, `LOCATION`, `LOCATION_STATE`, `CUSTOMER_STATE`,
+`CHANNEL`, `SALESPERSON`, `CUSTOMER_SEGMENT`, `INVENTORY_HEALTH_STATUS`. "State"
+is never ambiguous: it is either the establishment's state or the customer's,
+and a question that does not say which is refused. **Filters:** a date range
+(sales metrics), category, customer segment and inventory health status.
+
+**Power BI semantics that are preserved exactly.**
+
+- **Effective sales only** (`is_effective_sale = TRUE`) on every sales metric.
+- **Ranking ties:** products/categories use dense ranking (`RANKX(..., Dense)`);
+  the salesperson ranking uses default `RANKX` (ties skip positions). A
+  ranking filters on `ranking <= :top_n`, never `LIMIT`, so ties are kept.
+- **The champion product is the top product by net revenue** ("produto
+  campeão", "campeão de vendas" → `RANKING` + `NET_REVENUE` + `PRODUCT`, top 1).
+  "Produto mais vendido" and "mais unidades vendidas" remain quantity rankings.
+- **YTD / LTM / YoY need an explicit period.** Power BI evaluates them against
+  the report's date context (LTM and %YoY are `BLANK` without one), and the
+  Harness has none: without a period they are refused, and **no period is
+  ever assumed** (not "today", not "the latest sale"). YTD and LTM are anchored
+  on the *end* of the period given (the start is replaced by the window, as in
+  the DAX); YoY compares the period with the same period of the previous year.
+- **Salesperson ranking.** The measure `Ranking de Vendedores por Receita`
+  has no role filter of its own; the report's ranking table filters
+  `employee_role IN ('Salesperson')` and `employee_full_name NOT IN (null)`,
+  which is the ranking the dashboard shows. The same two filters are applied
+  (inner join to `dim_employees`) and the answer states "Considera apenas
+  funcionários com cargo Salesperson." The `'Salesperson'` value is taken
+  from that Power BI filter; it has not been read from Gold data (no SQL has
+  been run), so it is one of the things Phase 6B.2 confirms — a wrong value
+  would yield an empty result, never wrong numbers.
+- `DAYS_TO_STOCKOUT` is Power BI's `SUM(estimated_days_until_stockout)` (only
+  meaningful per item, so it has no plain aggregate), soonest first.
+
+**Fail-closed compatibility matrix** (encoded as data on the registry, not as
+scattered `if`s). An invalid combination returns the controlled "unsupported"
+outcome and nothing is compiled or executed:
+
+- average ticket is order-level: no product/category breakdown or category filter;
+- inventory and RFM metrics are current snapshots: no date filter, trend or
+  time modifier. The one exception is **stock on hand** (`STOCK_ON_HAND`), which
+  can also be asked *as of* one date or month (see "Inventory analytics" below);
+- products and salespeople can be ranked but not listed as a breakdown;
+- ranking/breakdown need exactly one dimension; time modifiers are a single
+  aggregate value;
+- personal data (email, telephone, address, documents) is never registered
+  and questions asking for it are refused;
+- "menos vendidos" / ascending rankings (only **stock** may be ranked in either
+  order: "menos estoque"), customer rankings, forecasts,
+  profit/margin, relative periods ("no último mês", "ontem"), a month without a
+  year, filters on a specific store/state/category/product, and rankings by two
+  dimensions are refused.
+
+Relative to Phase 6B.1, a period (`em 2024`), revenue ("geraram mais receita"),
+rankings by store and totals are now **supported**; "menos vendidos" and
+free-form filters stay unsupported.
+
+**Source router and parser.** The router (`harness/source_router.py`) only
+decides *which source family* a question needs; the Phase 4C retrieval policy
 (`EXACT_RULE_ID`/`NORMAL`/`CROSS_SOURCE`) still decides *how* AI Search
-retrieves and is untouched. Rule-based, with four cue families applied in a
-fixed precedence: documentary cues (how it is calculated/defined/where to
-find it) → supported analytical cues (the product ranking, in many
-wordings: "mais vendidos", "venderam mais", "campeão de vendas", "itens que
-mais saem", ...) → unsupported analytical cues (revenue, "menos vendidos",
-stores/customers rankings, totals) and unsupported scope (period, month,
-store, ...) → explanatory cues that turn a data request into `BOTH`. Scope
-words are read from the data part of the question only, so "período" inside
-the rule clause of a `BOTH` question is ignored. Questions that ask for
-live values the system cannot produce **fail closed** (`STRUCTURED_DATA_UNSUPPORTED`)
-instead of being answered with documentation. It is a deterministic set of
-Portuguese cues, not a semantic classifier: a data question phrased outside
-its cues falls through to `AI_SEARCH`.
+retrieves and is untouched. It splits a question into a documentary clause
+("como é calculado", "qual a regra") and a data clause, and hands the data
+clause to the parser (`structured/parser.py`) — one small, deterministic,
+vocabulary-driven mapper, not one regex family per question. It can only
+select approved parts; every request it builds passes the compatibility
+matrix. Period words inside the rule clause never affect the data request.
+It is a deterministic set of Portuguese cues, not a semantic classifier: a
+data question phrased outside its vocabulary falls through to `AI_SEARCH`
+(for example "Quais produtos são mais populares?" — a documented, safe false
+negative that runs no SQL). Questions that clearly ask for live values the
+system cannot produce **fail closed** (`STRUCTURED_DATA_UNSUPPORTED`) instead
+of being answered with documentation.
 
-**Deterministic structured output.** The ranked list is produced by
-`structured/rendering.py` directly from the validated rows — rank, product
-name and quantity exactly as returned, ties kept with their shared rank,
-order preserved, thousands shown with `.` — followed by a `Fonte: dados de
-vendas efetivas.` line. **No model reproduces, reorders, summarizes or
-truncates these values**, so the output token limit cannot cut them, and a
-structured-only question makes no model call at all. Structured values never
-receive an `[Sn]` citation and never appear in `sources`.
+**Inventory analytics (stock on hand).** Three inventory meanings are kept apart:
+
+- *Current stock* ("quantos coletes temos?") reads `gold.fct_current_inventory`,
+  which is already the current SCD2 row (`dbt_valid_to IS NULL`) of every product
+  variant + location. It is **never** filtered by `CURRENT_DATE` and
+  `inventory_reference_date` is not treated as a global snapshot date; answers say
+  "Na posição atual disponível no sistema" and never claim stock was updated today.
+- *Historical stock* ("quantos coletes havia em janeiro de 2026?") reads
+  `gold.fct_inventory_snapshot` and reconstructs the state **as of the end of** the
+  given day (a month means its last day): the one row per variant + location with
+  `snapshot_valid_from < D+1 AND (snapshot_valid_to IS NULL OR snapshot_valid_to >= D+1)`,
+  i.e. valid over `[valid_from, valid_to)` — never a sum of the snapshots created in
+  the period. The answer states the date used ("Na posição de estoque de
+  31/01/2026, ..."). A year, a range or a relative date is refused; there is no
+  inventory trend.
+- *Replenishment / risk* (`STOCKOUT_RISK`, `DAYS_TO_STOCKOUT`,
+  `REPLENISHMENT_REQUIRED`) stays on `fct_inventory_replenishment`.
+
+Stock questions accept **name filters** as typed values of the request
+(`RequestFilters.product_text`, `category_text`, `location_text`): a product phrase
+searches `dim_products.product_name` only (never `category_name`, whose Gold
+assignments are inconsistent — a category is filtered only when the question says
+"categoria X"), a location is a type + name ("Loja X", "Armazém Y"). A phrase is
+reduced to lowercase, accent-free search terms (simple plural variants) that are
+bound as named parameters of `LIKE` predicates; the user's text is never in the
+SQL. Every word of a stock question must be accounted for (`structured/qualifiers.py`):
+a product/place/category/date that cannot be represented — two items, a place
+without a type, a product id, "nas lojas" — makes the question **unsupported**
+instead of answering a broader one. "Em quais estoques temos X?" keeps only
+locations whose stock is greater than zero; "menos estoque" ranks ascending.
+
+**Deterministic, friendly structured output.** The answer is the *result* in
+natural Portuguese — never the internal semantic request (`AGGREGATE ·
+NET_REVENUE` is debug metadata only). It is produced by
+`structured/rendering.py` directly from the validated rows: labels and values
+exactly as returned, ties kept with their shared rank, order preserved,
+notation `1.737` / `R$ 1.234,56` / `12,34%`, followed by a `Fonte: camada Gold — <tables>.` line
+naming the tables the query actually read (names only, no catalog/schema; never
+an `[Sx]` citation) (and, for a dimension with a rule such as salespeople, a line stating it).
+One renderer per operation — an aggregate is one sentence ("O faturamento
+líquido foi de R$ 1.234.567,89.", "Foram 12.345 pedidos efetivos.", "A taxa de
+devolução foi de 4,32%."), a ranking has a natural title and numbered lines
+("Os 5 produtos com maior receita líquida foram:"), a breakdown and a trend
+have an introduction built from the metric, the dimension and the period
+("Em 2025, o faturamento líquido por categoria foi:"; for a trend, the periods
+actually returned: "Ao longo de 2025, o faturamento líquido mensal foi:", "De
+janeiro a agosto de 2026, ...", "Em janeiro de 2026, ...") and one line per
+group/period (trends chronological). There are **no per-question templates**: the wording is
+presentation metadata in the registry (`MetricDef.display_pt`, `sentence_pt`,
+`ranking_pt` and the value format `Unit` — `CURRENCY_BRL`, `INTEGER`, `UNITS`,
+`DECIMAL`, `PERCENT`, `DAYS`) plus the dimension labels. **No model reproduces, reorders, summarizes or truncates
+these values**, so the output token limit cannot cut them, and a
+structured-only question makes no model call at all. A result larger than the
+row cap (500) is refused, never truncated. Structured values never receive an
+`[Sn]` citation and never appear in `sources`.
 
 **`BOTH`.** The final answer is the deterministic structured block followed
 by a documentary explanation written by the model from AI Search evidence
@@ -2495,35 +2644,55 @@ Documentary `[Sn]` citations and `sources` belong to the explanation only.
 
 | Case | Internal status | HTTP | Public status | Answer | `sources` |
 |---|---|---:|---|---|---|
-| Structured OK (structured-only) | `STRUCTURED_DATA_OK` | 200 | `AI_SEARCH_OK` | deterministic ranking | `[]` |
-| `BOTH`: structured OK + documentary OK | `BOTH_OK` | 200 | `AI_SEARCH_OK` | ranking + explanation | documentary |
-| `BOTH`: structured OK, no documentary evidence | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | ranking only | `[]` |
-| `BOTH`: structured OK, documentary technical failure | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | ranking only | `[]` |
+| Structured OK (structured-only) | `STRUCTURED_DATA_OK` | 200 | `AI_SEARCH_OK` | deterministic answer | `[]` |
+| `BOTH`: structured OK + documentary OK | `BOTH_OK` | 200 | `AI_SEARCH_OK` | values + explanation | documentary |
+| `BOTH`: structured OK, no documentary evidence | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | values only | `[]` |
+| `BOTH`: structured OK, documentary technical failure | `BOTH_DEGRADED` | 200 | `AI_SEARCH_OK` | values only | `[]` |
 | Structured query returned zero rows | `STRUCTURED_DATA_NO_DATA` | 200 | `AI_SEARCH_NO_EVIDENCE` | none | `[]` |
 | Structured query failed (incl. `BOTH`) | `STRUCTURED_DATA_FAILED` | 500 | `RAG_EXECUTION_FAILED` | none | `[]` |
 | Unsupported analytical request | `STRUCTURED_DATA_UNSUPPORTED` | 200 | `AI_SEARCH_NO_EVIDENCE` | none | `[]` |
-| Structured route selected, no service configured (hypothetical: 6B.1 code deployed before 6B.2 configuration) | `STRUCTURED_DATA_UNAVAILABLE` | 500 | `RAG_EXECUTION_FAILED` | none | `[]` |
+| Structured route selected, no service configured (hypothetical: this code deployed before 6B.2 configuration) | `STRUCTURED_DATA_UNAVAILABLE` | 500 | `RAG_EXECUTION_FAILED` | none | `[]` |
 
 The asymmetry is deliberate: if the values cannot be produced, documentation
 is **never** substituted for them; if only the documentary explanation is
 missing, valid structured data is **never** discarded.
 
 **Public API compatibility.** `/api/ask` request and response schemas and the
-four public statuses are unchanged (see `API_CONTRACT.md`). Successful
-structured/`BOTH` responses currently map to the public `AI_SEARCH_OK`, which
-means `AI_SEARCH_OK` can carry an `answer` with `sources: []`. No frontend
-change is required. A dedicated public status and structured provenance field
-are possible later, additively, and are not part of this phase.
+four public statuses are unchanged (see `API_CONTRACT.md`): the generic
+structured layer is entirely behind the same `{"query": "..."}` contract.
+Successful structured/`BOTH` responses currently map to the public
+`AI_SEARCH_OK`, which means `AI_SEARCH_OK` can carry an `answer` with
+`sources: []`. No frontend change is required. A dedicated public status and
+structured provenance field are possible later, additively, and are not part
+of this work.
 
-**What remains for Phase 6B.2 (live).** SQL Warehouse resource and
-`SQL_WAREHOUSE_ID`/`DATA_*` configuration for the App, service-principal
-grants on the Gold tables, a live end-to-end validation (correctness,
-cold-start latency, timeouts), and a live smoke of the changed documentary
-prompt. The currently deployed App does not contain the Phase 6B.1 router;
-structured data stays NOT LIVE until Phase 6B.2. If the 6B.1 code were
-deployed before that configuration, a structured-routed question would return
-the controlled `RAG_EXECUTION_FAILED` response (the structured service would be
-unavailable) rather than a documentation answer.
+**Adding another metric** is a registry entry: one `Metric` enum member, one
+`MetricDef` (Power BI measure name, aggregate or numerator/denominator, unit,
+allowed operations/dimensions/filters) and one vocabulary line in the parser
+(plus a `FactDef` only if it needs a new Gold table). The compiler, validator,
+renderer, service and executor do not change; a test asserts they mention no
+individual metric. `AVERAGE_RECENCY` was added this way.
+
+**What remains for Phase 6B.2 (live).**
+
+- SQL Warehouse resource and `SQL_WAREHOUSE_ID`/`DATA_*` configuration for the
+  App, and a live end-to-end validation (correctness of the generated SQL on
+  Databricks SQL — e.g. `COUNT_IF`, `trunc`, `add_months`, `NULLS LAST` —
+  cold-start latency, timeouts).
+- Unity Catalog `SELECT` for the App service principal on **every Gold table
+  the registry uses**: `fct_sales` and `dim_products` are granted;
+  `dim_locations`, `dim_customers`, `dim_employees`, `fct_inventory_replenishment`,
+  `fct_current_inventory` and `agg_customer_rfm` are not.
+- Confirming the `'Salesperson'` role value in Gold, and that the date of
+  `fct_sales.placed_at` (the sales business date; the deployed table has no
+  `order_date`) agrees with Power BI's `dim_dates` relationship.
+- A live smoke of the changed documentary prompt.
+
+The currently deployed App does not contain this code; structured data stays
+NOT LIVE until Phase 6B.2. If the code were deployed before that
+configuration, a structured-routed question would return the controlled
+`RAG_EXECUTION_FAILED` response (the structured service would be unavailable)
+rather than a documentation answer.
 
 ## Interface Layer — Databricks App (Phase 8 — IMPLEMENTED, DEPLOYED to `dev`)
 
@@ -2832,7 +3001,7 @@ Harness" for the components an evaluation harness would eventually exercise.
 Local pure-Python test suite, last validated (executed) run:
 
 ```
-699 passed, 0 failed, 0 skipped
+1208 passed, 0 failed, 0 skipped
 ```
 
 (Historical progression: 229 → 232 when the sixth canonical document was
@@ -2864,8 +3033,16 @@ computed/assumed) → **699** with the Phase 6B.1 additions:
 `test_source_router.py`, `test_harness_structured.py`,
 `test_rag_pipeline_structured.py` and additional `test_app.py` cases, plus
 `tests/conftest.py`, which keeps MLflow from writing anything into the
-repository working directory during the run. 699 was confirmed by an actual
-full-suite run in the RAG-scoped environment (`rag/.venv`).)
+repository working directory during the run → **1208** with generic
+Structured Analytics: `test_semantic_registry.py` (registry checked against the
+dbt Gold YAML and the Power BI document), `test_analytical_compat.py`
+(fail-closed compatibility matrix), `test_analytical_parser.py`,
+`test_analytical_compiler.py` (every valid registry combination compiled and
+checked for safety, plus the byte-level Phase 6B.0 regression),
+`test_analytical_service_rendering.py` and `test_analytical_regression.py`
+(end to end through the Harness with a fake executor). 1208 was confirmed by
+an actual full-suite run in the RAG-scoped environment (`rag/.venv`), with no
+SQL executed.)
 
 - `test_loader.py` + `test_parser.py` + `test_chunker.py`: 156 (includes
   the 12 heading-only-section scenarios and 6 indivisible-lexical-segment
@@ -2935,7 +3112,7 @@ monkeypatched — no Databricks, no live MLflow). `test_harness.py` and
 `test_citations.py` need no App-scoped dependency; `test_tracing.py` and
 `test_app.py` require the App-scoped `mlflow`/`fastapi` dependencies (see
 "Interface Layer — Databricks App") and are skipped, not failed, wherever
-those aren't installed (`pytest.importorskip`) — the 699 total above was
+those aren't installed (`pytest.importorskip`) — the 1208 total above was
 obtained in an environment where all of them were importable, so none
 were skipped in that run.
 
@@ -3259,9 +3436,13 @@ for full detail; summary:
   Gold-layer product-ranking query (join, effective-sales population, dense
   ranking) outside the App.
 - **Phase 6B.1 — local implementation — DONE (unit-tested, NOT LIVE).**
-  Deterministic rule-based source router; `StructuredQueryService` with one
-  allowlisted intent (`TOP_PRODUCTS_BY_QUANTITY`) and an injectable SQL
-  executor; deterministic rendering of ranked values (no model reproduces
+  Deterministic rule-based source router; `StructuredQueryService` with an
+  injectable SQL executor — first one allowlisted intent
+  (`TOP_PRODUCTS_BY_QUANTITY`), then generalized to **Structured Analytics**:
+  a registry of 15 approved metrics and 9 dimensions taken from the Power BI
+  semantic model, a typed `AnalyticalRequest`, a compatibility matrix and a
+  deterministic SQL compiler (still no model-generated SQL; the old intent is
+  compiled by the same code and its statement is unchanged); deterministic rendering of ranked values (no model reproduces
   them); `BOTH` = deterministic block + documentary explanation, degrading
   to the structured block if the explanation is unavailable; fail-closed
   behavior for unsupported analytical requests and for structured failures;
@@ -3353,7 +3534,7 @@ now closed for its scoped `AI_SEARCH`-route responsibilities; Phase 7
 (tracing) and Phase 8 (App backend + dev deploy) are both now partially
 done, each with one specific named remaining step (an MLflow evaluation
 harness; a Unity Catalog grant), not a full re-scope. Phase 6B.1
-(structured routing for one Gold-layer intent) was later implemented
+(structured routing, generalized to Structured Analytics) was later implemented
 locally and is not live until Phase 6B.2; ML/forecast outputs remain
 deferred until a real data contract exists — nothing in Phase 7/8 required
 it. Infrastructure-hardening work such as Phase 3B may
@@ -3631,7 +3812,7 @@ the MVP above):
 45. The speculative `structured_data.py` abstraction (a `Protocol` with no
     implementation and no caller) was removed, not merely deferred in
     place. A real structured-data implementation was later introduced in
-    Phase 6B.1 (`src/structured/`, one Gold-layer intent) for a real data
+    Phase 6B.1 (`src/structured/`, generalized to Structured Analytics) for a real data
     contract; the ML/forecast side still waits for its own contract.
 46. `orchestration/rag_pipeline.py` always returns deterministic source
     metadata (`S1`, `S2`, ... with chunk/document/section/rule-ID/score/
@@ -3731,11 +3912,12 @@ Genuinely unresolved items — not answered by this document:
   defined; the previous `StructuredEvidence`/`StructuredDataProvider`
   placeholder interface was removed during the Lean Core review, not kept
   as a stand-in for this).
-- Structured-query interface for ML/forecast outputs (the Gold-layer
-  product-ranking intent has one since Phase 6B.1 — `StructuredQueryService`
-  — but ML/forecast outputs still need a real data contract).
-- Routing rules between AI Search and structured data beyond the single
-  implemented intent: Phase 6B.1 ships a deterministic rule-based router
+- Structured-query interface for ML/forecast outputs (Gold-layer
+  analytics have one since Phase 6B.1 — `StructuredQueryService` and the
+  Structured Analytics registry — but ML/forecast outputs still need a real
+  data contract).
+- Routing rules between AI Search and structured data beyond the approved
+  metrics: Phase 6B.1 ships a deterministic rule-based router
   (`AI_SEARCH` / `STRUCTURED_DATA` / `BOTH`, owned by the AI Harness;
   distinct from the Phase 4C retrieval policy, which only routes within AI
   Search). Whether a semantic router is ever warranted, and how to route
@@ -3793,7 +3975,7 @@ requests through the deployed HTTP endpoint); whether `databricks bundle
 deploy` alone reliably restarts a crashed App process (no — a separate
 `databricks bundle run <resource> -t dev --restart` was needed in the one
 case observed, see "Interface Layer — Databricks App"); and whether the
-full local test suite passes (yes — 699 passed, 0 failed, 0 skipped after
-the Phase 6B.1 additions, see "Testing").
+full local test suite passes (yes — 1208 passed, 0 failed, 0 skipped after
+the Structured Analytics additions, see "Testing").
 
 Nothing above is prematurely resolved by this README.

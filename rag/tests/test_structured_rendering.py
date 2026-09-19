@@ -86,7 +86,7 @@ def test_tie_rows_are_both_kept_and_share_their_rank():
     assert "8. GPS Plotter 6249 — 1.638 unidades" in text
     assert "8. Motor de Popa 7678 — 1.638 unidades" in text
     assert "9. Farol LED 5" in text  # dense rank: no gap after the tie
-    assert "compartilham a mesma posição" in text
+    assert "Produtos empatados compartilham a mesma posição, por isso a lista tem mais itens do que o pedido." in text  # 11 rows for 10 positions
 
 
 def test_no_tie_note_when_every_rank_is_distinct():
@@ -119,7 +119,7 @@ def test_a_maximum_size_result_is_rendered_completely():
     assert len(lines) == 51
     assert lines[0] == "1. Produto 001 — 9.999 unidades"
     assert lines[-2:] == ["50. Produto Empatado A — 5.000 unidades", "50. Produto Empatado B — 5.000 unidades"]
-    assert text.endswith("Fonte: dados de vendas efetivas.")  # the tail is never cut off
+    assert text.endswith("Fonte: camada Gold — fct_sales + dim_products.")  # the tail is never cut off
 
 
 def test_product_names_are_copied_verbatim():
@@ -131,9 +131,9 @@ def test_product_names_are_copied_verbatim():
 def test_text_frames_the_ranking_and_names_its_source_without_sql_details():
     text = render_structured_answer(_result())
 
-    assert text.startswith("Os produtos mais vendidos, por quantidade de unidades, são:")
-    assert text.rstrip().endswith("Fonte: dados de vendas efetivas.")
-    for leaked in ("SELECT", "fct_sales", "dim_products", "test_catalog", "DENSE_RANK", "warehouse", "Product ID"):
+    assert text.startswith("Os 10 produtos com mais unidades vendidas foram:")  # a friendly title, never an internal request
+    assert text.rstrip().endswith("Fonte: camada Gold — fct_sales + dim_products.")
+    for leaked in ("SELECT", "test_catalog", "gold.", "fct_sales.", "DENSE_RANK", "warehouse", "Product ID"):
         assert leaked not in text
 
 
@@ -165,4 +165,8 @@ def test_module_imports_nothing_that_could_call_a_model_or_do_io():
         for alias in (node.names if isinstance(node, ast.Import) else [None])
     }
 
-    assert imported == {"__future__", "src.structured.models"}
+    # Only the result models, the request type and the (pure data) registry; no client, no model, no I/O.
+    assert imported == {
+        "__future__", "datetime", "decimal",
+        "src.structured.analytical_request", "src.structured.models", "src.structured.semantic_model",
+    }  # fmt: skip
