@@ -27,6 +27,7 @@ from src.structured.semantic_model import (
     FACTS,
     INVENTORY_HEALTH_STATUSES,
     METRICS,
+    TEXT_FILTERS,
     Dimension,
     FilterKind,
     Metric,
@@ -166,6 +167,8 @@ def test_filters_are_backed_by_a_binding_or_a_date_column():
         for kind in definition.filters:
             if kind is FilterKind.DATE_RANGE:
                 assert fact.date_column and not definition.snapshot, metric
+            elif kind in TEXT_FILTERS:
+                assert TEXT_FILTERS[kind].dimension in fact.bindings, (metric, kind)
             else:
                 assert Dimension[kind.value] in fact.bindings, (metric, kind)
 
@@ -265,7 +268,7 @@ def test_sales_metrics_inherit_the_effective_sale_filter():
         (Metric.TOTAL_QUANTITY_SOLD, "SUM(s.order_item_quantity)"),
         (Metric.EFFECTIVE_ORDERS, "COUNT(DISTINCT s.order_id)"),
         (Metric.RETURN_AMOUNT, "SUM(s.completed_refund_amount)"),
-        (Metric.STOCK_ON_HAND, "SUM(r.quantity_on_hand)"),
+        (Metric.STOCK_ON_HAND, "SUM(i.quantity_on_hand)"),
         (Metric.AT_RISK_REVENUE, "SUM(k.monetary_amount)"),
     ],
 )
@@ -312,7 +315,7 @@ def test_every_registered_table_is_a_gold_model():
 def test_every_column_referenced_by_the_registry_exists_in_gold():
     for fact in FACTS.values():
         alias_tables = {fact.alias: fact.table}
-        fragments: list[str] = list(fact.base_predicates) + ([fact.date_column] if fact.date_column else [])
+        fragments: list[str] = list(fact.base_predicates) + list(fact.as_of_predicates) + ([fact.date_column] if fact.date_column else [])
         for binding in fact.bindings.values():
             if binding.join is not None:
                 alias_tables[binding.join.alias] = binding.join.table
@@ -357,3 +360,23 @@ def test_personal_data_is_absent_from_the_registry():
         assert word not in registry_text, word
     # ...even though Gold does have those columns (Power BI exposes them unmasked).
     assert {"customer_email", "customer_phone"} <= GOLD["dim_customers"]
+
+
+def test_text_filters_read_only_registry_columns_that_exist_in_gold():
+    for kind, definition in TEXT_FILTERS.items():
+        alias, column = definition.expr.split(".")
+        table = {"p": "dim_products", "l": "dim_locations"}[alias]
+        assert column in GOLD[table], (kind, definition.expr)
+    # a product phrase searches the product's name, never its category (Gold's categories are inconsistent)
+    assert TEXT_FILTERS[FilterKind.PRODUCT_TEXT].expr == "p.product_name"
+    assert TEXT_FILTERS[FilterKind.CATEGORY_TEXT].expr == "p.category_name"
+
+
+def test_a_metric_with_a_history_fact_names_a_fact_that_shares_its_aggregate_alias():
+    for metric, definition in METRICS.items():
+        if definition.historical_fact is None:
+            continue
+        current, history = FACTS[definition.fact], FACTS[definition.historical_fact]
+        assert history.alias == current.alias, metric  # the metric's aggregate ("SUM(i.quantity_on_hand)") serves both
+        assert history.as_of_predicates and ":as_of" in " ".join(history.as_of_predicates), metric
+        assert definition.snapshot, metric  # the current variant has no date filter of its own

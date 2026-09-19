@@ -30,6 +30,7 @@ choose among approved parts.
 
 from __future__ import annotations
 
+import calendar
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -41,13 +42,19 @@ from src.structured.analytical_request import (
     check_compatibility,
 )
 from src.structured.models import UnsupportedRequestError
+from src.structured.qualifiers import extract_qualifiers, item_after_quantity_word
 from src.structured.semantic_model import (
+    METRICS,
     Dimension,
+    FilterKind,
     Metric,
+    MetricFamily,
     Operation,
+    SortOrder,
     TimeGrain,
     TimeModifier,
 )
+from src.structured.text_match import MAX_TEXT_LENGTH, normalize_text
 
 __all__ = ["ParseOutcome", "parse_analytical_request"]
 
@@ -94,6 +101,12 @@ _DOCUMENTARY_OBJECTS = _c(
     r"\busad[oa]s? (?:no|na|em|para|nos|nas)\b",
 )
 
+# "quantos vendedores temos?" is not a question about the stock of an item.
+_NOT_ITEMS = frozenset(
+    "vendedor vendedores vendedora vendedoras funcionario funcionarios empregado empregados colaborador colaboradores "
+    "cliente clientes pedido pedidos fornecedor fornecedores usuario usuarios pessoa pessoas venda vendas".split()
+)
+
 _PII = _c(r"\b(e ?mails?|telefones?|celular|fone|cpf|cnpj|endereco|contato|whatsapp)\b")
 _PII_REASON = "personal data (email, telephone, address, documents) is never exposed"
 
@@ -135,11 +148,18 @@ _METRIC_PATTERNS: list[tuple[Metric, re.Pattern[str]]] = [
     (Metric.EFFECTIVE_ORDERS, re.compile(r"\b(?:quantos|numero de|total de|quantidade de) pedidos\b|\bpedidos efetivos\b")),
     (Metric.NET_REVENUE, re.compile(r"\breceita\b|\bfaturamento\b|\bfaturamos\b|\bfaturou\b|\bfaturaram\b|\bfaturar\b|\bfatura\b")),
     (Metric.TOTAL_QUANTITY_SOLD, re.compile(
-        r"\bunidades vendidas\b|\bquantidade (?:total )?(?:vendida|de itens vendidos)\b|\bquantas unidades\b|"
+        r"\bunidades vendidas\b|\bquantidade (?:total )?(?:vendida|de itens vendidos)\b|\bquantas unidades\b(?!.{0,40}\b(?:temos|tem|ha|havia|existem|restam|sobram|estoque)\b)|"
         r"\bquantos itens (?:vendemos|foram vendidos)\b|\bitens vendidos\b|\bmais vendid[oa]s?\b|"
         r"\b(?:vendeu|venderam|vende|vendem|vendemos) mais\b|\bmais (?:vendeu|venderam|vende|vendem|vendemos)\b|\bmais saem\b|\bmais unidades\b|"
         r"\b(?:produtos?|itens?) mais (?:popular(?:es)?|comprad[oa]s?|procurad[oa]s?)\b|\bvolume de vendas\b|"
         r"\bquantas? vendas\b|\bunidades vendemos\b|\bmelhores (?:produtos|itens) em vendas\b"
+    )),
+    # Last resort (every other metric had its chance): a question about stock that names
+    # the stock ("qual o estoque por estado", "em quais estoques ...") or asks how many of
+    # something "we have" ("quantos coletes temos?", "quanto temos do X?").
+    (Metric.STOCK_ON_HAND, re.compile(
+        r"\bestoques?\b|\b(?:quanto|quantos|quantas)\b.{0,80}\b(?:temos|tem|ha|havia|existem|existe|restam|sobram|tinhamos|possuimos)\b|"
+        r"\bonde\b.{0,20}\b(?:temos|tem|ha|havia|existem|existe|tinhamos)\b"
     )),
 ]
 
@@ -189,8 +209,9 @@ _ENTITY_DIMENSIONS: list[tuple[re.Pattern[str], Dimension]] = [
 ]
 
 _BY_PHRASE = re.compile(
-    r"\bpor (categorias?|lojas?|estabelecimentos?|filiais|filial|canal|canais|vendedor(?:es)?|segmentos?|status|situacao|saude|"
-    r"estados?|regioes|regiao|produtos?|itens?|clientes?|cidades?)\b(?: (?:do|da|de|dos|das) (lojas?|estabelecimentos?|filiais?|clientes?))?"
+    r"\b(?:por|em cada|para cada|de cada|por cada) (categorias?|lojas?|estabelecimentos?|filiais|filial|canal|canais|vendedor(?:es)?|segmentos?|status|situacao|saude|"
+    r"estados?|regioes|regiao|produtos?|itens?|clientes?|cidades?|localidades?|estoques?|armazens|armazem|depositos?)\b"
+    r"(?: (?:do|da|de|dos|das) (lojas?|estabelecimentos?|filiais?|clientes?))?"
 )
 
 _BY_DIMENSION = {
@@ -204,7 +225,22 @@ _BY_DIMENSION = {
     "status": Dimension.INVENTORY_HEALTH_STATUS, "situacao": Dimension.INVENTORY_HEALTH_STATUS,
     "saude": Dimension.INVENTORY_HEALTH_STATUS,
     "produto": Dimension.PRODUCT, "produtos": Dimension.PRODUCT, "item": Dimension.PRODUCT, "itens": Dimension.PRODUCT,
+    "localidade": Dimension.LOCATION, "localidades": Dimension.LOCATION, "estoque": Dimension.LOCATION,
+    "estoques": Dimension.LOCATION, "armazem": Dimension.LOCATION, "armazens": Dimension.LOCATION,
+    "deposito": Dimension.LOCATION, "depositos": Dimension.LOCATION,
 }  # fmt: skip
+
+# "em quais estoques temos X?" / "onde temos X?": the places where a stock exists (positive values only).
+_WHERE_LIST = re.compile(
+    r"\bem (?:quais|que) (?:estoques?|localidades?|lojas?|estabelecimentos?|filiais?|armazens|armazem|depositos?)\b|"
+    r"\bquais (?:estoques?|localidades?)\b|\bonde\b(?= (?:temos|tem|ha|havia|existem|existe|estao|esta|tinhamos)\b)"
+)
+# Stock concepts that are not values of an item ("qual o estoque de segurança?").
+_STOCK_CONCEPT = re.compile(r"\bestoques? (?:de |do )?(?:seguranca|minimo|maximo|ideal|parado|obsoleto|excedente)\b")
+# Direction words: "menos estoque". Only metrics that declare the opposite order accept them.
+_ASCENDING = re.compile(r"\b(?:menos|menor(?:es)?|minim[oa]s?|pouc[oa]s?)\b")
+# "now": for a metric with a history these words mean the current position.
+_CURRENT = re.compile(r"\b(?:hoje|agora|atualmente|atual|atuais|no momento|neste momento|nesse momento)\b")
 
 _TREND_PATTERNS: list[tuple[TimeGrain, re.Pattern[str]]] = [
     (TimeGrain.DAY, re.compile(r"\bpor dia\b|\bdiari[oa]s?\b|\bdia a dia\b|\bdiariamente\b")),
@@ -230,6 +266,9 @@ _MONTHS = {
     "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4, "maio": 5, "junho": 6,
     "julho": 7, "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
 }  # fmt: skip
+_DAY_TEXT = re.compile(r"\b(?:no dia |em |dia )?(\d{1,2})(?: de)? (" + "|".join(_MONTHS) + r")(?: de)? ((?:19|20)\d{2})\b")
+_DAY_NUMERIC = re.compile(r"\b(?:no dia |em |dia )?(\d{1,2}) (\d{1,2}) ((?:19|20)\d{2})\b")
+_DAY_ISO = re.compile(r"\b((?:19|20)\d{2})-(\d{2})-(\d{2})\b")
 _MONTH_YEAR = re.compile(r"\b(" + "|".join(_MONTHS) + r")(?: de)? ((?:19|20)\d{2})\b")
 _YEAR_RANGE = re.compile(r"\b(?:de|entre) ((?:19|20)\d{2}) (?:a|e|ate) ((?:19|20)\d{2})\b")
 _YEAR = re.compile(r"\b((?:19|20)\d{2})\b")
@@ -243,8 +282,8 @@ _LEFTOVER_PERIOD = re.compile(
     r"verao|inverno|outono|primavera|natal|feriado|feriados)\b"
 )
 _LEFTOVER_FILTER = re.compile(
-    r"\b(?:na|no|nas|nos|da|do|das|dos|em|para)\s+(?:loja|filial|estabelecimento|estado|categoria|canal|regiao|cidade|"
-    r"segmento|vendedor|produto|item|sku|cliente)\b"
+    r"\b(?:na|no|nas|nos|da|do|das|dos|em|para)\s+(?:loja|filial|estabelecimento|armazem|deposito|galpao|matriz|estado|"
+    r"categoria|canal|regiao|cidade|segmento|vendedor|produto|item|sku|cliente)\b"
 )
 
 _TOP_N_PATTERNS = _c(
@@ -292,6 +331,23 @@ def _detect_period(text: str) -> tuple[DateRange | None, str | None, str]:
     working = text
     ranges: list[DateRange] = []
 
+    # A single day ("15 de janeiro de 2026", "15/01/2026", "2026-01-15") is a one-day range.
+    days: list[date] = []
+    for pattern, order in ((_DAY_TEXT, "dmy_text"), (_DAY_NUMERIC, "dmy"), (_DAY_ISO, "ymd")):
+        for match in pattern.finditer(working):
+            try:
+                if order == "dmy_text":
+                    day = date(int(match.group(3)), _MONTHS[match.group(2)], int(match.group(1)))
+                elif order == "dmy":
+                    day = date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+                else:
+                    day = date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+            except ValueError:
+                return None, "the date does not exist", working
+            days.append(day)
+        working = pattern.sub(" ", working)
+    ranges.extend(DateRange(day, day) for day in days)
+
     for match in _MONTH_YEAR.finditer(working):
         month, year = _MONTHS[match.group(1)], int(match.group(2))
         end_day = (date(year + (month == 12), month % 12 + 1, 1) - date(year, month, 1)).days
@@ -316,9 +372,42 @@ def _detect_period(text: str) -> tuple[DateRange | None, str | None, str]:
     return (ranges[0] if ranges else None), None, working
 
 
-def parse_analytical_request(text: str) -> ParseOutcome:
+def _is_whole_month(start: date, end: date) -> bool:
+    return (start.year, start.month) == (end.year, end.month) and start.day == 1 and end.day == calendar.monthrange(end.year, end.month)[1]
+
+
+def _strip_top_n(text: str) -> str:
+    """Blank the number of "top 5" / "os 3 produtos" (the entity word stays)."""
+    for pattern in _TOP_N_PATTERNS:
+        text = pattern.sub(lambda m: m.group(0).replace(m.group(1), " ", 1), text)
+    return _TOP_N_WORD.sub(lambda m: m.group(0).replace(m.group(1), " ", 1), text)
+
+
+def _display_phrase(phrase: str | None, raw: str | None) -> str | None:
+    """The phrase as the user typed it ("Loja Leão"), found by comparing words
+    without accents or case; the normalized phrase when it cannot be found."""
+    if phrase is None or not raw:
+        return phrase
+    words = raw.split()
+    stream: list[str] = []
+    owner: list[int] = []
+    for index, word in enumerate(words):
+        for token in normalize_text(word).split():
+            stream.append(token)
+            owner.append(index)
+    target = normalize_text(phrase).split()
+    for start in range(len(stream) - len(target) + 1):
+        if stream[start : start + len(target)] == target:
+            shown = " ".join(words[owner[start] : owner[start + len(target) - 1] + 1]).strip(" ?!.,;:")
+            if shown and shown.isprintable() and len(shown) <= MAX_TEXT_LENGTH and normalize_text(shown) == normalize_text(phrase):
+                return shown
+    return phrase
+
+
+def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
     """Map the normalized data clause of a question to an approved request,
-    a controlled refusal, or "not analytical"."""
+    a controlled refusal, or "not analytical". ``raw`` is the question as the
+    user typed it: only used to show a name filter the way it was written."""
     t = text.strip()
     if not t or _any(_DOCUMENTARY_OBJECTS, t):
         return _NOT_ANALYTICAL
@@ -336,10 +425,24 @@ def parse_analytical_request(text: str) -> ParseOutcome:
     if metric is None:
         return _unsupported("ambiguous metric: say 'receita' (R$) or 'unidades vendidas'") if _AMBIGUOUS_SALES.search(t) else _NOT_ANALYTICAL
     has_cue = champion or _any(_DATA_REQUEST, t)
+    definition = METRICS[metric]
+    # A metric that takes name filters is asked in free wording ("quantos coletes temos?"):
+    # every word of the question is accounted for (see ``qualifiers``).
+    named = FilterKind.PRODUCT_TEXT in definition.filters
 
     # -- what is being asked ------------------------------------------------
     grain = _detect_grain(t)
     modifier = next((m for m, pattern in _MODIFIERS if pattern.search(t)), None)
+
+    if named and not (has_cue or grain or modifier or _BY_PHRASE.search(t) or _WHERE_LIST.search(t)):
+        return _NOT_ANALYTICAL  # a statement about stock ("explique o estoque de segurança"), not a request for values
+
+    if named and _STOCK_CONCEPT.search(t):
+        return _NOT_ANALYTICAL  # "estoque de segurança", "estoque mínimo": a concept, explained in the documentation
+
+    where_list = _WHERE_LIST.search(t) if named else None
+    has_cue = has_cue or bool(where_list)  # "onde temos X?" asks for values
+    asked = _WHERE_LIST.sub(" ", t) if where_list else t  # the question without the "em quais estoques" part
 
     by_phrases = list(_BY_PHRASE.finditer(t))
     by_dimensions: list[Dimension] = []
@@ -351,7 +454,11 @@ def parse_analytical_request(text: str) -> ParseOutcome:
             elif qualifier and qualifier.startswith("cliente"):
                 by_dimensions.append(Dimension.CUSTOMER_STATE)
             else:
-                return _unsupported("'estado' is ambiguous: say 'estado do estabelecimento' or 'estado do cliente'")
+                # Ambiguous only when the metric can be split by both kinds of state.
+                states = [d for d in (Dimension.LOCATION_STATE, Dimension.CUSTOMER_STATE) if d in definition.dimensions]
+                if len(states) != 1:
+                    return _unsupported("'estado' is ambiguous: say 'estado do estabelecimento' or 'estado do cliente'")
+                by_dimensions.append(states[0])
         elif head in _BY_DIMENSION:
             by_dimensions.append(_BY_DIMENSION[head])
         elif head not in ("mes", "dia", "trimestre", "ano"):
@@ -360,7 +467,10 @@ def parse_analytical_request(text: str) -> ParseOutcome:
     # Remove what has been understood; whatever period/filter wording is left
     # is refused. (The metric's own words, e.g. "estoque atual", are not
     # period or filter wording.)
-    working = metric_pattern.sub(" ", t) if metric_pattern is not None else t
+    if named:
+        working = asked  # nothing is removed with the metric: its noun phrase may name the item asked about
+    else:
+        working = metric_pattern.sub(" ", t) if metric_pattern is not None else t
     for _, pattern in _TREND_PATTERNS:
         working = pattern.sub(" ", working)
     working = _TREND_GENERIC.sub(" ", working)
@@ -374,13 +484,45 @@ def parse_analytical_request(text: str) -> ParseOutcome:
     date_range, refusal, working = _detect_period(working)
     if refusal:
         return _unsupported(refusal)
+
+    # -- name filters and the position in time (metrics with a history) -----------
+    qualifiers = None
+    as_of: date | None = None
+    if named:
+        if date_range is not None:
+            if date_range.start == date_range.end:
+                as_of = date_range.start
+            elif _is_whole_month(date_range.start, date_range.end):
+                as_of = date_range.end  # a month means the position at its end
+            else:
+                return _unsupported(
+                    "an inventory position needs one date or one month (e.g. '15 de janeiro de 2026', 'em janeiro de 2026'); "
+                    "a year or a range is not supported"
+                )
+            date_range = None
+        working = _CURRENT.sub(" ", working)  # "hoje", "atualmente": the current position
+        qualifiers = extract_qualifiers(_strip_top_n(working))
+        if qualifiers.refusal:
+            return _unsupported(qualifiers.refusal)
+        working = qualifiers.remaining
+        if qualifiers.past_tense and as_of is None:
+            return _unsupported("a past inventory position needs a date (e.g. 'em janeiro de 2026')")
+        if "estoque" not in t and "estoques" not in t and (
+            qualifiers.product is None or qualifiers.product.split()[0] in _NOT_ITEMS
+        ):
+            return _NOT_ANALYTICAL  # "quantos ... temos" about something that is not an item's stock
+    elif definition.family is MetricFamily.INVENTORY:
+        item = item_after_quantity_word(metric_pattern.sub(" ", t) if metric_pattern is not None else t)
+        if item is not None:
+            return _unsupported(f"{metric.value} cannot be filtered by a named item ('{item}'); ask about stock, or drop the item")
+
     month_without_year = bool(_MONTH_NAME.search(working))
     relative_period = bool(_LEFTOVER_PERIOD.search(working))
     specific_filter = bool(_LEFTOVER_FILTER.search(working))
     # A metric with no question word ("Receita da loja X") is still a data
     # request when it carries scope wording: refuse it instead of leaving it
     # to documentation.
-    scoped = bool(by_phrases or grain or modifier or date_range or month_without_year or relative_period or specific_filter)
+    scoped = bool(by_phrases or grain or modifier or date_range or as_of or month_without_year or relative_period or specific_filter)
     if not (has_cue or scoped):
         return _NOT_ANALYTICAL
     if month_without_year:
@@ -391,13 +533,28 @@ def parse_analytical_request(text: str) -> ParseOutcome:
         return _unsupported("filtering by a specific store, state, category, product, channel or person is not supported")
 
     entities = [dim for pattern, dim in _ENTITY_DIMENSIONS if pattern.search(working)]
-    ranking = champion or _any(_RANKING_CUES, t)
+    ranking = champion or _any(_RANKING_CUES, asked)
+    ascending = bool(_ASCENDING.search(asked))
+    ranking_order: SortOrder | None = None
+    if ascending and named and not ranking:
+        return _unsupported("'menos'/'menor' only applies to a ranking (e.g. 'quais produtos têm menos estoque?')")
+    if ascending and ranking and definition.ranking_order is SortOrder.DESC:
+        if not definition.ranking_reverse_pt:
+            return _unsupported('ascending rankings ("menos vendidos", lowest revenue) are not supported')
+        ranking_order = SortOrder.ASC
 
     # -- build ---------------------------------------------------------------
     top_n: int | None = None
     time_grain: TimeGrain | None = None
+    positive_only = False
     if grain is not None:
         operation, dimensions, time_grain = Operation.TREND, (), grain
+    elif where_list:
+        if by_dimensions:
+            return _unsupported("a list of places cannot also be broken down by another dimension")
+        positive_only = True
+        top_n = _extract_top_n(asked) if ranking else None
+        operation, dimensions = (Operation.RANKING if top_n else Operation.BREAKDOWN), (Dimension.LOCATION,)
     elif ranking:
         if len(by_dimensions) > 1 or (by_dimensions and entities and by_dimensions[0] not in entities):
             return _unsupported("a ranking by more than one dimension is not supported")
@@ -412,15 +569,26 @@ def parse_analytical_request(text: str) -> ParseOutcome:
         operation, dimensions = Operation.BREAKDOWN, (by_dimensions[0],)
     else:
         operation, dimensions = Operation.AGGREGATE, ()
+    if operation is not Operation.RANKING:
+        ranking_order = None
 
+    filters = RequestFilters(
+        date_range=date_range,
+        product_text=_display_phrase(qualifiers.product, raw) if qualifiers else None,
+        category_text=_display_phrase(qualifiers.category, raw) if qualifiers else None,
+        location_text=_display_phrase(qualifiers.location, raw) if qualifiers else None,
+    )
     request = AnalyticalRequest(
         metric=metric,
         operation=operation,
         dimensions=dimensions,
-        filters=RequestFilters(date_range=date_range),
+        filters=filters,
         time_grain=time_grain,
         time_modifier=modifier,
         top_n=top_n,
+        as_of=as_of,
+        ranking_order=ranking_order,
+        positive_only=positive_only,
     )
     try:
         check_compatibility(request)

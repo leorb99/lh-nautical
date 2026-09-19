@@ -21,7 +21,13 @@ metric:
 - YTD, LTM and YOY are evaluated against an explicit period (the end of the
   period is the anchor); without one the request is refused, never
   completed with an assumed period;
-- there is deliberately no ascending ranking ("menos vendidos").
+- there is deliberately no ascending ranking ("menos vendidos"), except for
+  metrics that declare the opposite order (stock: "menos estoque");
+- a name filter (product, category, location) is free text reduced to search
+  terms by :mod:`src.structured.text_match` — only metrics that declare the
+  filter accept it, so a qualifier is never silently ignored;
+- ``as_of`` asks for a position at the end of a past day and only exists for
+  metrics with a history fact.
 """
 
 from __future__ import annotations
@@ -33,15 +39,18 @@ from src.structured.models import InvalidParameterError, UnsupportedRequestError
 from src.structured.semantic_model import (
     CUSTOMER_SEGMENTS,
     DIMENSIONS,
+    FACTS,
     INVENTORY_HEALTH_STATUSES,
     METRICS,
     Dimension,
     FilterKind,
     Metric,
     Operation,
+    SortOrder,
     TimeGrain,
     TimeModifier,
 )
+from src.structured.text_match import MAX_TEXT_LENGTH, search_terms
 
 __all__ = [
     "DEFAULT_TOP_N",
@@ -76,6 +85,11 @@ class RequestFilters:
     categories: tuple[str, ...] = ()
     customer_segments: tuple[str, ...] = ()
     inventory_health_statuses: tuple[str, ...] = ()
+    #: Free-text name filters, as the user wrote them ("coletes", "Motor de
+    #: Popa 6014", "Loja Leão"); matched through search terms, never as SQL.
+    product_text: str | None = None
+    category_text: str | None = None
+    location_text: str | None = None
 
     def present(self) -> frozenset[FilterKind]:
         present = set()
@@ -87,7 +101,22 @@ class RequestFilters:
             present.add(FilterKind.CUSTOMER_SEGMENT)
         if self.inventory_health_statuses:
             present.add(FilterKind.INVENTORY_HEALTH_STATUS)
+        if self.product_text is not None:
+            present.add(FilterKind.PRODUCT_TEXT)
+        if self.category_text is not None:
+            present.add(FilterKind.CATEGORY_TEXT)
+        if self.location_text is not None:
+            present.add(FilterKind.LOCATION_TEXT)
         return frozenset(present)
+
+    def text_filters(self) -> dict[FilterKind, str]:
+        """The free-text filters that are set, by kind."""
+        values = {
+            FilterKind.PRODUCT_TEXT: self.product_text,
+            FilterKind.CATEGORY_TEXT: self.category_text,
+            FilterKind.LOCATION_TEXT: self.location_text,
+        }
+        return {kind: value for kind, value in values.items() if value is not None}
 
 
 @dataclass(frozen=True)
@@ -100,6 +129,13 @@ class AnalyticalRequest:
     time_modifier: TimeModifier | None = None
     #: Ranking positions (not rows: ties are kept). ``None`` = default.
     top_n: int | None = None
+    #: The position at the END of this (past) day, for metrics with a history
+    #: fact. ``None`` = the current position.
+    as_of: date | None = None
+    #: Ranking direction; ``None`` = the metric's own order.
+    ranking_order: SortOrder | None = None
+    #: Keep only the groups whose value is greater than zero.
+    positive_only: bool = False
 
 
 def _reject(message: str) -> UnsupportedRequestError:
@@ -170,9 +206,32 @@ def check_compatibility(request: AnalyticalRequest) -> None:
                 "no period is assumed"
             )
 
+    # As-of position ------------------------------------------------------------
+    if request.as_of is not None:
+        if definition.historical_fact is None:
+            raise _reject(f"{name} has no history: it can only be asked for its current position")
+        if filters.date_range is not None or request.time_grain is not None or request.time_modifier is not None:
+            raise _reject("an as-of position takes a single date, not a period, trend or time modifier")
+        history = FACTS[definition.historical_fact]
+        for dimension in dimensions:
+            if dimension not in history.bindings:
+                raise _reject(f"{name} cannot be broken down by {dimension.value} in a past position")
+
     # Ranking -----------------------------------------------------------------
     if op is not Operation.RANKING and request.top_n is not None:
         raise _reject("top_n is only valid for RANKING")
+    if request.ranking_order is not None:
+        if op is not Operation.RANKING:
+            raise _reject("a ranking order is only valid for RANKING")
+        if not isinstance(request.ranking_order, SortOrder):
+            raise _reject("ranking order must be an approved enum value")
+        if request.ranking_order is not definition.ranking_order and not definition.ranking_reverse_pt:
+            raise _reject(f"{name} is only ranked {definition.ranking_order.value}; the opposite order is not supported")
+    if request.positive_only:
+        if not definition.positive_only:
+            raise _reject(f"{name} cannot be restricted to positive values")
+        if op is Operation.AGGREGATE:
+            raise _reject("positive-only applies to groups (a breakdown or a ranking), not to a single value")
 
 
 def _validate_values(values: tuple[str, ...], label: str, allowed: tuple[str, ...] | None) -> None:
@@ -181,6 +240,17 @@ def _validate_values(values: tuple[str, ...], label: str, allowed: tuple[str, ..
             raise InvalidParameterError(f"invalid {label} filter value: {value!r}")
         if allowed is not None and value not in allowed:
             raise InvalidParameterError(f"{label} must be one of {list(allowed)}, got {value!r}")
+
+
+def _validate_text_filter(value: str, label: str) -> None:
+    if not isinstance(value, str) or not value.strip() or len(value) > MAX_TEXT_LENGTH or not value.isprintable():
+        raise InvalidParameterError(f"invalid {label} filter value: {value!r}")
+    try:
+        terms = search_terms(value)
+    except ValueError as exc:
+        raise InvalidParameterError(f"{label} filter: {exc}") from exc
+    if not terms:
+        raise InvalidParameterError(f"{label} filter has no searchable word: {value!r}")
 
 
 def validate_request(request: AnalyticalRequest) -> AnalyticalRequest:
@@ -205,6 +275,15 @@ def validate_request(request: AnalyticalRequest) -> AnalyticalRequest:
             raise InvalidParameterError(f"a daily trend is limited to {MAX_DAILY_TREND_DAYS} days")
     if request.time_grain is TimeGrain.DAY and date_range is None:
         raise InvalidParameterError(f"a daily trend needs a period of at most {MAX_DAILY_TREND_DAYS} days")
+
+    if request.as_of is not None:
+        if isinstance(request.as_of, bool) or not isinstance(request.as_of, date):
+            raise InvalidParameterError("as_of must be a date")
+        if request.as_of > date.today():
+            raise InvalidParameterError("an as-of position cannot be in the future")
+
+    for kind, value in request.filters.text_filters().items():
+        _validate_text_filter(value, kind.value)
 
     _validate_values(request.filters.categories, "category", None)
     _validate_values(request.filters.customer_segments, "customer segment", CUSTOMER_SEGMENTS)

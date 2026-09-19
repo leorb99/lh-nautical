@@ -231,7 +231,12 @@ def test_every_time_modifier_is_accepted_with_a_period(modifier):
 
 def test_the_request_has_no_way_to_ask_for_an_ascending_ranking():
     fields = {f.name for f in dataclasses.fields(AnalyticalRequest)}
-    assert fields == {"metric", "operation", "dimensions", "filters", "time_grain", "time_modifier", "top_n"}
+    # The only order knob is ``ranking_order`` (an enum), validated against the metric: it is
+    # accepted only where the registry declares the opposite order (stock). No SQL-shaped field exists.
+    assert fields == {
+        "metric", "operation", "dimensions", "filters", "time_grain", "time_modifier", "top_n",
+        "as_of", "ranking_order", "positive_only",
+    }
     assert not {"order", "direction", "sort", "sql", "where", "table", "column"} & fields
 
 

@@ -110,6 +110,15 @@ def format_quantity(value: int) -> str:
     return f"{_format_int(value)} {'unidade' if value == 1 else 'unidades'}"
 
 
+def format_decimal_units(value: Decimal) -> str:
+    """An exact decimal quantity shown as whole physical units ("556 unidades",
+    "1 unidade"). Rounded half up, for display only: the value itself, and the
+    order of a ranking, always use the exact decimal. The noun follows the
+    rounded number."""
+    whole = int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    return f"{_format_int(whole)} {'unidade' if whole == 1 else 'unidades'}"
+
+
 def _format_value(value: object, metric: MetricDef) -> str:
     """The value in the metric's format (``MetricDef.unit``)."""
     if value is None:
@@ -125,6 +134,8 @@ def _format_value(value: object, metric: MetricDef) -> str:
         return _format_decimal(Decimal(value), 2)
     if unit is Unit.UNITS:
         return format_quantity(int(value))
+    if unit is Unit.DECIMAL_UNITS:
+        return format_decimal_units(Decimal(value))
     return _format_int(int(value))  # INTEGER
 
 
@@ -170,6 +181,8 @@ def _period_phrase(request) -> str:
     start, end = date_range.start, date_range.end
     if (start.month, start.day, end.month, end.day) == (1, 1, 12, 31) and start.year == end.year:
         return f" em {start.year}"
+    if start == end:
+        return f" em {_format_date(start)}"
     if _is_whole_month(start, end):
         return f" em {_MONTHS[start.month - 1]} de {start.year}"
     return f" entre {_format_date(start)} e {_format_date(end)}"
@@ -193,11 +206,36 @@ def _filter_phrase(request) -> str:
     if filters.inventory_health_statuses:
         labels = [_HEALTH_LABELS.get(v, v).lower() for v in filters.inventory_health_statuses]
         parts.append(f"com status {_join_pt(labels)}")
+    # Name filters, shown as the user wrote them: what the answer covers is never hidden.
+    if filters.product_text:
+        parts.append(f'de produtos com "{filters.product_text}" no nome')
+    if filters.category_text:
+        parts.append(f"na categoria {filters.category_text}")
+    if filters.location_text:
+        parts.append(f'no estabelecimento "{filters.location_text}"')
     return "".join(f" {part}" for part in parts)
 
 
 def _scope(request) -> str:
     return _period_phrase(request) + _filter_phrase(request)
+
+
+def _position_prefix(request, metric: MetricDef) -> str:
+    """Which position of a stock the values describe: the date of a past one, or
+    the current one as available in the system (never "updated today")."""
+    if request.as_of is not None:
+        return f"Na posição de estoque de {_format_date(request.as_of)}"
+    return metric.position_pt
+
+
+def _lower_first(text: str) -> str:
+    return text[:1].lower() + text[1:]
+
+
+def _with_position(request, metric: MetricDef, sentence: str) -> str:
+    """``Na posição atual disponível no sistema, o estoque ... é de ...``."""
+    prefix = _position_prefix(request, metric)
+    return f"{prefix}, {_lower_first(sentence)}" if prefix else sentence
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +258,10 @@ def _agreement(metric: MetricDef) -> tuple[bool, bool]:
     return article in ("a", "as"), article in ("os", "as")
 
 
-def _verb(metric: MetricDef, plural: bool) -> str:
-    """A snapshot is stated in the present ("é"), a period in the past ("foi")."""
-    if metric.snapshot:
+def _verb(metric: MetricDef, plural: bool, *, past: bool = False) -> str:
+    """A snapshot is stated in the present ("é"), a period or a past position
+    in the past ("foi")."""
+    if metric.snapshot and not past:
         return "são" if plural else "é"
     return "foram" if plural else "foi"
 
@@ -321,8 +360,8 @@ def _capitalize(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _sentence(metric: MetricDef, value, value_text: str, scope: str) -> str:
-    template = metric.sentence_pt
+def _sentence(metric: MetricDef, value, value_text: str, scope: str, *, past: bool = False) -> str:
+    template = metric.historical_sentence_pt if past and metric.historical_sentence_pt else metric.sentence_pt
     if metric.sentence_one_pt and metric.unit in (Unit.INTEGER, Unit.UNITS) and value == 1:
         template = metric.sentence_one_pt
     return template.format(value=value_text, scope=scope)
@@ -345,7 +384,8 @@ def _render_aggregate(request, table: AnalyticalTable, metric: MetricDef) -> lis
         )
         return [sentence + comparison + variation + "."]
 
-    return [_sentence(metric, value, _metric_text(table, row, metric), scope)]
+    past = request.as_of is not None
+    return [_with_position(request, metric, _sentence(metric, value, _metric_text(table, row, metric), scope, past=past))]
 
 
 def _render_trend(request, table: AnalyticalTable, metric: MetricDef) -> list[str]:
@@ -363,9 +403,11 @@ def _render_trend(request, table: AnalyticalTable, metric: MetricDef) -> list[st
 def _render_breakdown(request, table: AnalyticalTable, metric: MetricDef) -> list[str]:
     dimension = request.dimensions[0]
     _, plural = _agreement(metric)
-    period = _period_phrase(request).strip()
-    subject = f"{period}, {metric.display_pt}" if period else metric.display_pt
-    title = f"{subject} por {DIMENSIONS[dimension].label_pt}{_filter_phrase(request)} {_verb(metric, plural)}:"
+    prefix = _position_prefix(request, metric) or _capitalize(_period_phrase(request).strip())
+    subject = f"{prefix}, {metric.display_pt}" if prefix else metric.display_pt
+    only = " (somente valores maiores que zero)" if request.positive_only else ""
+    verb = _verb(metric, plural, past=request.as_of is not None)
+    title = f"{subject} por {DIMENSIONS[dimension].label_pt}{_filter_phrase(request)}{only} {verb}:"
     lines = [_capitalize(title), ""]
     lines += [f"- {_row_label(table, row, dimension)} — {_metric_text(table, row, metric)}" for row in table.rows]
     return lines
@@ -378,10 +420,14 @@ def _render_ranking(request, table: AnalyticalTable, metric: MetricDef) -> list[
     shown = min(n, len(table.rows))  # fewer than asked when there are fewer items
     scope = _scope(request)
     article = "A" if definition.feminine else "O"
+    reversed_order = request.ranking_order is not None and request.ranking_order is not metric.ranking_order
+    by = metric.ranking_reverse_pt if reversed_order else metric.ranking_pt
+    only = " (somente valores maiores que zero)" if request.positive_only else ""
     if shown == 1:
-        title = f"{article} {definition.label_pt} com {metric.ranking_pt}{scope} foi:"
+        title = f"{article} {definition.label_pt} com {by}{scope}{only} foi:"
     else:
-        title = f"{article}s {shown} {definition.plural_pt} com {metric.ranking_pt}{scope} foram:"
+        title = f"{article}s {shown} {definition.plural_pt} com {by}{scope}{only} foram:"
+    title = _with_position(request, metric, title)
 
     rank_index = table.column_index("ranking")
     lines = [title, ""]
@@ -389,7 +435,7 @@ def _render_ranking(request, table: AnalyticalTable, metric: MetricDef) -> list[
         f"{row[rank_index]}. {_row_label(table, row, dimension)} — {_metric_text(table, row, metric)}" for row in table.rows
     ]
     ranks = [row[rank_index] for row in table.rows]
-    if len(set(ranks)) < len(ranks):  # ties keep their shared rank, and the text says so
+    if metric.preserve_ties and len(set(ranks)) < len(ranks):  # ties keep their shared rank, and the text says so
         adjective = "empatadas" if definition.feminine else "empatados"
         note = f"{_capitalize(definition.plural_pt)} {adjective} compartilham a mesma posição"
         if len(ranks) > n:

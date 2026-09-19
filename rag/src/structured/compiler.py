@@ -5,8 +5,9 @@ no execution) and it only *assembles* reviewed fragments from the registry
 (:mod:`src.structured.semantic_model`):
 
 - tables and columns come from the registry's bindings, never from input;
-- every user-controlled value (dates, ``top_n``, filter values) is a named
-  parameter (``:date_from``, ``:top_n``, ``:category_0``, ...), never
+- every user-controlled value (dates, ``top_n``, filter values, the search
+  terms of a name filter) is a named parameter (``:date_from``, ``:top_n``,
+  ``:category_0``, ``:product_term_0_0``, ``:as_of``, ...), never
   interpolated into the statement;
 - catalog/schema are validated as plain identifiers;
 - the fact's business filters (Power BI's ``is_effective_sale = TRUE()``
@@ -37,11 +38,13 @@ from src.structured.models import (
     PreparedQuery,
     StructuredIntent,
 )
+from src.structured.text_match import SQL_ACCENTS_FROM, SQL_ACCENTS_TO, search_terms
 from src.structured.semantic_model import (
     DIMENSIONS,
     FACTS,
     METRICS,
     Dimension,
+    TEXT_FILTERS,
     FactDef,
     FilterKind,
     GroupColumn,
@@ -119,7 +122,8 @@ class _Builder:
         self.catalog = catalog
         self.schema = schema
         self.metric: MetricDef = METRICS[request.metric]
-        self.fact: FactDef = FACTS[self.metric.fact]
+        # A position AS OF a date is read from the metric's history fact.
+        self.fact: FactDef = FACTS[self.metric.historical_fact if request.as_of is not None else self.metric.fact]
         self.parameters: dict[str, Any] = {}
 
     # -- names -----------------------------------------------------------
@@ -133,6 +137,7 @@ class _Builder:
         for kind in (FilterKind.CATEGORY, FilterKind.CUSTOMER_SEGMENT, FilterKind.INVENTORY_HEALTH_STATUS):
             if kind in filters.present():
                 needed.append(_FILTER_DIMENSION[kind])
+        needed.extend(TEXT_FILTERS[kind].dimension for kind in filters.text_filters())
         return needed
 
     def joins(self) -> list[JoinSpec]:
@@ -157,6 +162,9 @@ class _Builder:
     # -- filters ----------------------------------------------------------
     def predicates(self, *, include_date: bool = True) -> list[str]:
         predicates = list(self.fact.base_predicates) + list(self.metric.metric_predicates)
+        if self.request.as_of is not None:
+            predicates.extend(self.fact.as_of_predicates)
+            self.parameters["as_of"] = self.request.as_of.isoformat()
         for dimension in self.request.dimensions:  # rules that always come with a dimension
             predicates.extend(self.fact.bindings[dimension].predicates)
         filters = self.request.filters
@@ -179,6 +187,25 @@ class _Builder:
                 self.parameters[key] = value
                 names.append(f":{key}")
             predicates.append(f"{expr} IN ({', '.join(names)})")
+        predicates.extend(self._text_predicates())
+        return predicates
+
+    def _text_predicates(self) -> list[str]:
+        """One predicate per search term of every name filter: the term must
+        appear in the accent/case-folded column (any of its singular/plural
+        variants). Terms are letters and digits only and travel as parameters
+        (``:product_term_0_0`` = ``%colete%``)."""
+        predicates: list[str] = []
+        for kind, value in self.request.filters.text_filters().items():
+            definition = TEXT_FILTERS[kind]
+            folded = f"translate(lower({definition.expr}), '{SQL_ACCENTS_FROM}', '{SQL_ACCENTS_TO}')"
+            for term_index, variants in enumerate(search_terms(value)):
+                alternatives = []
+                for variant_index, variant in enumerate(variants):
+                    key = f"{definition.prefix}_{term_index}_{variant_index}"
+                    self.parameters[key] = f"%{variant}%"
+                    alternatives.append(f"{folded} LIKE :{key}")
+                predicates.append(alternatives[0] if len(alternatives) == 1 else "(" + " OR ".join(alternatives) + ")")
         return predicates
 
     def from_lines(self) -> list[str]:
@@ -273,6 +300,8 @@ class _Builder:
         select = ["SELECT"] + _indent(_comma(items)) + self.from_lines() + self.where_lines(predicates)
         if group_exprs:
             select += ["GROUP BY"] + _indent(_comma(group_exprs))
+        if self.request.positive_only:
+            select += [f"HAVING {m.aggregate} > 0"]
         return [], select
 
     # -- assembling ----------------------------------------------------------
@@ -285,13 +314,18 @@ class _Builder:
         dim_names = [c.name for c in self.group_columns()]
 
         if request.operation is Operation.RANKING:
-            rank_fn = DIMENSIONS[request.dimensions[0]].rank_function
-            order = "ASC" if m.ranking_order is SortOrder.ASC else "DESC"
+            order = "ASC" if (request.ranking_order or m.ranking_order) is SortOrder.ASC else "DESC"
             self.parameters["top_n"] = DEFAULT_TOP_N if request.top_n is None else request.top_n
             carried = dim_names + self.value_names()
+            if m.preserve_ties:
+                rank_fn, order_by = DIMENSIONS[request.dimensions[0]].rank_function, f"{m.value_alias} {order}"
+            else:
+                # Bounded: exactly the first N by the exact value, ties broken by the
+                # dimension's own columns (product_id, product_name, ...), ranks 1..N.
+                rank_fn, order_by = "ROW_NUMBER", ", ".join([f"{m.value_alias} {order}"] + dim_names)
             window = [
                 f"{rank_fn}() OVER (",
-                f"    ORDER BY {m.value_alias} {order}",
+                f"    ORDER BY {order_by}",
                 ") AS ranking",
             ]
             ranked = ["SELECT"] + _indent([f"{name}," for name in carried]) + _indent(window) + ["FROM grouped"]
@@ -407,7 +441,9 @@ class _Builder:
     def applied_filters(self) -> dict[str, Any]:
         request = self.request
         filters = request.filters
-        if self.metric.snapshot:
+        if request.as_of is not None:
+            period = f"as_of:{request.as_of.isoformat()}"
+        elif self.metric.snapshot:
             period = "snapshot"
         elif request.time_modifier in (TimeModifier.YTD, TimeModifier.LTM):
             period = f"{request.time_modifier.value}@{filters.date_range.end.isoformat()}"
@@ -426,6 +462,12 @@ class _Builder:
             applied["customer_segments"] = list(filters.customer_segments)
         if filters.inventory_health_statuses:
             applied["inventory_health_statuses"] = list(filters.inventory_health_statuses)
+        for kind, value in filters.text_filters().items():
+            applied[kind.value.lower()] = value
+        if request.positive_only:
+            applied["positive_only"] = True
+        if request.ranking_order is not None:
+            applied["ranking_order"] = request.ranking_order.value
         return applied
 
 

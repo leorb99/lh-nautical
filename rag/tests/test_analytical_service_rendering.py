@@ -180,7 +180,7 @@ def test_aggregate_currency_is_a_natural_sentence_in_brazilian_reais():
             "A taxa de devolução foi de 4,32% (432 de 10.000 unidades).",
         ),
         (_req(Metric.RETURN_AMOUNT), {"refunded_amount": "999.5"}, "O valor reembolsado foi de R$ 999,50."),
-        (_req(Metric.STOCK_ON_HAND), {"stock_on_hand": "1500"}, "O estoque atual é de 1.500 unidades."),
+        (_req(Metric.STOCK_ON_HAND), {"stock_on_hand": "1500"}, "Na posição atual disponível no sistema, o estoque é de 1.500 unidades."),
         (_req(Metric.AT_RISK_CUSTOMERS), {"at_risk_customers": "420"}, "Há 420 clientes em risco."),
         (_req(Metric.AT_RISK_CUSTOMERS), {"at_risk_customers": "1"}, "Há 1 cliente em risco."),
         (_req(Metric.CUSTOMER_COUNT), {"customer_count": "12000"}, "Há 12.000 clientes."),
@@ -763,7 +763,7 @@ def test_the_trend_introduction_keeps_the_filters_of_the_question():
         (
             _req(Metric.STOCK_ON_HAND, Operation.BREAKDOWN, [Dimension.CATEGORY]),
             [{"category_name": "Coletes", "stock_on_hand": "3"}],
-            "O estoque atual por categoria é:",  # a snapshot is stated in the present
+            "Na posição atual disponível no sistema, o estoque por categoria é:",  # a snapshot is stated in the present
         ),
     ],
 )

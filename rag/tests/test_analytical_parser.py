@@ -212,7 +212,7 @@ def test_year_over_year_keeps_its_period():
         ("Qual o ticket médio por produto?", "AVERAGE_TICKET cannot be broken down by PRODUCT"),
         ("Ticket médio por categoria", "AVERAGE_TICKET cannot be broken down by CATEGORY"),
         ("Qual o crescimento da receita?", "explicit period"),
-        ("Estoque atual em 2025", "current snapshot|does not accept the DATE_RANGE"),
+        ("Estoque atual em 2025", "one date or one month"),
         ("Evolução mensal do estoque", "current snapshot|has no history|does not support TREND"),
         ("Evolução mensal de clientes em risco", "current snapshot|does not support TREND"),
         ("Receita por categoria e por loja", "more than one dimension"),

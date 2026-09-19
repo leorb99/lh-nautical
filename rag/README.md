@@ -2547,13 +2547,15 @@ outcome and nothing is compiled or executed:
 
 - average ticket is order-level: no product/category breakdown or category filter;
 - inventory and RFM metrics are current snapshots: no date filter, trend or
-  time modifier;
+  time modifier. The one exception is **stock on hand** (`STOCK_ON_HAND`), which
+  can also be asked *as of* one date or month (see "Inventory analytics" below);
 - products and salespeople can be ranked but not listed as a breakdown;
 - ranking/breakdown need exactly one dimension; time modifiers are a single
   aggregate value;
 - personal data (email, telephone, address, documents) is never registered
   and questions asking for it are refused;
-- "menos vendidos" / ascending rankings, customer rankings, forecasts,
+- "menos vendidos" / ascending rankings (only **stock** may be ranked in either
+  order: "menos estoque"), customer rankings, forecasts,
   profit/margin, relative periods ("no último mês", "ontem"), a month without a
   year, filters on a specific store/state/category/product, and rankings by two
   dimensions are refused.
@@ -2577,6 +2579,37 @@ data question phrased outside its vocabulary falls through to `AI_SEARCH`
 negative that runs no SQL). Questions that clearly ask for live values the
 system cannot produce **fail closed** (`STRUCTURED_DATA_UNSUPPORTED`) instead
 of being answered with documentation.
+
+**Inventory analytics (stock on hand).** Three inventory meanings are kept apart:
+
+- *Current stock* ("quantos coletes temos?") reads `gold.fct_current_inventory`,
+  which is already the current SCD2 row (`dbt_valid_to IS NULL`) of every product
+  variant + location. It is **never** filtered by `CURRENT_DATE` and
+  `inventory_reference_date` is not treated as a global snapshot date; answers say
+  "Na posição atual disponível no sistema" and never claim stock was updated today.
+- *Historical stock* ("quantos coletes havia em janeiro de 2026?") reads
+  `gold.fct_inventory_snapshot` and reconstructs the state **as of the end of** the
+  given day (a month means its last day): the one row per variant + location with
+  `snapshot_valid_from < D+1 AND (snapshot_valid_to IS NULL OR snapshot_valid_to >= D+1)`,
+  i.e. valid over `[valid_from, valid_to)` — never a sum of the snapshots created in
+  the period. The answer states the date used ("Na posição de estoque de
+  31/01/2026, ..."). A year, a range or a relative date is refused; there is no
+  inventory trend.
+- *Replenishment / risk* (`STOCKOUT_RISK`, `DAYS_TO_STOCKOUT`,
+  `REPLENISHMENT_REQUIRED`) stays on `fct_inventory_replenishment`.
+
+Stock questions accept **name filters** as typed values of the request
+(`RequestFilters.product_text`, `category_text`, `location_text`): a product phrase
+searches `dim_products.product_name` only (never `category_name`, whose Gold
+assignments are inconsistent — a category is filtered only when the question says
+"categoria X"), a location is a type + name ("Loja X", "Armazém Y"). A phrase is
+reduced to lowercase, accent-free search terms (simple plural variants) that are
+bound as named parameters of `LIKE` predicates; the user's text is never in the
+SQL. Every word of a stock question must be accounted for (`structured/qualifiers.py`):
+a product/place/category/date that cannot be represented — two items, a place
+without a type, a product id, "nas lojas" — makes the question **unsupported**
+instead of answering a broader one. "Em quais estoques temos X?" keeps only
+locations whose stock is greater than zero; "menos estoque" ranks ascending.
 
 **Deterministic, friendly structured output.** The answer is the *result* in
 natural Portuguese — never the internal semantic request (`AGGREGATE ·

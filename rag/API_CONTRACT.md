@@ -304,7 +304,11 @@ metric, dimension or route. What the UI should be aware of:
   segment or inventory health status; monthly/quarterly/yearly/daily trends;
   year-to-date, last-12-months and year-over-year revenue; current inventory
   (stock, days to stockout, items needing replenishment or at risk of
-  stockout, health status counts); and customers (count, at risk, revenue at
+  stockout, health status counts) and stock on hand as of a past date or month
+  ("quantos coletes havia em janeiro de 2026?"), optionally for a named
+  product, category or location ("Loja X"); the answer states the position it
+  describes ("Na posição atual disponível no sistema", "Na posição de estoque de
+  31/01/2026"); and customers (count, at risk, revenue at
   risk). Periods are calendar years or a month with its year (for example
   "em 2024"); the *product champion* is the product with the highest **net
   revenue**, while "mais vendidos" ranks by **units**.
@@ -315,7 +319,8 @@ metric, dimension or route. What the UI should be aware of:
   This covers: "least sold" rankings, customer rankings, forecasts,
   profit/margin, relative periods ("last month", "yesterday"), a month without
   a year, an ambiguous "state", filters on one specific store/state/category/
-  product, rankings by two dimensions, order-level metrics split by product,
+  product (except in stock questions, which accept a named product, category
+  or location — anything else in them that cannot be represented is refused), rankings by two dimensions, order-level metrics split by product,
   inventory or customer snapshots asked over a period, and any request for
   personal data (email, telephone, address, documents).
 - A question that asks for both the values and the rule behind them returns

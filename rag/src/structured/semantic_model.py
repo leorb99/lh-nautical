@@ -45,11 +45,13 @@ __all__ = [
     "GroupColumn",
     "DimensionBinding",
     "FactDef",
+    "TextFilterDef",
     "MetricDef",
     "DimensionDef",
     "FACTS",
     "METRICS",
     "DIMENSIONS",
+    "TEXT_FILTERS",
     "INVENTORY_HEALTH_STATUSES",
     "CUSTOMER_SEGMENTS",
     "BLOCKED_ATTRIBUTES",
@@ -87,12 +89,14 @@ class SortOrder(Enum):
 class Unit(Enum):
     """How a metric's value is presented (and, for the compiler, whether it
     is a whole number): Brazilian reais, a whole number, a whole number of
-    units (an integer that names its noun), a plain decimal, a percentage
-    (a ratio shown x 100) or days."""
+    units (an integer that names its noun), fractional units (an exact decimal
+    quantity, DECIMAL(14,3) in Gold, that is shown as whole units), a plain
+    decimal, a percentage (a ratio shown x 100) or days."""
 
     CURRENCY_BRL = "CURRENCY_BRL"
     INTEGER = "INTEGER"
     UNITS = "UNITS"
+    DECIMAL_UNITS = "DECIMAL_UNITS"
     DECIMAL = "DECIMAL"
     PERCENT = "PERCENT"
     DAYS = "DAYS"
@@ -145,6 +149,11 @@ class FilterKind(Enum):
     CATEGORY = "CATEGORY"
     CUSTOMER_SEGMENT = "CUSTOMER_SEGMENT"
     INVENTORY_HEALTH_STATUS = "INVENTORY_HEALTH_STATUS"
+    #: Free-text name filters, matched by :mod:`src.structured.text_match`
+    #: (search terms bound as parameters — never the user's text in SQL).
+    PRODUCT_TEXT = "PRODUCT_TEXT"
+    CATEGORY_TEXT = "CATEGORY_TEXT"
+    LOCATION_TEXT = "LOCATION_TEXT"
 
 
 #: Values of ``fct_current_inventory.inventory_health_status`` (GOLD-017,
@@ -230,6 +239,20 @@ class FactDef:
     population: str
     date_column: str | None
     bindings: Mapping[Dimension, DimensionBinding]
+    #: Predicates that reconstruct the state of a slowly-changing (SCD2) table
+    #: AS OF the request's ``as_of`` date (bound as ``:as_of``); only on facts
+    #: that hold history.
+    as_of_predicates: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TextFilterDef:
+    """A free-text name filter: the dimension whose join provides the column,
+    the (registry-approved) column, and the prefix of its parameters."""
+
+    dimension: Dimension
+    expr: str
+    prefix: str
 
 
 _PRODUCT_JOIN = "dim_products"
@@ -325,6 +348,9 @@ FACTS: Mapping[str, FactDef] = MappingProxyType(
             source_note_pt="Fonte: posição atual de estoque (snapshot).",
             population="current_inventory_snapshot",
             date_column=None,
+            # fct_current_inventory is already the current (dbt_valid_to IS NULL) SCD2 row of
+            # every product variant + location: no date filter is ever applied to it, and its
+            # inventory_reference_date is not a global snapshot date.
             bindings=MappingProxyType(
                 {
                     **_product_bindings("i"),
@@ -334,6 +360,28 @@ FACTS: Mapping[str, FactDef] = MappingProxyType(
                         order_by=_HEALTH_ORDER,
                     ),
                 }
+            ),
+        ),
+        # Historical stock: the SCD2 history behind fct_current_inventory (one row per
+        # product variant + location + validity interval). Same alias as the current
+        # fact so a metric's aggregate ("SUM(i.quantity_on_hand)") serves both.
+        "inventory_history": FactDef(
+            key="inventory_history",
+            table="fct_inventory_snapshot",
+            alias="i",
+            base_predicates=(),
+            source_note_pt="Fonte: histórico de posições de estoque (snapshot SCD2).",
+            population="historical_inventory_snapshot",
+            date_column=None,
+            bindings=MappingProxyType({**_product_bindings("i"), **_location_bindings("i")}),
+            # A row is valid over [snapshot_valid_from, snapshot_valid_to) (valid_to NULL = still
+            # valid). "The position on day D" is the one at the END of D, i.e. the row valid just
+            # before D+1 00:00: valid_from < D+1 and (valid_to IS NULL OR valid_to >= D+1).
+            # Exactly one row per variant + location satisfies it; summing every snapshot
+            # created during a month would double count.
+            as_of_predicates=(
+                "i.snapshot_valid_from < CAST(date_add(CAST(:as_of AS DATE), 1) AS TIMESTAMP)",
+                "(i.snapshot_valid_to IS NULL OR i.snapshot_valid_to >= CAST(date_add(CAST(:as_of AS DATE), 1) AS TIMESTAMP))",
             ),
         ),
         # Power BI: agg_customer_rfm (one row per customer with an effective sale)
@@ -388,7 +436,7 @@ class MetricDef:
     #: Presentation (Portuguese), used only by the deterministic renderer —
     #: never by a model, never per question:
     #: the noun phrase with its article ("o faturamento líquido"), used in
-    #: introductions ("Veja o faturamento líquido por categoria:");
+    #: introductions ("Em 2025, o faturamento líquido por categoria foi:");
     display_pt: str
     #: the sentence for a single value; ``{value}`` is the formatted value and
     #: ``{scope}`` the period/filter phrase ("" or " em 2025");
@@ -423,6 +471,27 @@ class MetricDef:
     ranking_order: SortOrder = SortOrder.DESC
     #: Whether the metric is a current snapshot: no date filter, no trend.
     snapshot: bool = False
+    #: Fact (a key of ``FACTS``) that holds the metric's history: with it the
+    #: metric can be asked AS OF a date (``AnalyticalRequest.as_of``).
+    historical_fact: str | None = None
+    #: The metric can be restricted to groups whose value is greater than zero
+    #: ("em quais estoques temos X?").
+    positive_only: bool = False
+    #: How the opposite ranking reads ("menor estoque"); non-empty means the
+    #: ranking may be requested in the opposite order too.
+    ranking_reverse_pt: str = ""
+    #: Whether a ranking keeps items with the same value at the same position
+    #: (``DENSE_RANK`` / ``RANK`` — Power BI's behaviour, so a top N can list
+    #: more than N items) or is bounded to exactly N items: ``ROW_NUMBER()`` with
+    #: the dimension's own columns as deterministic tie-breakers. Stock has
+    #: hundreds of ties (every item with the same quantity), so it is bounded.
+    preserve_ties: bool = True
+    #: The single-value sentence for an as-of (past) position; falls back to ``sentence_pt``.
+    historical_sentence_pt: str = ""
+    #: What the current values are the position of, said at the start of the
+    #: answer ("Na posição atual disponível no sistema, ..."): the latest row
+    #: each stock has in the system, never "updated today".
+    position_pt: str = ""
 
     @property
     def is_ratio(self) -> bool:
@@ -476,6 +545,18 @@ DIMENSIONS: Mapping[Dimension, DimensionDef] = MappingProxyType(
             Dimension.INVENTORY_HEALTH_STATUS, "status de saúde do estoque", "status de saúde do estoque",
             "fct_current_inventory[inventory_health_status]",
         ),
+    }
+)
+
+#: Free-text filters. The product filter searches ``product_name`` ONLY — never
+#: ``category_name`` (Gold's category assignments are inconsistent, so a
+#: category is not a safe implicit product resolver); a category is filtered
+#: only when the question names one explicitly.
+TEXT_FILTERS: Mapping[FilterKind, TextFilterDef] = MappingProxyType(
+    {
+        FilterKind.PRODUCT_TEXT: TextFilterDef(Dimension.PRODUCT, "p.product_name", "product_term"),
+        FilterKind.CATEGORY_TEXT: TextFilterDef(Dimension.CATEGORY, "p.category_name", "category_term"),
+        FilterKind.LOCATION_TEXT: TextFilterDef(Dimension.LOCATION, "l.location_name", "location_term"),
     }
 )
 
@@ -553,14 +634,24 @@ METRICS: Mapping[Metric, MetricDef] = MappingProxyType(
         ),
         # -------------------------------------------------------------- INVENTORY
         Metric.STOCK_ON_HAND: MetricDef(
-            metric=Metric.STOCK_ON_HAND, family=MetricFamily.INVENTORY, fact="replenishment", unit=Unit.UNITS,
-            label_pt="estoque atual",
-            display_pt="o estoque atual", sentence_pt="O estoque atual{scope} é de {value}.", ranking_pt="maior estoque atual",
+            metric=Metric.STOCK_ON_HAND, family=MetricFamily.INVENTORY, fact="inventory", unit=Unit.DECIMAL_UNITS,
+            label_pt="estoque",
+            display_pt="o estoque", sentence_pt="O estoque{scope} é de {value}.", ranking_pt="maior estoque",
+            ranking_reverse_pt="menor estoque",
+            historical_sentence_pt="O estoque{scope} foi de {value}.",
+            position_pt="Na posição atual disponível no sistema",
+            # The Power BI measure is SUM over fct_inventory_replenishment; the Harness reads the
+            # same quantity_on_hand from fct_current_inventory (already the current SCD2 row of each
+            # product variant + location) and, as of a date, from fct_inventory_snapshot.
             pbi_source="Estoque Atual = SUM(fct_inventory_replenishment[quantity_on_hand])",
             value_alias="stock_on_hand",
-            aggregate="SUM(r.quantity_on_hand)",
+            aggregate="SUM(i.quantity_on_hand)",
             operations=frozenset({Operation.AGGREGATE, Operation.BREAKDOWN, Operation.RANKING}),
-            dimensions=_INVENTORY_DIMS, filters=frozenset({FilterKind.CATEGORY}), snapshot=True,
+            dimensions=_INVENTORY_DIMS,
+            filters=frozenset(
+                {FilterKind.CATEGORY, FilterKind.PRODUCT_TEXT, FilterKind.CATEGORY_TEXT, FilterKind.LOCATION_TEXT}
+            ),
+            snapshot=True, historical_fact="inventory_history", positive_only=True, preserve_ties=False,
         ),
         Metric.DAYS_TO_STOCKOUT: MetricDef(
             metric=Metric.DAYS_TO_STOCKOUT, family=MetricFamily.INVENTORY, fact="replenishment", unit=Unit.DAYS,

@@ -126,7 +126,7 @@ class RuleBasedSourceRouter:
         data, rule = _split_clauses(query)
 
         # 1. Purely documentary wording (or nothing recognizable as a data request).
-        outcome = parse_analytical_request(data) if data else None
+        outcome = parse_analytical_request(data, raw=query) if data else None
         if outcome is None or (outcome.request is None and outcome.unsupported_reason is None):
             reason = "rule/definition question" if rule else "default documentary route"
             return RouteDecision(SourceRoute.AI_SEARCH, reason=reason)
