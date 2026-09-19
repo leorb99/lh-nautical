@@ -210,7 +210,7 @@ _ENTITY_DIMENSIONS: list[tuple[re.Pattern[str], Dimension]] = [
 
 _BY_PHRASE = re.compile(
     r"\b(?:por|em cada|para cada|de cada|por cada) (categorias?|lojas?|estabelecimentos?|filiais|filial|canal|canais|vendedor(?:es)?|segmentos?|status|situacao|saude|"
-    r"estados?|regioes|regiao|produtos?|itens?|clientes?|cidades?|localidades?|estoques?|armazens|armazem|depositos?)\b"
+    r"fornecedor(?:es)?|estados?|regioes|regiao|produtos?|itens?|clientes?|cidades?|localidades?|estoques?|armazens|armazem|depositos?)\b"
     r"(?: (?:do|da|de|dos|das) (lojas?|estabelecimentos?|filiais?|clientes?))?"
 )
 
