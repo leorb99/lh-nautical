@@ -11,6 +11,7 @@ so the shared dbt venv's regression run stays green without them."""
 from __future__ import annotations
 
 import copy
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -361,7 +362,7 @@ def test_structured_data_success_uses_the_existing_ok_status_with_no_sources(cli
 STRUCTURED_BLOCK = (
     "Os produtos mais vendidos, por quantidade de unidades, são:\n\n"
     "1. Colete Salva-Vidas 2374 — 1.737 unidades\n2. Bateria Náutica 1945 — 1.731 unidades\n\n"
-    "Fonte: dados de vendas efetivas."
+    "Fonte: camada Gold — fct_sales + dim_products."
 )
 
 
@@ -449,7 +450,7 @@ def test_unsupported_structured_question_is_a_controlled_no_answer_not_a_new_sta
     assert resp.status_code == 200 and set(body) == PUBLIC_RESPONSE_KEYS
     assert body["status"] in PUBLIC_STATUSES
     assert body["answer"] is None and body["sources"] == [] and body["citation_integrity"] is None
-    assert body["message"] == "This question asks for data that is not supported yet."
+    assert body["message"] == "Esta consulta ainda não é suportada pelos dados estruturados disponíveis."
     assert "intent" not in resp.text  # internal reason is logged, never returned
 
 
@@ -524,3 +525,72 @@ def test_app_wires_the_router_and_enables_structured_data_only_when_a_warehouse_
     assert isinstance(app_module.harness._source_router, RuleBasedSourceRouter)
     warehouse_configured = bool((os.environ.get("SQL_WAREHOUSE_ID") or "").strip())
     assert (app_module.harness._structured_query_service is not None) == warehouse_configured
+
+
+# ---------------------------------------------------------------------------
+# Structured analytics: the public `answer` is the friendly result, the API
+# schema is unchanged. (Real router + parser + compiler + service + renderer;
+# only the SQL executor is a fake.)
+# ---------------------------------------------------------------------------
+
+
+class _FakeSqlExecutor:
+    def __init__(self, rows):
+        self.rows, self.statements = rows, []
+
+    def execute(self, statement, parameters=None):
+        self.statements.append(statement)
+        return [dict(row) for row in self.rows]
+
+
+def _real_structured_harness(monkeypatch, rows):
+    from src.harness.harness import AIHarness
+    from src.harness.source_router import RuleBasedSourceRouter
+    from src.structured.service import StructuredQueryService
+
+    executor = _FakeSqlExecutor(rows)
+    harness = AIHarness(
+        orchestrator=MagicMock(),  # never used by a structured-only question
+        structured_query_service=StructuredQueryService(executor, catalog="test_catalog"),
+        source_router=RuleBasedSourceRouter(),
+    )
+    monkeypatch.setattr(app_module, "harness", harness)
+    monkeypatch.setattr(app_module, "traced_ask", lambda h, query: h.ask(query))
+    return harness
+
+
+@pytest.mark.parametrize(
+    "question, rows, expected_first_line",
+    [
+        ("Quanto faturamos?", [{"net_revenue": "1234567.89"}], "O faturamento líquido foi de R$ 1.234.567,89."),
+        ("Quantos pedidos tivemos?", [{"effective_orders": "12345"}], "Foram 12.345 pedidos efetivos."),
+        (
+            "Top 2 produtos por receita",
+            [
+                {"ranking": "1", "product_id": "1", "product_name": "Produto A", "net_revenue": "100000"},
+                {"ranking": "2", "product_id": "2", "product_name": "Produto B", "net_revenue": "95000"},
+            ],
+            "Os 2 produtos com maior receita líquida foram:",
+        ),
+    ],
+)
+def test_the_public_answer_is_the_friendly_result_with_no_sources_and_the_same_schema(client, monkeypatch, question, rows, expected_first_line):
+    _real_structured_harness(monkeypatch, rows)
+
+    resp = client.post("/api/ask", json={"query": question})
+
+    body = resp.json()
+    assert resp.status_code == 200 and set(body) == PUBLIC_RESPONSE_KEYS  # no new field
+    assert body["status"] == "AI_SEARCH_OK"  # unchanged public status
+    assert body["answer"].splitlines()[0] == expected_first_line
+    assert body["sources"] == [] and body["citation_integrity"]["status"] == "NO_CITATIONS" and body["message"] is None
+    for internal in ("AGGREGATE", "RANKING", "NET_REVENUE", "EFFECTIVE_ORDERS", "·", "SELECT"):
+        assert internal not in body["answer"]  # the semantic request is metadata, never the answer
+
+
+def test_the_structured_analytics_work_leaves_the_published_api_schema_unchanged(client):
+    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+
+    assert set(schemas["AskRequest"]["properties"]) == {"query"}
+    assert set(schemas["AskResponse"]["properties"]) == PUBLIC_RESPONSE_KEYS
+    assert set(schemas["AskResponse"]["required"]) == PUBLIC_RESPONSE_KEYS

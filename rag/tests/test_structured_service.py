@@ -133,7 +133,11 @@ def test_only_the_allowlisted_statement_is_executed():
     _service(executor).execute(INTENT, {"top_n": 3})
 
     statement, _ = executor.calls[0]
-    assert statement == TOP_PRODUCTS_BY_QUANTITY_SQL.format(catalog="test_catalog", schema="gold")
+    # The compiled statement is the statement validated in Phase 6B.0
+    # (only the first CTE carries a generic name now).
+    assert statement == TOP_PRODUCTS_BY_QUANTITY_SQL.format(catalog="test_catalog", schema="gold").replace(
+        "product_sales", "grouped"
+    )
 
 
 def test_sql_uses_dense_rank():

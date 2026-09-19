@@ -232,7 +232,7 @@ def ask(request: AskRequest) -> JSONResponse:
         return _no_answer_response(
             200,
             HarnessStatus.AI_SEARCH_NO_EVIDENCE.value,
-            "This question asks for data that is not supported yet.",
+            "Esta consulta ainda não é suportada pelos dados estruturados disponíveis.",
         )
 
     if status is HarnessStatus.INVALID_REQUEST:
