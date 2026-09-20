@@ -9,7 +9,7 @@ casos difíceis de forçar no backend real, como citation_integrity=INVALID.
 
 Rodar:
     pip install fastapi uvicorn --break-system-packages
-    python mock_app.py
+    python mock.py
     # abrir http://127.0.0.1:8000
 
 Gatilhos (não fazem parte do contrato real — são só desta simulação):

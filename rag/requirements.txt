@@ -32,4 +32,3 @@ mlflow
 fastapi
 uvicorn
 databricks-sdk==0.139.0
-httpx==0.24.1
