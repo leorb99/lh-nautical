@@ -26,6 +26,8 @@ metric:
 - a name filter (product, category, location) is free text reduced to search
   terms by :mod:`src.structured.text_match` — only metrics that declare the
   filter accept it, so a qualifier is never silently ignored;
+- a metric can require filters (a forecast is for one product in one store) and is
+  refused without them;
 - ``as_of`` asks for a position at the end of a past day and only exists for
   metrics with a history fact.
 """
@@ -181,6 +183,10 @@ def check_compatibility(request: AnalyticalRequest) -> None:
         filters.date_range is not None or request.time_grain is not None or request.time_modifier is not None
     ):
         raise _reject(f"{name} is a current snapshot: it has no date filter, trend or time modifier")
+
+    missing = definition.required_filters - filters.present()
+    if missing:
+        raise _reject(f"{name} needs the {' and '.join(sorted(kind.value for kind in missing))} filter(s): it is never widened")
 
     # Time --------------------------------------------------------------------
     if op is Operation.TREND:

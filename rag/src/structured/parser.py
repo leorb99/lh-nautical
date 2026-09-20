@@ -110,11 +110,18 @@ _NOT_ITEMS = frozenset(
 _PII = _c(r"\b(e ?mails?|telefones?|celular|fone|cpf|cnpj|endereco|contato|whatsapp)\b")
 _PII_REASON = "personal data (email, telephone, address, documents) is never exposed"
 
+_FORECAST_REFUSAL = "demand forecasts are not part of the supported analytics"
+_FORECAST_SHAPE_REFUSAL = (
+    "a demand forecast (P85) is available for exactly one product in exactly one store over the next 3 months "
+    "(e.g. 'previsão do <produto> na <loja> nos próximos 3 meses'); totals, rankings, other periods and "
+    "several products or stores are not supported"
+)
+
 _UNSUPPORTED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bmenos vendid|\bvend\w* menos\b|\bmenor(?:es)? (?:receita|venda|vendas|faturamento|quantidade)\b|\bpior(?:es)?\b"),
      'ascending rankings ("menos vendidos", lowest revenue) are not supported'),
     (re.compile(r"\bprevisao|\bprever\b|\bprojecao|\bforecast|\bdemanda futura"),
-     "demand forecasts are not part of the supported analytics"),
+     _FORECAST_REFUSAL),
     (re.compile(r"\bclientes? (?:que )?(?:mais|menos) (?:compr|gast|vend)|\bclientes?\b.{0,25}\b(?:compr|gast)\w* (?:mais|menos)\b|\b(?:melhores|maiores|principais|top) clientes\b"),
      "customer rankings are not supported (customer-level data is personal)"),
     (re.compile(r"\blucro|\bmargem|\bimpostos?\b|\bicms\b|\bipi\b|\bdescontos?\b|\bfrete\b"),
@@ -153,6 +160,12 @@ _METRIC_PATTERNS: list[tuple[Metric, re.Pattern[str]]] = [
         r"\b(?:vendeu|venderam|vende|vendem|vendemos) mais\b|\bmais (?:vendeu|venderam|vende|vendem|vendemos)\b|\bmais saem\b|\bmais unidades\b|"
         r"\b(?:produtos?|itens?) mais (?:popular(?:es)?|comprad[oa]s?|procurad[oa]s?)\b|\bvolume de vendas\b|"
         r"\bquantas? vendas\b|\bunidades vendemos\b|\bmelhores (?:produtos|itens) em vendas\b"
+    )),
+    # The P85 forecast of one product in one store. After every other metric: "previsão de receita" is
+    # still a refused forecast of revenue, not this one.
+    (Metric.DEMAND_FORECAST_P85, re.compile(
+        r"\bprevisao\b|\bprevisoes\b|\bprojecao\b|\bdemanda (?:prevista|futura)\b|\bprever\b|\bforecast\b|"
+        r"\bdemanda\b.{0,60}\bproximos?\b"
     )),
     # Last resort (every other metric had its chance): a question about stock that names
     # the stock ("qual o estoque por estado", "em quais estoques ...") or asks how many of
@@ -237,6 +250,9 @@ _WHERE_LIST = re.compile(
 )
 # Stock concepts that are not values of an item ("qual o estoque de segurança?").
 _STOCK_CONCEPT = re.compile(r"\bestoques? (?:de |do )?(?:seguranca|minimo|maximo|ideal|parado|obsoleto|excedente)\b")
+# The only horizon a forecast is asked for: the official 3 months. Any other ("próximo mês",
+# "próximos 6 meses") stays in the text and is refused as a relative period.
+_HORIZON = re.compile(r"\b(?:nos |para os |durante os |pelos )?proximos (?:3|tres) meses\b")
 # Direction words: "menos estoque". Only metrics that declare the opposite order accept them.
 _ASCENDING = re.compile(r"\b(?:menos|menor(?:es)?|minim[oa]s?|pouc[oa]s?)\b")
 # "now": for a metric with a history these words mean the current position.
@@ -421,11 +437,14 @@ def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
 
     for pattern, reason in _UNSUPPORTED_PATTERNS:
         if pattern.search(t):
+            if reason == _FORECAST_REFUSAL and metric is Metric.DEMAND_FORECAST_P85:
+                continue  # the one forecast that is supported; its shape is checked below
             return _unsupported(reason)
     if metric is None:
         return _unsupported("ambiguous metric: say 'receita' (R$) or 'unidades vendidas'") if _AMBIGUOUS_SALES.search(t) else _NOT_ANALYTICAL
-    has_cue = champion or _any(_DATA_REQUEST, t)
     definition = METRICS[metric]
+    fixed = definition.fixed_shape  # a metric that can only be asked in one shape (a forecast series)
+    has_cue = champion or fixed is not None or _any(_DATA_REQUEST, t)
     # A metric that takes name filters is asked in free wording ("quantos coletes temos?"):
     # every word of the question is accounted for (see ``qualifiers``).
     named = FilterKind.PRODUCT_TEXT in definition.filters
@@ -481,6 +500,8 @@ def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
     if modifier in (TimeModifier.YTD, TimeModifier.LTM):
         working = re.sub(r"\bate\b", " ", working)  # "acumulada no ano até março de 2025": the anchor is the period's end
 
+    if fixed is not None:
+        working = _HORIZON.sub(" ", working)
     date_range, refusal, working = _detect_period(working)
     if refusal:
         return _unsupported(refusal)
@@ -489,6 +510,8 @@ def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
     qualifiers = None
     as_of: date | None = None
     if named:
+        if fixed is not None and (date_range is not None or re.search(r"\bproximos?\b", working)):
+            return _unsupported(_FORECAST_SHAPE_REFUSAL)  # only the official 3 months, never another period
         if date_range is not None:
             if date_range.start == date_range.end:
                 as_of = date_range.start
@@ -507,7 +530,9 @@ def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
         working = qualifiers.remaining
         if qualifiers.past_tense and as_of is None:
             return _unsupported("a past inventory position needs a date (e.g. 'em janeiro de 2026')")
-        if "estoque" not in t and "estoques" not in t and (
+        if fixed is not None and (qualifiers.product is None or qualifiers.location is None):
+            return _unsupported(_FORECAST_SHAPE_REFUSAL)  # never widened to "all products" / "all stores"
+        if metric is Metric.STOCK_ON_HAND and "estoque" not in t and "estoques" not in t and (
             qualifiers.product is None or qualifiers.product.split()[0] in _NOT_ITEMS
         ):
             return _NOT_ANALYTICAL  # "quantos ... temos" about something that is not an item's stock
@@ -543,11 +568,16 @@ def parse_analytical_request(text: str, raw: str | None = None) -> ParseOutcome:
             return _unsupported('ascending rankings ("menos vendidos", lowest revenue) are not supported')
         ranking_order = SortOrder.ASC
 
+    if fixed is not None and (grain or modifier or ranking or ascending or by_dimensions or where_list):
+        return _unsupported(_FORECAST_SHAPE_REFUSAL)
+
     # -- build ---------------------------------------------------------------
     top_n: int | None = None
     time_grain: TimeGrain | None = None
     positive_only = False
-    if grain is not None:
+    if fixed is not None:
+        operation, dimensions = fixed[0], (fixed[1],)
+    elif grain is not None:
         operation, dimensions, time_grain = Operation.TREND, (), grain
     elif where_list:
         if by_dimensions:

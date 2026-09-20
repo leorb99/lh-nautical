@@ -46,6 +46,7 @@ __all__ = [
     "DimensionBinding",
     "FactDef",
     "TextFilterDef",
+    "OfficialWindowSpec",
     "MetricDef",
     "DimensionDef",
     "FACTS",
@@ -107,6 +108,8 @@ class MetricFamily(Enum):
     RETURNS = "RETURNS"
     INVENTORY = "INVENTORY"
     CUSTOMER = "CUSTOMER"
+    #: Outputs of a predictive model (not Power BI measures).
+    FORECAST = "FORECAST"
 
 
 class Metric(Enum):
@@ -130,6 +133,9 @@ class Metric(Enum):
     AT_RISK_REVENUE = "AT_RISK_REVENUE"
     # P1 — added only to prove that a metric is a registry entry (see README)
     AVERAGE_RECENCY = "AVERAGE_RECENCY"
+    # FORECAST — the 85th-percentile (quantile) forecast of one product in one store.
+    # Deliberately NOT called "expected demand": it is the P85 output of a quantile model.
+    DEMAND_FORECAST_P85 = "DEMAND_FORECAST_P85"
 
 
 class Dimension(Enum):
@@ -142,6 +148,8 @@ class Dimension(Enum):
     SALESPERSON = "SALESPERSON"
     CUSTOMER_SEGMENT = "CUSTOMER_SEGMENT"
     INVENTORY_HEALTH_STATUS = "INVENTORY_HEALTH_STATUS"
+    #: One forecast series' months (with the product and store they belong to).
+    FORECAST_MONTH = "FORECAST_MONTH"
 
 
 class FilterKind(Enum):
@@ -243,6 +251,39 @@ class FactDef:
     #: AS OF the request's ``as_of`` date (bound as ``:as_of``); only on facts
     #: that hold history.
     as_of_predicates: tuple[str, ...] = ()
+    #: Optional location of the table when it is NOT under the App's
+    #: ``DATA_CATALOG``/``DATA_SCHEMA`` (a model output living elsewhere). Set
+    #: only here, in the registry — never from a question or from configuration.
+    catalog: str | None = None
+    schema: str | None = None
+    #: Name filters read straight from a column of this table (instead of
+    #: through a dimension join): ``{PRODUCT_TEXT: "f.product_name", ...}``.
+    text_columns: Mapping[FilterKind, str] = MappingProxyType({})
+    #: A fact whose rows are only trusted per series, inside an official
+    #: window derived from the data (see :class:`OfficialWindowSpec`).
+    official_window: "OfficialWindowSpec | None" = None
+
+
+@dataclass(frozen=True)
+class OfficialWindowSpec:
+    """Eligibility of a forecast series, as data the compiler turns into SQL.
+
+    The official window is derived from the rows of the official model
+    version: its last month is ``MAX(month_column)`` over
+    ``version_column = official_version`` and the ``months - 1`` months before
+    it complete the window. A series is eligible only when, inside that window,
+    it has exactly ``months`` rows, every one of them from the official
+    version (no other version is a fallback), a single ``generated_at`` and a
+    non-NULL value. Column names are authored here and validated by the
+    compiler; the version is bound as a named parameter."""
+
+    series_columns: tuple[str, ...]
+    month_column: str
+    version_column: str
+    official_version: str
+    generated_at_column: str
+    value_column: str
+    months: int = 3
 
 
 @dataclass(frozen=True)
@@ -384,6 +425,44 @@ FACTS: Mapping[str, FactDef] = MappingProxyType(
                 "(i.snapshot_valid_to IS NULL OR i.snapshot_valid_to >= CAST(date_add(CAST(:as_of AS DATE), 1) AS TIMESTAMP))",
             ),
         ),
+        # Output of the product x store demand model (CatBoost, quantile alpha 0.85), written by a
+        # notebook — not a dbt model, and in the prod catalog. Only trusted per series inside the
+        # official window of the official model version (see OfficialWindowSpec).
+        "demand_forecast": FactDef(
+            key="demand_forecast",
+            table="demand_forecast_rolling_3m",
+            alias="f",
+            base_predicates=(),
+            source_note_pt="Fonte: previsão de demanda por produto e loja (percentil 85).",
+            population="official_demand_forecast_p85",
+            date_column=None,
+            catalog="prod_lh_nautical",
+            schema="gold",
+            text_columns=MappingProxyType(
+                {FilterKind.PRODUCT_TEXT: "f.product_name", FilterKind.LOCATION_TEXT: "f.location_name"}
+            ),
+            official_window=OfficialWindowSpec(
+                series_columns=("product_name", "location_name"),
+                month_column="month_start",
+                version_column="model_version",
+                official_version="3",
+                generated_at_column="generated_at",
+                value_column="unit_demand_forcast",
+                months=3,
+            ),
+            bindings=MappingProxyType(
+                {
+                    Dimension.FORECAST_MONTH: DimensionBinding(
+                        columns=(
+                            GroupColumn("CAST(f.month_start AS DATE)", "forecast_month", ColumnType.DATE, nullable=False),
+                            GroupColumn("f.product_name", "product_name", ColumnType.TEXT, nullable=False),
+                            GroupColumn("f.location_name", "location_name", ColumnType.TEXT, nullable=False),
+                        ),
+                        order_by="forecast_month",
+                    ),
+                }
+            ),
+        ),
         # Power BI: agg_customer_rfm (one row per customer with an effective sale)
         "customer_rfm": FactDef(
             key="customer_rfm",
@@ -492,6 +571,17 @@ class MetricDef:
     #: answer ("Na posição atual disponível no sistema, ..."): the latest row
     #: each stock has in the system, never "updated today".
     position_pt: str = ""
+    #: Filters the question MUST carry (a forecast is asked for one product in
+    #: one store); a request without them is refused, never widened.
+    required_filters: frozenset[FilterKind] = frozenset()
+    #: The only shape the metric can be asked in (operation, dimension): a
+    #: forecast series is listed month by month, never summed or ranked.
+    fixed_shape: tuple[Operation, Dimension] | None = None
+    #: A short caveat printed after the values.
+    note_pt: str = ""
+    #: What to say when the query returns no rows, instead of the generic
+    #: "no information" message ("" = the generic one).
+    no_data_message_pt: str = ""
 
     @property
     def is_ratio(self) -> bool:
@@ -544,6 +634,9 @@ DIMENSIONS: Mapping[Dimension, DimensionDef] = MappingProxyType(
         Dimension.INVENTORY_HEALTH_STATUS: DimensionDef(
             Dimension.INVENTORY_HEALTH_STATUS, "status de saúde do estoque", "status de saúde do estoque",
             "fct_current_inventory[inventory_health_status]",
+        ),
+        Dimension.FORECAST_MONTH: DimensionDef(
+            Dimension.FORECAST_MONTH, "mês previsto", "meses previstos", "demand_forecast_rolling_3m[month_start]",
         ),
     }
 )
@@ -754,6 +847,32 @@ METRICS: Mapping[Metric, MetricDef] = MappingProxyType(
             operations=frozenset({Operation.AGGREGATE, Operation.BREAKDOWN}),
             dimensions=frozenset({Dimension.CUSTOMER_SEGMENT, Dimension.CUSTOMER_STATE}),
             filters=frozenset({FilterKind.CUSTOMER_SEGMENT}), snapshot=True,
+        ),
+        # -------------------------------------------------------------- FORECAST
+        Metric.DEMAND_FORECAST_P85: MetricDef(
+            metric=Metric.DEMAND_FORECAST_P85, family=MetricFamily.FORECAST, fact="demand_forecast", unit=Unit.UNITS,
+            label_pt="previsão quantílica P85 (percentil 85)",
+            display_pt="a previsão quantílica P85 (percentil 85)",
+            sentence_pt="A previsão quantílica P85 (percentil 85){scope} é de {value}.",
+            ranking_pt="maior previsão quantílica P85",
+            # Not a Power BI measure: the P85 output of the quantile model (unit_demand_forcast is the
+            # continuous forecast rounded up to whole units). It is NOT the expected (mean) demand.
+            pbi_source="",
+            value_alias="demand_forecast_p85",
+            aggregate="SUM(f.unit_demand_forcast)",
+            operations=frozenset({Operation.BREAKDOWN}),
+            dimensions=frozenset({Dimension.FORECAST_MONTH}),
+            filters=frozenset({FilterKind.PRODUCT_TEXT, FilterKind.LOCATION_TEXT}),
+            required_filters=frozenset({FilterKind.PRODUCT_TEXT, FilterKind.LOCATION_TEXT}),
+            fixed_shape=(Operation.BREAKDOWN, Dimension.FORECAST_MONTH),
+            snapshot=True,  # a fixed official window: no date filter, trend or time modifier
+            note_pt=(
+                "É um cenário mais conservador para planejamento de estoque "
+                "e não representa a demanda média esperada."
+            ),
+            no_data_message_pt=(
+                "Não há previsão P85 disponível para esse produto nessa loja em todos os três meses solicitados."
+            ),
         ),
     }
 )

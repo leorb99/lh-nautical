@@ -124,11 +124,18 @@ class _Builder:
         self.metric: MetricDef = METRICS[request.metric]
         # A position AS OF a date is read from the metric's history fact.
         self.fact: FactDef = FACTS[self.metric.historical_fact if request.as_of is not None else self.metric.fact]
+        # Where the fact's table lives: its own catalog/schema when the registry says so
+        # (validated like the App's), otherwise the App's DATA_CATALOG / DATA_SCHEMA.
+        self.fact_catalog = validate_identifier(self.fact.catalog, label="fact catalog") if self.fact.catalog else catalog
+        self.fact_schema = validate_identifier(self.fact.schema, label="fact schema") if self.fact.schema else schema
         self.parameters: dict[str, Any] = {}
 
     # -- names -----------------------------------------------------------
     def table(self, name: str) -> str:
         return f"{self.catalog}.{self.schema}.{name}"
+
+    def fact_table(self) -> str:
+        return f"{self.fact_catalog}.{self.fact_schema}.{self.fact.table}"
 
     # -- joins / columns ---------------------------------------------------
     def _needed_dimensions(self) -> list[Dimension]:
@@ -137,7 +144,9 @@ class _Builder:
         for kind in (FilterKind.CATEGORY, FilterKind.CUSTOMER_SEGMENT, FilterKind.INVENTORY_HEALTH_STATUS):
             if kind in filters.present():
                 needed.append(_FILTER_DIMENSION[kind])
-        needed.extend(TEXT_FILTERS[kind].dimension for kind in filters.text_filters())
+        needed.extend(
+            TEXT_FILTERS[kind].dimension for kind in filters.text_filters() if kind not in self.fact.text_columns
+        )
         return needed
 
     def joins(self) -> list[JoinSpec]:
@@ -187,6 +196,10 @@ class _Builder:
                 self.parameters[key] = value
                 names.append(f":{key}")
             predicates.append(f"{expr} IN ({', '.join(names)})")
+        if self.fact.official_window is not None:
+            # Name filters and eligibility live in the CTEs (see ``official_window_ctes``).
+            predicates.extend(self._official_window_predicates())
+            return predicates
         predicates.extend(self._text_predicates())
         return predicates
 
@@ -198,7 +211,8 @@ class _Builder:
         predicates: list[str] = []
         for kind, value in self.request.filters.text_filters().items():
             definition = TEXT_FILTERS[kind]
-            folded = f"translate(lower({definition.expr}), '{SQL_ACCENTS_FROM}', '{SQL_ACCENTS_TO}')"
+            column = self.fact.text_columns.get(kind, definition.expr)
+            folded = f"translate(lower({column}), '{SQL_ACCENTS_FROM}', '{SQL_ACCENTS_TO}')"
             for term_index, variants in enumerate(search_terms(value)):
                 alternatives = []
                 for variant_index, variant in enumerate(variants):
@@ -209,7 +223,9 @@ class _Builder:
         return predicates
 
     def from_lines(self) -> list[str]:
-        lines = [f"FROM {self.table(self.fact.table)} AS {self.fact.alias}"]
+        lines = [f"FROM {self.fact_table()} AS {self.fact.alias}"]
+        if self.fact.official_window is not None:
+            lines.append("CROSS JOIN bounds AS b")  # one row: the last month of the official window
         for join in self.joins():
             lines.append(f"{join.kind} JOIN {self.table(join.table)} AS {join.alias}")
             lines.append(f"    ON {join.on}")
@@ -302,7 +318,66 @@ class _Builder:
             select += ["GROUP BY"] + _indent(_comma(group_exprs))
         if self.request.positive_only:
             select += [f"HAVING {m.aggregate} > 0"]
-        return [], select
+        return self.official_window_ctes(), select
+
+    # -- official-window eligibility (model outputs) ---------------------------------------
+    def _window_month(self) -> str:
+        spec = self.fact.official_window
+        return f"CAST({self.fact.alias}.{spec.month_column} AS DATE)"
+
+    def _official_window_predicates(self) -> list[str]:
+        spec = self.fact.official_window
+        alias = self.fact.alias
+        self.parameters["official_version"] = spec.official_version
+        series = ", ".join(f"{alias}.{c}" for c in spec.series_columns)
+        plain = ", ".join(spec.series_columns)
+        return [
+            f"({series}) IN (SELECT {plain} FROM eligible)",  # only series that pass the rule
+            f"{alias}.{spec.version_column} = :official_version",
+            f"{self._window_month()} BETWEEN add_months(b.window_end, -{spec.months - 1}) AND b.window_end",
+            "(SELECT COUNT(*) FROM matched) = 1",  # the text filters name exactly one series
+        ]
+
+    def official_window_ctes(self) -> list[tuple[str, list[str]]]:
+        """CTEs of a fact with an official window: ``bounds`` (the window's last
+        month, from the official version's rows), ``matched`` (the series the
+        name filters select) and ``eligible`` (those of them that pass the
+        rule). Nothing here comes from the question except the filter terms,
+        which are bound parameters."""
+        spec = self.fact.official_window
+        if spec is None:
+            return []
+        for identifier in (*spec.series_columns, spec.month_column, spec.version_column, spec.generated_at_column, spec.value_column):
+            validate_identifier(identifier, label="official window column")
+        alias = self.fact.alias
+        table = self.fact_table()
+        self.parameters["official_version"] = spec.official_version
+        series = [f"{alias}.{c}" for c in spec.series_columns]
+        same_series = " AND ".join(f"{alias}.{c} = m.{c}" for c in spec.series_columns)
+        text = self._text_predicates()
+        bounds = [
+            "SELECT",
+            f"    CAST(MAX({alias}.{spec.month_column}) AS DATE) AS window_end",
+            f"FROM {table} AS {alias}",
+            f"WHERE {alias}.{spec.version_column} = :official_version",
+        ]
+        matched = ["SELECT DISTINCT"] + _indent(_comma(series)) + [f"FROM {table} AS {alias}"] + self.where_lines(text)
+        eligible = (
+            ["SELECT"]
+            + _indent(_comma(series))
+            + [f"FROM {table} AS {alias}", "CROSS JOIN bounds AS b", "INNER JOIN matched AS m", f"    ON {same_series}"]
+            + self.where_lines([f"{self._window_month()} BETWEEN add_months(b.window_end, -{spec.months - 1}) AND b.window_end"])
+            + ["GROUP BY"]
+            + _indent(_comma(series))
+            + [
+                f"HAVING COUNT(*) = {spec.months}",
+                f"    AND COUNT(DISTINCT {self._window_month()}) = {spec.months}",
+                f"    AND COUNT(CASE WHEN {alias}.{spec.version_column} = :official_version THEN 1 END) = {spec.months}",
+                f"    AND COUNT(DISTINCT {alias}.{spec.generated_at_column}) = 1",
+                f"    AND COUNT({alias}.{spec.value_column}) = {spec.months}",
+            ]
+        )
+        return [("bounds", bounds), ("matched", matched), ("eligible", eligible)]
 
     # -- assembling ----------------------------------------------------------
     def compile_plain(self) -> tuple[str, list[ColumnSpec]]:
@@ -349,7 +424,7 @@ class _Builder:
         if request.operation is Operation.BREAKDOWN:
             binding = self.fact.bindings[request.dimensions[0]]
             if binding.order_by:
-                order_items = [binding.order_by] + dim_names
+                order_items = list(dict.fromkeys([binding.order_by] + dim_names))
             else:
                 nulls = " NULLS LAST" if m.nullable_value else ""
                 order_items = [f"{m.value_alias} DESC{nulls}"] + dim_names
@@ -490,7 +565,7 @@ def compile_request(
     else:
         statement, columns = builder.compile_plain()
 
-    source_tables = (f"{schema}.{builder.fact.table}",) + tuple(f"{schema}.{join.table}" for join in builder.joins())
+    source_tables = (f"{builder.fact_schema}.{builder.fact.table}",) + tuple(f"{schema}.{join.table}" for join in builder.joins())
     return PreparedQuery(
         intent=intent,
         statement=statement,

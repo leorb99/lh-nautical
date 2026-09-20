@@ -52,7 +52,7 @@ from src.structured.semantic_model import (
     Unit,
 )
 
-__all__ = ["format_quantity", "render_structured_answer"]
+__all__ = ["format_quantity", "no_data_message", "render_structured_answer"]
 
 _UNKNOWN_LABEL = "(não informado)"
 
@@ -348,7 +348,9 @@ def _metric_text(table: AnalyticalTable, row: tuple, metric: MetricDef) -> str:
 def _dimension_notes(request) -> list[str]:
     """Rules a dimension applies that the reader should know (e.g. which
     employees the salesperson ranking considers)."""
-    return [DIMENSIONS[d].scope_note_pt for d in request.dimensions if DIMENSIONS[d].scope_note_pt]
+    notes = [DIMENSIONS[d].scope_note_pt for d in request.dimensions if DIMENSIONS[d].scope_note_pt]
+    note = METRICS[request.metric].note_pt  # a caveat of the metric itself (e.g. what a P85 forecast is)
+    return notes + ([note] if note else [])
 
 
 def _capitalize(text: str) -> str:
@@ -413,6 +415,22 @@ def _render_breakdown(request, table: AnalyticalTable, metric: MetricDef) -> lis
     return lines
 
 
+def _render_forecast_series(table: AnalyticalTable, metric: MetricDef) -> list[str]:
+    """The months of ONE forecast series (one product in one store), chronological.
+    The query already guarantees a single eligible series; if that ever fails, nothing is shown."""
+    month_i, product_i, location_i = (table.column_index(n) for n in ("forecast_month", "product_name", "location_name"))
+    rows = sorted(table.rows, key=lambda row: row[month_i])
+    series = {(row[product_i], row[location_i]) for row in rows}
+    if len(series) != 1:
+        raise UnsupportedIntentError("a forecast is shown for exactly one product in one store")
+    product, location = next(iter(series))
+    span, _ = _trend_span(TimeGrain.MONTH, rows[0][month_i], rows[-1][month_i])
+    subject = _capitalize(metric.display_pt.split(" ", 1)[1])  # "previsão quantílica P85 (percentil 85)"
+    lines = [f"{subject} para {product} em {location}, {_lower_first(span)}:", ""]
+    lines += [f"- {_period_label(row[month_i], TimeGrain.MONTH)} — {_metric_text(table, row, metric)}" for row in rows]
+    return lines
+
+
 def _render_ranking(request, table: AnalyticalTable, metric: MetricDef) -> list[str]:
     dimension = request.dimensions[0]
     definition = DIMENSIONS[dimension]
@@ -462,6 +480,8 @@ def _render_analytical(result: StructuredResult) -> str:
         lines = _render_aggregate(request, table, metric)
     elif operation is Operation.TREND:
         lines = _render_trend(request, table, metric)
+    elif operation is Operation.BREAKDOWN and request.dimensions == (Dimension.FORECAST_MONTH,):
+        lines = _render_forecast_series(table, metric)
     elif operation is Operation.BREAKDOWN:
         lines = _render_breakdown(request, table, metric)
     else:  # RANKING
@@ -478,6 +498,17 @@ def _legacy_table(rows: tuple[TopProductRow, ...]) -> AnalyticalTable:
         ColumnSpec("quantity_sold", ColumnType.INT, ColumnRole.METRIC),
     )
     return AnalyticalTable(columns, tuple((r.rank, r.product_id, r.product_name, r.quantity_sold) for r in rows))
+
+
+def no_data_message(result: StructuredResult | None) -> str | None:
+    """What to say when a query returned no rows, if its metric has its own wording
+    (a forecast series without complete P85 coverage of the official months: the rule checks
+    coverage and integrity of the output, not statistical quality); ``None`` = the generic
+    "no information" message."""
+    request = getattr(result, "request", None)
+    if request is None:
+        return None
+    return METRICS[request.metric].no_data_message_pt or None
 
 
 def render_structured_answer(result: StructuredResult) -> str:
