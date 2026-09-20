@@ -32,6 +32,7 @@ import mlflow
 from databricks.sdk import WorkspaceClient
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.evaluation.citations import check_citation_integrity
@@ -88,7 +89,7 @@ if _mlflow_experiment_id:
 
 # Exactly once per process — never per request. See tracing.py; not
 # modified here, not reimplemented here.
-enable_autolog()
+# enable_autolog()
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +209,18 @@ def ask(request: AskRequest) -> JSONResponse:
         message="This request type is not supported yet.",
     )
     return JSONResponse(status_code=500, content=body.model_dump())
+
+
+# ---------------------------------------------------------------------------
+# Frontend — static files served from the same origin as /api/ask. Mounted
+# last, after every API route above, so FastAPI/Starlette keeps matching
+# /api/ask first; this mount only catches whatever isn't already handled.
+# Serving the frontend from this same process means a same-origin
+# fetch('/api/ask') from static/script.js, with no CORS to configure and
+# no bearer token to manage in the browser — the Databricks Apps platform
+# session handles auth for anyone opening this App from inside the workspace.
+# ---------------------------------------------------------------------------
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 if __name__ == "__main__":
