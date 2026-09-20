@@ -101,3 +101,32 @@ resources:
             environment_version: "3"
             dependencies:
               - dbt-databricks 
+
+    job_demand_forecast_products:
+      name: "Demand Forecast Products (ML)" 
+      # Executar o Job todo segundo dia do mês
+      schedule:
+        quartz_cron_expression: "0 1 0 2 * ?"
+        timezone_id: "America/Sao_Paulo"
+        pause_status: "UNPAUSED"
+
+      # Quando entrar no expect um e-mail é disparado nos e-mail cadastrados
+      email_notifications:
+        on_failure:
+          - "adriano.takata@indicium.ai"
+          - "gabriel.freitas@indicium.ai"
+          - "natalia.correia@indicium.ai"
+          - "leonardo.barbosa@indicium.ai"
+          #- "time-dados@suaempresa.com" # Pode colocar mais de um e-mail se quiser
+  
+      tasks:
+        - task_key: "Demand_Forecast_Products"
+          notebook_task:
+            notebook_path: ../src/ml/demand_forecast_store_product.ipynb
+            base_parameters:
+              catalog_name: ${var.catalog_name}
+              schema: gold
+          # Configuração de Retry
+          max_retries: 3
+          min_retry_interval_millis: 3600000
+          retry_on_timeout: true
