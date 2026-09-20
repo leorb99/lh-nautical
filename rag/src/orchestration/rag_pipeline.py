@@ -18,12 +18,11 @@ than getting a single opaque string back.
 What this pipeline does NOT do (reserved for the future AI Harness /
 Phase 6 — see that phase's design, not implemented here):
 - decide AI Search vs. structured/Delta/SQL data, or fetch structured
-  evidence at all — no structured-data provider exists yet in this
-  codebase (Phase 5A.1 removed the placeholder ``StructuredEvidence``/
-  ``StructuredDataProvider`` interface that had zero real callers; a future
-  Harness that has a real structured-data source can extend
-  :func:`build_context_blocks` / :meth:`RagOrchestrator.generate` again once
-  one exists, rather than carrying a speculative interface until then);
+  evidence — the Harness does that (Phase 6B.1). This module contains no
+  SQL and no structured-data client, and it never sees or reproduces
+  structured values: for a combined question it only writes the
+  *documentary explanation* (see ``values_shown_separately``); the values
+  themselves are rendered deterministically elsewhere;
 - score or gate evidence sufficiency;
 - validate citations;
 - apply guardrails;
@@ -52,6 +51,7 @@ __all__ = [
     "chunks_to_evidence_and_nodes",
     "build_context_blocks",
     "GROUNDING_PROMPT_TEMPLATE",
+    "EXPLANATION_PROMPT_TEMPLATE",
     "PolicyRetriever",
     "OrchestrationResult",
     "RagOrchestrator",
@@ -172,6 +172,19 @@ def build_context_blocks(evidence: Sequence[RetrievedEvidence]) -> str:
 # does not support a claim; cite source labels for factual claims.
 # Deliberately small — this is not the future AI Harness prompt (guardrails,
 # evidence-sufficiency gating, etc. are out of scope here).
+
+# Answer-style rules shared by every template below (Phase 6B.1): they shape
+# how the answer reads, never what the evidence says.
+_STYLE_RULES = (
+    "- Answer in the same language as the question.\n"
+    "- Start with the direct answer, in natural language. Do not open with a "
+    "preamble such as \"According to the evidence\" and do not repeat the "
+    "question.\n"
+    "- Be concise unless the question asks for detail.\n"
+    "- Do not include code, DAX or SQL unless the question explicitly asks "
+    "for it.\n"
+)
+
 GROUNDING_PROMPT_TEMPLATE = PromptTemplate(
     "You are answering a question using ONLY the evidence blocks below, "
     "retrieved from this project's canonical knowledge base.\n\n"
@@ -184,9 +197,40 @@ GROUNDING_PROMPT_TEMPLATE = PromptTemplate(
     "- If the evidence does not support a factual assertion needed to "
     "answer the question, say so plainly instead of guessing.\n"
     "- When you make a factual claim, cite the source label(s) it comes "
-    "from, e.g. [S1].\n"
-    "- Do not use outside/general knowledge beyond what is in the evidence.\n\n"
-    "Evidence:\n{context_str}\n\n"
+    "from, e.g. [S1], at the end of the sentence it supports.\n"
+    "- Do not use outside/general knowledge beyond what is in the evidence.\n"
+    + _STYLE_RULES
+    + "\nEvidence:\n{context_str}\n\n"
+    "Question: {query_str}\n"
+    "Answer:"
+)
+
+# Combined (BOTH) route: the live values are computed and rendered
+# deterministically, outside the model, and shown to the user in their own
+# block. The model is only asked for the documentary explanation; it never
+# sees, restates or ranks the values. Citations, as always, attach only to
+# documentary claims.
+EXPLANATION_PROMPT_TEMPLATE = PromptTemplate(
+    "You are answering the explanatory part of a question using ONLY the "
+    "evidence blocks below, retrieved from this project's canonical "
+    "knowledge base.\n\n"
+    "The question also asks for live data values (for example a ranking with "
+    "quantities). Those values are computed separately and shown to the user "
+    "in another block; you do not have them.\n\n"
+    "Rules:\n"
+    "- Write ONLY the explanation of the rule, definition or calculation "
+    "method the question asks about. Do not list, restate, estimate or "
+    "invent any ranking, product name, rank or quantity.\n"
+    "- Answer using only the information present in the evidence blocks.\n"
+    "- Do not invent business rules, identifiers, or numeric values that are "
+    "not explicitly present in the evidence.\n"
+    "- If the evidence does not support what is needed to explain, say so "
+    "plainly instead of guessing.\n"
+    "- When you make a factual claim, cite the source label(s) it comes "
+    "from, e.g. [S1], at the end of the sentence it supports.\n"
+    "- Do not use outside/general knowledge beyond what is in the evidence.\n"
+    + _STYLE_RULES
+    + "\nEvidence:\n{context_str}\n\n"
     "Question: {query_str}\n"
     "Answer:"
 )
@@ -272,6 +316,17 @@ class OrchestrationResult:
     usage: dict[str, Any] | None = field(default=None)
 
 
+def _usage_from_response(response: Any) -> dict[str, Any] | None:
+    raw_usage = (response.raw or {}).get("usage") if isinstance(response.raw, dict) else None
+    if raw_usage is None:
+        return None
+    return {
+        "prompt_tokens": getattr(raw_usage, "prompt_tokens", None),
+        "completion_tokens": getattr(raw_usage, "completion_tokens", None),
+        "total_tokens": getattr(raw_usage, "total_tokens", None),
+    }
+
+
 def _evidence_to_source_dict(e: RetrievedEvidence) -> dict[str, Any]:
     return {
         "source_label": e.source_label,
@@ -308,6 +363,7 @@ class RagOrchestrator:
         query: str,
         *,
         retrieval_decision: RetrievalPolicyDecision | None = None,
+        values_shown_separately: bool = False,
     ) -> OrchestrationResult:
         """Run one retrieval call (via the existing policy) followed by, at
         most, one generation call.
@@ -318,6 +374,15 @@ class RagOrchestrator:
         classification. A caller (e.g. a future Harness that already
         computed/overrode a decision) may pass one in directly; the
         decision object stays fully inspectable on the result either way.
+
+        ``values_shown_separately``: normally ``False`` (documentary-only,
+        exactly the pre-6B.1 behavior). The Harness sets it for the
+        documentary half of a combined question whose live values it already
+        rendered deterministically: the prompt then asks the model for the
+        explanation only. Retrieval, the empty-retrieval guard and the
+        returned sources are identical either way — the natural user
+        ``query`` is what reaches AI Search, and no structured data is passed
+        to this method, so the model cannot rewrite it.
         """
         total_start = time.monotonic()
         decision = retrieval_decision or classify_query(query, self._policy_config)
@@ -351,25 +416,19 @@ class RagOrchestrator:
             )
 
         context_str = build_context_blocks(evidence)
-        prompt = GROUNDING_PROMPT_TEMPLATE.format(context_str=context_str, query_str=query)
+        template = EXPLANATION_PROMPT_TEMPLATE if values_shown_separately else GROUNDING_PROMPT_TEMPLATE
+        prompt = template.format(context_str=context_str, query_str=query)
 
         generation_start = time.monotonic()
         response = self._llm.complete(prompt)
         generation_latency_s = time.monotonic() - generation_start
 
-        usage = None
-        raw_usage = (response.raw or {}).get("usage") if isinstance(response.raw, dict) else None
-        if raw_usage is not None:
-            usage = {
-                "prompt_tokens": getattr(raw_usage, "prompt_tokens", None),
-                "completion_tokens": getattr(raw_usage, "completion_tokens", None),
-                "total_tokens": getattr(raw_usage, "total_tokens", None),
-            }
+        usage = _usage_from_response(response)
 
         return OrchestrationResult(
             query=query,
             answer=response.text,
-            evidence_available=True,
+            evidence_available=bool(evidence),
             sources=[_evidence_to_source_dict(e) for e in evidence],
             retrieval_policy_decision=decision,
             model=self._llm.model_endpoint,

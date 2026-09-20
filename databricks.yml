@@ -69,3 +69,7 @@ targets:
         level: CAN_MANAGE
       - group_name: users
         level: CAN_RUN
+# Files used locally but not required by the Databricks App deployment.
+sync:
+  exclude:
+    - "rag/Dashboard LH Nautical.pbix"

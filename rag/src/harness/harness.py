@@ -1,8 +1,8 @@
-"""AI Harness — Phase 1 minimal core.
+"""AI Harness — control layer above the RAG runtime and structured data.
 
 A thin application-level control layer above the existing RAG runtime
-(``src.orchestration.rag_pipeline.RagOrchestrator``) and a future
-Structured Data provider. Based on the "AI Harness — Phase 0: Architecture
+(``src.orchestration.rag_pipeline.RagOrchestrator``) and the structured-data
+layer (``src.structured``). Based on the "AI Harness — Phase 0: Architecture
 Preflight" review; see that report for the full design rationale this
 module intentionally does not repeat.
 
@@ -10,41 +10,56 @@ Scope boundary, restated because it is easy to blur in a control layer:
 
 - **Retrieval Policy** (``src.retrieval.policy``) decides *how* AI Search
   retrieves evidence once AI Search has been chosen as (part of) the
-  source — query classification, Top-K, filtering. This module never
-  reimplements, duplicates, or bypasses that.
-- **AI Harness** (this module) decides *which* source family a request
-  needs (:class:`SourceRoute`) and what controls wrap execution
-  (availability handling, controlled degradation, failure containment).
-  It never talks to AI Search or the Llama serving endpoint directly —
-  every AI Search / generation call goes through
+  source — query classification (``EXACT_RULE_ID``/``NORMAL``/
+  ``CROSS_SOURCE``), Top-K, filtering. This module never reimplements,
+  duplicates, or bypasses that.
+- **Source routing** (:class:`SourceRoute`, decided by an injected
+  :class:`SourceRouter`) is a different, higher layer: it decides *which
+  source family* a request needs — ``AI_SEARCH``, ``STRUCTURED_DATA`` or
+  ``BOTH``. The two layers are kept separate on purpose.
+- **AI Harness** (this module) coordinates the sources and the controls
+  that wrap execution (availability handling, controlled degradation,
+  failure containment). It never talks to AI Search, a SQL Warehouse, or
+  the Llama serving endpoint directly: documentary evidence goes through
   :meth:`~src.orchestration.rag_pipeline.RagOrchestrator.generate`
-  unchanged.
+  unchanged, and live analytical data goes through an injected
+  ``structured_query_service`` (an allowlisted, deterministic query
+  service — never model-generated SQL).
 
-What this module deliberately does NOT do (Phase 1):
-- infer :class:`SourceRoute` from query text — no semantic/keyword router
-  exists yet; the real Structured Data contract doesn't exist yet either,
-  so any keyword vocabulary written today would be a guess, not
-  evidence-derived routing (see ``src.retrieval.policy`` for what
-  evidence-derived routing actually looks like once it *can* be built);
-- implement a real ``StructuredDataProvider`` — no Delta table, catalog,
-  schema, or SQL is referenced anywhere in this module;
-- merge AI Search evidence and structured evidence into one generation
-  call — that needs a real structured-evidence shape to design against;
-- validate citations, apply guardrails, or do MLflow tracing — all
-  explicitly future work per the Phase 0 review.
+Behavior when nothing is injected is exactly the original Phase 1 behavior:
+no router means every request defaults to ``AI_SEARCH``, and the legacy
+``structured_data_provider`` placeholder keeps its original semantics.
+
+Provenance stays separate: documentary evidence carries ``[Sn]`` source
+labels (via ``rag_result.sources``); structured evidence lives on
+``structured_result`` and is never given a fake ``[Sn]`` citation. Structured
+values reach the user only through
+:func:`~src.structured.rendering.render_structured_answer` — plain code, not
+a model — so a language model can neither rewrite nor truncate them. A model
+is used only for the documentary explanation of a ``BOTH`` question.
+
+What this module deliberately does NOT do:
+- generate SQL, or accept SQL from a caller;
+- validate citations or do MLflow tracing — see
+  ``src.evaluation.citations`` and ``src.harness.tracing``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 
 from src.orchestration.rag_pipeline import OrchestrationResult, RagOrchestrator
+from src.structured.models import StructuredIntent, StructuredResult
+from src.structured.rendering import render_structured_answer
 
 __all__ = [
     "SourceRoute",
     "DEFAULT_SOURCE_ROUTE",
+    "RouteDecision",
+    "SourceRouter",
+    "StructuredQueryRunner",
     "StructuredEvidence",
     "StructuredDataProvider",
     "HarnessStatus",
@@ -71,6 +86,36 @@ class SourceRoute(Enum):
 #: once one exists) explicitly supplies a route. This is intentional, not
 #: a placeholder for a missing default value.
 DEFAULT_SOURCE_ROUTE = SourceRoute.AI_SEARCH
+
+
+@dataclass(frozen=True)
+class RouteDecision:
+    """Outcome of source routing for one query.
+
+    ``unsupported_reason`` is set when the request needs live structured
+    values that no implemented intent can produce: the Harness then returns
+    a controlled "unsupported" outcome instead of falling back to
+    documentation, which would answer a data question with a description of
+    how the data is calculated.
+    """
+
+    route: SourceRoute
+    structured_intent: StructuredIntent | None = None
+    structured_params: Mapping[str, Any] = field(default_factory=dict)
+    unsupported_reason: str | None = None
+    reason: str = ""
+
+
+class SourceRouter(Protocol):
+    def route(self, query: str) -> RouteDecision:
+        """Deterministically decide which source family ``query`` needs."""
+        ...
+
+
+class StructuredQueryRunner(Protocol):
+    """The slice of ``StructuredQueryService`` the Harness relies on."""
+
+    def execute(self, intent: StructuredIntent, params: Mapping[str, Any] | None = None) -> StructuredResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +200,29 @@ class HarnessStatus(Enum):
     #: status is raised whenever any of those fail, not only generation
     #: itself.
     RAG_EXECUTION_FAILED = "RAG_EXECUTION_FAILED"
+    #: STRUCTURED_DATA route executed; ``answer`` is the deterministic
+    #: rendering of ``structured_result`` — no model is involved.
+    STRUCTURED_DATA_OK = "STRUCTURED_DATA_OK"
+    #: BOTH route, complete: ``answer`` is the deterministic rendering of
+    #: ``structured_result`` followed by the model-written documentary
+    #: explanation (``rag_result``, whose sources carry the ``[Sn]`` labels).
+    BOTH_OK = "BOTH_OK"
+    #: BOTH route where the structured values were obtained and rendered but
+    #: the documentary explanation is missing — either retrieval found no
+    #: evidence or the AI Search/generation call failed technically
+    #: (``error`` says which). ``answer`` is the structured rendering alone;
+    #: valid live data is never discarded because an explanation is missing.
+    BOTH_DEGRADED = "BOTH_DEGRADED"
+    #: The structured query ran successfully but returned no rows. No
+    #: documentation-only answer is substituted for missing values.
+    STRUCTURED_DATA_NO_DATA = "STRUCTURED_DATA_NO_DATA"
+    #: The structured query failed — invalid parameters, executor/warehouse
+    #: failure, or malformed rows. No documentation-only answer is
+    #: substituted for missing values.
+    STRUCTURED_DATA_FAILED = "STRUCTURED_DATA_FAILED"
+    #: The question needs live values that no implemented structured intent
+    #: can produce. Nothing was executed and RAG was not used as a substitute.
+    STRUCTURED_DATA_UNSUPPORTED = "STRUCTURED_DATA_UNSUPPORTED"
 
 
 @dataclass(frozen=True)
@@ -183,6 +251,13 @@ class HarnessResult:
     #: Human-readable, non-sensitive failure/validation detail; set only
     #: when status is INVALID_REQUEST or RAG_EXECUTION_FAILED.
     error: str | None = None
+    #: Live structured evidence, when the structured route ran successfully.
+    #: Kept separate from ``rag_result.sources`` — never given a ``[Sn]`` label.
+    structured_result: StructuredResult | None = None
+    #: Final user-facing answer for ``STRUCTURED_DATA_OK``, ``BOTH_OK`` and
+    #: ``BOTH_DEGRADED``. For the pure AI_SEARCH route the answer stays on
+    #: ``rag_result.answer``.
+    answer: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -200,17 +275,23 @@ class AIHarness:
         self,
         orchestrator: RagOrchestrator,
         structured_data_provider: StructuredDataProvider | None = None,
+        *,
+        structured_query_service: StructuredQueryRunner | None = None,
+        source_router: SourceRouter | None = None,
     ) -> None:
         self._orchestrator = orchestrator
         self._structured_data_provider = structured_data_provider
+        self._structured_query_service = structured_query_service
+        self._source_router = source_router
 
     def ask(self, query: str, *, source_route: SourceRoute | None = None) -> HarnessResult:
         """Answer ``query`` via the requested source route.
 
-        ``source_route``: normally left ``None``, in which case
-        :data:`DEFAULT_SOURCE_ROUTE` (``AI_SEARCH``) is used — Phase 1 has
-        no semantic router (see module docstring). Tests and future
-        callers may pass a route explicitly.
+        ``source_route``: normally left ``None``. With an injected
+        :class:`SourceRouter` the route is decided from the query text;
+        without one, :data:`DEFAULT_SOURCE_ROUTE` (``AI_SEARCH``) is used —
+        the original Phase 1 behavior. Tests and callers may still pass a
+        route explicitly.
 
         Validates ``query`` before touching any route: an invalid query
         never reaches ``RagOrchestrator`` or ``StructuredDataProvider``,
@@ -228,8 +309,27 @@ class AIHarness:
                 error="query must be a non-empty, non-whitespace string",
             )
 
+        decision = self._source_router.route(query) if self._source_router is not None else None
+        if source_route is None and decision is not None:
+            route = decision.route
+
         if route is SourceRoute.AI_SEARCH:
             return self._ask_ai_search(query, route)
+
+        # Structured routes (STRUCTURED_DATA / BOTH).
+        if self._structured_query_service is not None:
+            return self._ask_with_structured_service(query, route, decision)
+        if decision is not None and decision.unsupported_reason is not None:
+            return self._unsupported_result(query, route, decision)
+        if source_route is None and self._structured_data_provider is None:
+            # Auto-routed to a structured route, but nothing is configured to
+            # run it: fail closed rather than answering from documentation.
+            return HarnessResult(
+                query=query,
+                source_route=route,
+                status=HarnessStatus.STRUCTURED_DATA_UNAVAILABLE,
+                rag_result=None,
+            )
         if route is SourceRoute.STRUCTURED_DATA:
             return self._ask_structured_data(query, route)
         return self._ask_both(query, route)
@@ -267,6 +367,113 @@ class AIHarness:
             source_route=route,
             status=status,
             rag_result=rag_result,
+        )
+
+    @staticmethod
+    def _unsupported_result(query: str, route: SourceRoute, decision: RouteDecision | None) -> HarnessResult:
+        reason = decision.unsupported_reason if decision is not None else None
+        return HarnessResult(
+            query=query,
+            source_route=route,
+            status=HarnessStatus.STRUCTURED_DATA_UNSUPPORTED,
+            rag_result=None,
+            error=reason or "no supported structured intent was resolved for this request",
+        )
+
+    def _ask_with_structured_service(
+        self, query: str, route: SourceRoute, decision: RouteDecision | None
+    ) -> HarnessResult:
+        """STRUCTURED_DATA and BOTH, backed by the allowlisted structured
+        query service. The values are computed and rendered first,
+        deterministically; if they cannot be produced, the request fails
+        closed — documentation alone is never substituted for the requested
+        values. No model ever reproduces them."""
+        intent = decision.structured_intent if decision is not None else None
+        if intent is None:
+            return self._unsupported_result(query, route, decision)
+
+        try:
+            structured = self._structured_query_service.execute(intent, decision.structured_params)  # type: ignore[union-attr]
+            structured_answer = render_structured_answer(structured) if structured.row_count else ""
+        except Exception as exc:  # noqa: BLE001 — the structured execution
+            # boundary: every failure (invalid parameters, executor,
+            # malformed rows, rendering) becomes one controlled outcome.
+            return HarnessResult(
+                query=query,
+                source_route=route,
+                status=HarnessStatus.STRUCTURED_DATA_FAILED,
+                rag_result=None,
+                error=str(exc),
+            )
+
+        if structured.row_count == 0:
+            return HarnessResult(
+                query=query,
+                source_route=route,
+                status=HarnessStatus.STRUCTURED_DATA_NO_DATA,
+                rag_result=None,
+                structured_result=structured,
+                structured_data_available=True,
+            )
+
+        if route is SourceRoute.STRUCTURED_DATA:
+            return HarnessResult(
+                query=query,
+                source_route=route,
+                status=HarnessStatus.STRUCTURED_DATA_OK,
+                rag_result=None,
+                structured_result=structured,
+                structured_data_available=True,
+                answer=structured_answer,
+            )
+
+        # BOTH: the values are already final (rendered above, outside any
+        # model). The model is only asked for the documentary explanation,
+        # and the natural-language query is what reaches retrieval. A missing
+        # or failed explanation degrades the answer; it never discards data.
+        try:
+            rag_result = self._orchestrator.generate(query, values_shown_separately=True)
+        except Exception as exc:  # noqa: BLE001 — same boundary as AI_SEARCH
+            return self._both_degraded(
+                query, route, structured, structured_answer, f"documentary explanation failed: {exc}"
+            )
+        if not rag_result.evidence_available or not rag_result.answer:
+            return self._both_degraded(
+                query,
+                route,
+                structured,
+                structured_answer,
+                "no documentary evidence was retrieved for the explanation",
+                rag_result=rag_result,
+            )
+        return HarnessResult(
+            query=query,
+            source_route=route,
+            status=HarnessStatus.BOTH_OK,
+            rag_result=rag_result,
+            structured_result=structured,
+            structured_data_available=True,
+            answer=f"{structured_answer}\n\n{rag_result.answer}",
+        )
+
+    @staticmethod
+    def _both_degraded(
+        query: str,
+        route: SourceRoute,
+        structured: StructuredResult,
+        structured_answer: str,
+        reason: str,
+        rag_result: OrchestrationResult | None = None,
+    ) -> HarnessResult:
+        return HarnessResult(
+            query=query,
+            source_route=route,
+            status=HarnessStatus.BOTH_DEGRADED,
+            rag_result=rag_result,
+            error=reason,
+            structured_result=structured,
+            structured_data_available=True,
+            answer=structured_answer,
         )
 
     def _provider_available(self) -> bool:

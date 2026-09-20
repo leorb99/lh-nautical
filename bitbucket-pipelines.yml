@@ -10,6 +10,10 @@ pipelines:
       - step:
           name: "Lint + dbt build (Pré-Merge)"
           image: python:3.11
+          condition:
+            changesets:
+              includePaths:
+                - "dbt_lh_nautical/**"
           script:
             - |
               if [ "$BITBUCKET_PR_DESTINATION_BRANCH" != "develop" ]; then
@@ -51,6 +55,21 @@ pipelines:
               {% endmacro %}
               EOF
               dbt run-operation drop_ci_transformed_schemas || true
+
+      - step:
+          name: "Bundle validate (Pré-Merge)"
+          condition:
+            changesets:
+              includePaths:
+                - "databricks.yml"
+                - "resources/**"
+          script:
+            - |
+              if [ "$BITBUCKET_PR_DESTINATION_BRANCH" != "develop" ]; then
+                echo "Destino não é develop ($BITBUCKET_PR_DESTINATION_BRANCH), pulando."
+                exit 0
+              fi
+              databricks bundle validate -t dev
 
     # Cenário B: alguém abriu um Pull Request de 'develop' -> 'main'. Aqui a origem do PR realmente
     # é 'develop', então a chave já casa direto com o cenário pretendido, sem precisar de checagem em runtime.

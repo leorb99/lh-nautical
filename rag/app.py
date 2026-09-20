@@ -38,8 +38,13 @@ from pydantic import BaseModel
 from src.evaluation.citations import check_citation_integrity
 from src.generation.llama_client import DatabricksLlamaLLM, DEFAULT_MODEL_ENDPOINT
 from src.harness.harness import AIHarness, HarnessStatus
+from src.harness.source_router import RuleBasedSourceRouter
 from src.harness.tracing import enable_autolog, traced_ask
 from src.orchestration.rag_pipeline import RagOrchestrator
+from src.structured.config import StructuredDataConfig
+from src.structured.executor import DatabricksSqlExecutor
+from src.structured.rendering import no_data_message
+from src.structured.service import StructuredQueryService
 
 logger = logging.getLogger("rag.app")
 
@@ -71,7 +76,29 @@ _MODEL_ENDPOINT = os.environ.get("RAG_MODEL_ENDPOINT", DEFAULT_MODEL_ENDPOINT)
 _client = WorkspaceClient()
 _llm = DatabricksLlamaLLM(client=_client, model_endpoint=_MODEL_ENDPOINT)
 _orchestrator = RagOrchestrator(client=_client, index_name=_INDEX_NAME, llm=_llm)
-harness = AIHarness(orchestrator=_orchestrator)
+
+# Structured data (live analytics over the Gold layer) is enabled only when a
+# SQL Warehouse is configured. DATA_CATALOG falls back to the same Bundle
+# catalog as RAG_CATALOG and DATA_SCHEMA to "gold"; SQL_WAREHOUSE_ID has no
+# default. Without it, structured questions get a controlled "unavailable"
+# outcome — never a documentation-only answer to a data question.
+_structured_config = StructuredDataConfig.from_env(os.environ, default_catalog=_CATALOG)
+_structured_service = (
+    StructuredQueryService(
+        DatabricksSqlExecutor(_client, warehouse_id=_structured_config.warehouse_id),
+        catalog=_structured_config.catalog,
+        schema=_structured_config.schema,
+        warehouse_id=_structured_config.warehouse_id,
+    )
+    if _structured_config is not None
+    else None
+)
+
+harness = AIHarness(
+    orchestrator=_orchestrator,
+    structured_query_service=_structured_service,
+    source_router=RuleBasedSourceRouter(),
+)
 
 # Where traces go — a deployment concern, deliberately not hardcoded here
 # (never the Phase 2A/2B throwaway spike path) and not configured inside
@@ -94,7 +121,11 @@ if _mlflow_experiment_id:
 
 # ---------------------------------------------------------------------------
 # API contract — frozen for V1. The caller sends only `query`; it has no
-# way to see or choose SourceRoute, RetrievalRoute, top_k, or a model.
+# way to see or choose SourceRoute, RetrievalRoute, top_k, or a model. Source
+# routing (AI_SEARCH / STRUCTURED_DATA / BOTH) is decided internally by the
+# Harness and is never exposed: the internal statuses it produces are mapped
+# onto the existing public statuses below, so the frontend contract is
+# unchanged.
 # ---------------------------------------------------------------------------
 
 
@@ -145,70 +176,78 @@ def _citation_integrity_out(answer: str | None, sources: list[dict]) -> Citation
     )
 
 
+def _answer_response(answer: str | None, sources: list[dict]) -> JSONResponse:
+    # Public status stays "AI_SEARCH_OK" for every successfully answered
+    # request, whichever internal route produced it (documentary,
+    # structured, or both) — the frontend contract is unchanged. `sources`
+    # only ever carries documentary evidence ([Sn] citations); structured
+    # values are never given a fake source entry.
+    body = AskResponse(
+        status=HarnessStatus.AI_SEARCH_OK.value,
+        answer=answer,
+        sources=[SourceOut(**source) for source in sources],
+        citation_integrity=_citation_integrity_out(answer, sources),
+        message=None,
+    )
+    return JSONResponse(status_code=200, content=body.model_dump())
+
+
+def _no_answer_response(status_code: int, status: str, message: str) -> JSONResponse:
+    body = AskResponse(status=status, answer=None, sources=[], citation_integrity=None, message=message)
+    return JSONResponse(status_code=status_code, content=body.model_dump())
+
+
 @app.post("/api/ask", response_model=AskResponse)
 def ask(request: AskRequest) -> JSONResponse:
-    # AI_SEARCH is the only route V1 callers can reach — source_route is
-    # never accepted from the request body, so the Harness always falls
-    # back to its own DEFAULT_SOURCE_ROUTE (AI_SEARCH) internally.
+    # The route (AI_SEARCH / STRUCTURED_DATA / BOTH) is decided by the
+    # Harness's source router from the query text; it is never accepted from
+    # the request body.
     result = traced_ask(harness, request.query)
     status = result.status
 
     if status is HarnessStatus.AI_SEARCH_OK:
         rag = result.rag_result
-        body = AskResponse(
-            status=status.value,
-            answer=rag.answer,
-            sources=[SourceOut(**source) for source in rag.sources],
-            citation_integrity=_citation_integrity_out(rag.answer, rag.sources),
-            message=None,
-        )
-        return JSONResponse(status_code=200, content=body.model_dump())
+        return _answer_response(rag.answer, rag.sources)
 
-    if status is HarnessStatus.AI_SEARCH_NO_EVIDENCE:
-        body = AskResponse(
-            status=status.value,
-            answer=None,
-            sources=[],
-            citation_integrity=None,
-            message="No relevant information was found for this question.",
+    if status is HarnessStatus.BOTH_OK:
+        # Deterministic structured block + documentary explanation; only the
+        # documentary evidence is a source.
+        return _answer_response(result.answer, result.rag_result.sources)
+
+    if status is HarnessStatus.STRUCTURED_DATA_OK:
+        return _answer_response(result.answer, [])
+
+    if status is HarnessStatus.BOTH_DEGRADED:
+        # The requested values are valid and complete; only the documentary
+        # explanation is missing. Return them (no documentary sources)
+        # instead of failing the whole request.
+        logger.warning("BOTH_DEGRADED for query=%r: %s", request.query, result.error)
+        return _answer_response(result.answer, [])
+
+    if status in (HarnessStatus.AI_SEARCH_NO_EVIDENCE, HarnessStatus.STRUCTURED_DATA_NO_DATA):
+        # A structured metric may have its own wording (a forecast without complete P85 coverage); same status.
+        message = no_data_message(result.structured_result) or "No relevant information was found for this question."
+        return _no_answer_response(200, HarnessStatus.AI_SEARCH_NO_EVIDENCE.value, message)
+
+    if status is HarnessStatus.STRUCTURED_DATA_UNSUPPORTED:
+        logger.info("Unsupported structured request for query=%r: %s", request.query, result.error)
+        return _no_answer_response(
+            200,
+            HarnessStatus.AI_SEARCH_NO_EVIDENCE.value,
+            "Esta consulta ainda não é suportada pelos dados estruturados disponíveis.",
         )
-        return JSONResponse(status_code=200, content=body.model_dump())
 
     if status is HarnessStatus.INVALID_REQUEST:
-        body = AskResponse(
-            status=status.value,
-            answer=None,
-            sources=[],
-            citation_integrity=None,
-            message="Please provide a non-empty question.",
-        )
-        return JSONResponse(status_code=400, content=body.model_dump())
+        return _no_answer_response(400, status.value, "Please provide a non-empty question.")
 
-    if status is HarnessStatus.RAG_EXECUTION_FAILED:
-        # result.error is never exposed to the caller — only to server logs.
-        logger.error("RAG_EXECUTION_FAILED for query=%r: %s", request.query, result.error)
-        body = AskResponse(
-            status=status.value,
-            answer=None,
-            sources=[],
-            citation_integrity=None,
-            message="Something went wrong processing this request.",
-        )
-        return JSONResponse(status_code=500, content=body.model_dump())
-
-    # STRUCTURED_DATA_UNAVAILABLE / STRUCTURED_DATA_FETCHED_NO_GENERATION /
-    # BOTH_PARTIAL are unreachable in V1 (source_route is never anything
-    # but AI_SEARCH here) — handled safely rather than silently presented
-    # as success, in case that ever changes.
-    logger.error("Unexpected HarnessStatus reached the V1 API: %s", status)
-    body = AskResponse(
-        status=status.value,
-        answer=None,
-        sources=[],
-        citation_integrity=None,
-        message="This request type is not supported yet.",
+    # Every remaining status is a failure (RAG_EXECUTION_FAILED,
+    # STRUCTURED_DATA_FAILED, STRUCTURED_DATA_UNAVAILABLE, and the legacy
+    # placeholder statuses). result.error is never exposed to the caller —
+    # only to server logs — and the public status stays the existing one.
+    logger.error("%s for query=%r: %s", status.value, request.query, result.error)
+    return _no_answer_response(
+        500, HarnessStatus.RAG_EXECUTION_FAILED.value, "Something went wrong processing this request."
     )
-    return JSONResponse(status_code=500, content=body.model_dump())
 
 
 # ---------------------------------------------------------------------------
