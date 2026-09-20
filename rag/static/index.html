@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doris</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="icon" type="image/png" href="/img/favicon.png">
+</head>
+<body>
+    <div class="header">
+        <img src="/img/logo.png" alt="Logotipo LH Nautical" style="height: 50px;">
+    </div>
+
+    <div class="chat-wrapper">
+        <div id="chat" class="chat-container">
+        </div>
+    </div>
+
+    <div class="input-area">
+        <form id="ask-form" class="input-container">
+            <input type="text" id="query-input" autocomplete="off" placeholder="Como posso ajudar hoje?">
+            <button type="submit" id="send-btn" class="action-btn">➤</button>
+            <button type="button" id="stop-btn" class="action-btn" style="font-size: 14px;">⏹</button>
+        </form>
+        <!-- Elementos restaurados para evitar a quebra do app.js -->
+        <div id="status-indicator" hidden>
+            <span id="status-text"></span>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+
+</body>
+</html>
