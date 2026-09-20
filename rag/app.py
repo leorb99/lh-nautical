@@ -89,7 +89,7 @@ if _mlflow_experiment_id:
 
 # Exactly once per process — never per request. See tracing.py; not
 # modified here, not reimplemented here.
-# enable_autolog()
+enable_autolog()
 
 
 # ---------------------------------------------------------------------------

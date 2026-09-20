@@ -134,19 +134,35 @@
 function renderResult(assistantEl, data) {
     assistantEl.innerHTML = '';
 
+    // Resposta que não deu pra entender como JSON (ex: página de login em
+    // HTML de um proxy de auth) — sem 'data' pra checar nada, é falha.
+    if (!data) {
+      renderFailure(assistantEl);
+      return;
+    }
+
     // 1. Se a API devolver 'answer', renderiza o sucesso (funciona para RAG e SQL)
     if (data.answer) {
       renderSuccess(assistantEl, data);
       return;
     }
 
-    // 2. Se não há resposta, mas existe 'message' (ex: sem dados ou não suportado)
+    // 2. Falha real do backend não é a mesma coisa que "sem evidência" —
+    //    RAG_EXECUTION_FAILED também vem com 'message', então esse check
+    //    precisa vir antes do genérico abaixo, ou os dois casos ficam
+    //    visualmente idênticos.
+    if (data.status === 'RAG_EXECUTION_FAILED') {
+      renderFailure(assistantEl);
+      return;
+    }
+
+    // 3. Se não há resposta, mas existe 'message' (ex: sem dados ou não suportado)
     if (data.message) {
       renderNeutral(assistantEl, data.message);
       return;
     }
 
-    // 3. Fallback para erros internos da API
+    // 4. Fallback para qualquer coisa que não bateu em nenhum caso acima
     renderFailure(assistantEl);
   }
 
