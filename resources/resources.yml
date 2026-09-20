@@ -122,7 +122,7 @@ resources:
       tasks:
         - task_key: "Demand_Forecast_Products"
           notebook_task:
-            notebook_path: ../src/ml/demand_forecast_store_product.ipynb
+            notebook_path: ../src/ml/demand_forecast_store_product_full.ipynb
             base_parameters:
               catalog_name: ${var.catalog_name}
               schema: gold
