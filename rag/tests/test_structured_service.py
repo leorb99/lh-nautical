@@ -197,7 +197,8 @@ def test_structured_package_hardcodes_no_environment_catalog():
     package = Path(__file__).resolve().parents[1] / "src" / "structured"
     for path in package.glob("*.py"):
         text = path.read_text(encoding="utf-8")
-        assert "prod_lh_nautical" not in text, path.name
+        # The forecast model's output lives in the prod catalog; the registry is the ONLY place that says so.
+        assert text.count("prod_lh_nautical") == (1 if path.name == "semantic_model.py" else 0), path.name
         assert "dev_natalia" not in text, path.name
 
 

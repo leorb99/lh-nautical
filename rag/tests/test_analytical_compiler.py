@@ -340,8 +340,26 @@ def test_year_over_year_compares_with_the_same_period_of_the_previous_year():
 # ---------------------------------------------------------------------------
 
 
+_REQUIRED_FILTER_FIELD = {
+    FilterKind.PRODUCT_TEXT: "product_text",
+    FilterKind.CATEGORY_TEXT: "category_text",
+    FilterKind.LOCATION_TEXT: "location_text",
+}
+
+
 def _all_valid_requests():
-    yield from _enumerate_requests()
+    """Every valid combination; a metric that requires filters (a forecast is for one product in one
+    store) gets them, otherwise it would rightly be refused."""
+    import dataclasses
+
+    for request in _enumerate_requests():
+        required = METRICS[request.metric].required_filters
+        if required:
+            request = dataclasses.replace(
+                request,
+                filters=dataclasses.replace(request.filters, **{_REQUIRED_FILTER_FIELD[kind]: "Nome Teste" for kind in required}),
+            )
+        yield request
 
 
 def _enumerate_requests():
@@ -391,7 +409,11 @@ def test_every_valid_request_compiles_to_safe_sql(request_):
     tables = re.findall(r"(?:FROM|JOIN) ([\w.]+)", statement)
     referenced = {t.split(".")[-1] for t in tables if t.startswith(f"{CATALOG}.{SCHEMA}.")}
     assert referenced <= ALLOWED_TABLES
-    assert all(t.startswith(f"{CATALOG}.{SCHEMA}.") or t in ("orders", "anchor", "periods", "grouped", "ranked") for t in tables)
+    # a fact may name its own home (the forecast model's output), and the official-window CTEs are local names
+    fact = FACTS[METRICS[request_.metric].fact]
+    own = f"{fact.catalog}.{fact.schema}." if fact.catalog else f"{CATALOG}.{SCHEMA}."
+    local = ("orders", "anchor", "periods", "grouped", "ranked", "bounds", "matched", "eligible")
+    assert all(t.startswith(f"{CATALOG}.{SCHEMA}.") or t.startswith(own) or t in local for t in tables)
     # result shape is fully described, and named in the SQL
     assert query.columns
     for column in query.columns:

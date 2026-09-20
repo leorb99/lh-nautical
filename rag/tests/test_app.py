@@ -416,6 +416,36 @@ def test_both_degraded_keeps_the_structured_values_with_no_sources(client, monke
     assert "internal detail" not in resp.text  # logged server-side only
 
 
+def test_a_missing_p85_forecast_uses_its_own_message_with_the_same_status_and_shape(client, monkeypatch):
+    from src.structured.analytical_request import AnalyticalRequest, RequestFilters
+    from src.structured.models import StructuredIntent, StructuredResult
+    from src.structured.semantic_model import Dimension, Metric, Operation
+
+    request = AnalyticalRequest(
+        Metric.DEMAND_FORECAST_P85, Operation.BREAKDOWN, (Dimension.FORECAST_MONTH,),
+        RequestFilters(product_text="Colete Salva-Vidas 2374", location_text="Loja Leão"),
+    )
+    structured = StructuredResult(
+        intent=StructuredIntent.ANALYTICS, rows=(), row_count=0, source_tables=(), catalog="c", request=request
+    )
+    result = HarnessResult(
+        query="q", source_route=SourceRoute.STRUCTURED_DATA, status=HarnessStatus.STRUCTURED_DATA_NO_DATA,
+        rag_result=None, structured_result=structured,
+    )
+    _install_fake(monkeypatch, result)
+
+    resp = client.post("/api/ask", json={"query": "q"})
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "status": "AI_SEARCH_NO_EVIDENCE",
+        "answer": None,
+        "sources": [],
+        "citation_integrity": None,
+        "message": "Não há previsão P85 disponível para esse produto nessa loja em todos os três meses solicitados.",
+    }
+
+
 def test_structured_no_data_uses_the_existing_no_evidence_response(client, monkeypatch):
     result = HarnessResult(
         query="q", source_route=SourceRoute.STRUCTURED_DATA, status=HarnessStatus.STRUCTURED_DATA_NO_DATA, rag_result=None

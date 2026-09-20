@@ -57,7 +57,11 @@ _TIME = frozenset(
     "passado passada dia dias ano anos desde ate apos depois antes durante entre verao inverno outono primavera natal "
     "feriado feriados janeiro fevereiro marco abril maio junho julho agosto setembro outubro novembro dezembro".split()
 )
-_VOCABULARY = _QUESTION | _HAVING | _STOCK | _ENTITIES | _RANKING | _FUNCTION | _TIME
+# Words of a forecast question ("qual a previsão de demanda do X na loja Y nos próximos 3 meses").
+_FORECAST = frozenset(
+    "previsao previsoes projecao prevista futura prever forecast demanda proximo proximos tres vamos vender".split()
+)
+_VOCABULARY = _QUESTION | _HAVING | _STOCK | _ENTITIES | _RANKING | _FUNCTION | _TIME | _FORECAST
 
 #: Words that may sit *inside* a name ("motor de popa", "armazem de santos").
 _CONNECTORS = frozenset({"de", "do", "da", "dos", "das"})

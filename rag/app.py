@@ -42,6 +42,7 @@ from src.harness.tracing import enable_autolog, traced_ask
 from src.orchestration.rag_pipeline import RagOrchestrator
 from src.structured.config import StructuredDataConfig
 from src.structured.executor import DatabricksSqlExecutor
+from src.structured.rendering import no_data_message
 from src.structured.service import StructuredQueryService
 
 logger = logging.getLogger("rag.app")
@@ -223,9 +224,9 @@ def ask(request: AskRequest) -> JSONResponse:
         return _answer_response(result.answer, [])
 
     if status in (HarnessStatus.AI_SEARCH_NO_EVIDENCE, HarnessStatus.STRUCTURED_DATA_NO_DATA):
-        return _no_answer_response(
-            200, HarnessStatus.AI_SEARCH_NO_EVIDENCE.value, "No relevant information was found for this question."
-        )
+        # A structured metric may have its own wording (a forecast without complete P85 coverage); same status.
+        message = no_data_message(result.structured_result) or "No relevant information was found for this question."
+        return _no_answer_response(200, HarnessStatus.AI_SEARCH_NO_EVIDENCE.value, message)
 
     if status is HarnessStatus.STRUCTURED_DATA_UNSUPPORTED:
         logger.info("Unsupported structured request for query=%r: %s", request.query, result.error)

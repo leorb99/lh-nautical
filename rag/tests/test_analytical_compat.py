@@ -101,9 +101,12 @@ SNAPSHOT_METRICS = [m for m, d in METRICS.items() if d.snapshot]
 def _valid_snapshot_request(metric, **kwargs) -> AnalyticalRequest:
     """A structurally valid request for the metric (so a refusal can only be
     about the time capability that is added on top)."""
-    if Operation.AGGREGATE in METRICS[metric].operations:
+    definition = METRICS[metric]
+    if Operation.AGGREGATE in definition.operations:
         return _req(metric, **kwargs)
-    return _req(metric, Operation.RANKING, [Dimension.PRODUCT], **kwargs)
+    if Operation.RANKING in definition.operations:
+        return _req(metric, Operation.RANKING, [Dimension.PRODUCT], **kwargs)
+    return _req(metric, Operation.BREAKDOWN, [next(iter(definition.dimensions))], **kwargs)  # e.g. a forecast series
 
 
 def test_there_are_inventory_and_customer_snapshot_metrics():

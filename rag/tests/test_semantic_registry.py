@@ -100,6 +100,9 @@ def test_all_p0_metrics_are_registered():
 def test_every_metric_names_the_power_bi_measure_it_mirrors_and_that_measure_exists():
     document = PBI_DOC.read_text(encoding="utf-8")
     for metric, definition in METRICS.items():
+        if definition.family is MetricFamily.FORECAST:
+            assert not definition.pbi_source, metric  # a model output, not a Power BI measure
+            continue
         measure = definition.pbi_source.split(" = ")[0].strip()
         assert measure, metric
         assert measure in document, f"{metric.value}: Power BI measure {measure!r} not found in the semantic document"
@@ -147,7 +150,7 @@ def test_metric_families_and_facts_are_consistent():
     for metric, definition in METRICS.items():
         assert definition.fact in FACTS, metric
         assert isinstance(definition.family, MetricFamily)
-    assert {METRICS[m].family for m in P0_METRICS} == set(MetricFamily)
+    assert {METRICS[m].family for m in P0_METRICS} == set(MetricFamily) - {MetricFamily.FORECAST}  # forecast is not a P0 measure
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +170,8 @@ def test_filters_are_backed_by_a_binding_or_a_date_column():
         for kind in definition.filters:
             if kind is FilterKind.DATE_RANGE:
                 assert fact.date_column and not definition.snapshot, metric
+            elif kind in fact.text_columns:
+                assert kind in TEXT_FILTERS  # read straight from a column of the fact, no join
             elif kind in TEXT_FILTERS:
                 assert TEXT_FILTERS[kind].dimension in fact.bindings, (metric, kind)
             else:
@@ -304,16 +309,51 @@ def test_the_gold_yaml_is_available_for_the_checks_below():
     assert {"fct_sales", "dim_products", "agg_customer_rfm", "fct_current_inventory"} <= set(GOLD)
 
 
+# The one fact that is NOT a dbt Gold model: the output of the product x store demand model (written
+# by a notebook, in the prod catalog). Its columns are the contract checked below (DESCRIBE of the table).
+FORECAST_TABLE_COLUMNS = {
+    "product_name", "location_name", "month_start", "demand_forcast", "unit_demand_forcast",
+    "model_name", "model_version", "generated_at",
+}
+
+
+def _external_facts():
+    return {key for key, fact in FACTS.items() if fact.catalog is not None}
+
+
+def test_only_the_forecast_fact_lives_outside_the_gold_models_and_says_where():
+    assert _external_facts() == {"demand_forecast"}
+    fact = FACTS["demand_forecast"]
+    assert (fact.catalog, fact.schema, fact.table) == ("prod_lh_nautical", "gold", "demand_forecast_rolling_3m")
+    for other in set(FACTS) - {"demand_forecast"}:
+        assert FACTS[other].catalog is None and FACTS[other].schema is None, other  # they keep using DATA_CATALOG
+
+
 def test_every_registered_table_is_a_gold_model():
     for fact in FACTS.values():
+        if fact.catalog is not None:
+            continue  # external model output, see FORECAST_TABLE_COLUMNS
         assert fact.table in GOLD, fact.table
         for binding in fact.bindings.values():
             if binding.join is not None:
                 assert binding.join.table in GOLD, binding.join.table
 
 
+def test_the_forecast_fact_references_only_columns_of_the_forecast_table():
+    fact = FACTS["demand_forecast"]
+    fragments = list(fact.text_columns.values()) + [c.expr for b in fact.bindings.values() for c in b.columns]
+    spec = fact.official_window
+    fragments += [f"{fact.alias}.{c}" for c in (*spec.series_columns, spec.month_column, spec.version_column, spec.generated_at_column, spec.value_column)]
+    fragments += [d.aggregate for d in METRICS.values() if d.fact == "demand_forecast"]
+    for fragment in fragments:
+        for alias, column in _column_references(fragment):
+            assert alias == fact.alias and column in FORECAST_TABLE_COLUMNS, (fragment, alias, column)
+
+
 def test_every_column_referenced_by_the_registry_exists_in_gold():
     for fact in FACTS.values():
+        if fact.catalog is not None:
+            continue  # checked against FORECAST_TABLE_COLUMNS above
         alias_tables = {fact.alias: fact.table}
         fragments: list[str] = list(fact.base_predicates) + list(fact.as_of_predicates) + ([fact.date_column] if fact.date_column else [])
         for binding in fact.bindings.values():
